@@ -3,6 +3,7 @@ import unittest
 import vtk, qt, ctk, slicer
 from slicer.ScriptedLoadableModule import *
 import logging
+import tempfile
 
 #
 # VentriculostomyPlanning
@@ -16,9 +17,9 @@ class VentriculostomyPlanning(ScriptedLoadableModule):
   def __init__(self, parent):
     ScriptedLoadableModule.__init__(self, parent)
     self.parent.title = "VentriculostomyPlanning" # TODO make this more human readable by adding spaces
-    self.parent.categories = ["Junichi Tokuda (BWH)"]
+    self.parent.categories = ["IGT"]
     self.parent.dependencies = []
-    self.parent.contributors = ["IGT"] # replace with "Firstname Lastname (Organization)"
+    self.parent.contributors = ["Junichi Tokuda (BWH)"] # replace with "Firstname Lastname (Organization)"
     self.parent.helpText = """
     This is an example of scripted loadable module bundled in an extension.
     It performs a simple thresholding on the input volume and optionally captures a screenshot.
@@ -75,18 +76,34 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     #
     # input volume selector
     #
-    self.inputSelector = slicer.qMRMLNodeComboBox()
-    self.inputSelector.nodeTypes = ["vtkMRMLScalarVolumeNode"]
-    self.inputSelector.selectNodeUponCreation = True
-    self.inputSelector.addEnabled = False
-    self.inputSelector.removeEnabled = False
-    self.inputSelector.noneEnabled = False
-    self.inputSelector.showHidden = False
-    self.inputSelector.showChildNodeTypes = False
-    self.inputSelector.setMRMLScene( slicer.mrmlScene )
-    self.inputSelector.setToolTip( "Pick the input to the algorithm." )
-    parametersFormLayout.addRow("Input Volume: ", self.inputSelector)
+    self.inputVolumeSelector = slicer.qMRMLNodeComboBox()
+    self.inputVolumeSelector.nodeTypes = ["vtkMRMLScalarVolumeNode"]
+    self.inputVolumeSelector.selectNodeUponCreation = True
+    self.inputVolumeSelector.addEnabled = False
+    self.inputVolumeSelector.removeEnabled = False
+    self.inputVolumeSelector.noneEnabled = False
+    self.inputVolumeSelector.showHidden = False
+    self.inputVolumeSelector.showChildNodeTypes = False
+    self.inputVolumeSelector.setMRMLScene( slicer.mrmlScene )
+    self.inputVolumeSelector.setToolTip( "Pick the input to the algorithm." )
+    parametersFormLayout.addRow("Input Volume: ", self.inputVolumeSelector)
 
+    #
+    # output volume selector
+    #
+    self.outputModelSelector = slicer.qMRMLNodeComboBox()
+    self.outputModelSelector.nodeTypes = ["vtkMRMLModelNode"]
+    self.outputModelSelector.selectNodeUponCreation = True
+    self.outputModelSelector.addEnabled = True
+    self.outputModelSelector.removeEnabled = True
+    self.outputModelSelector.noneEnabled = True
+    self.outputModelSelector.showHidden = False
+    self.outputModelSelector.showChildNodeTypes = False
+    self.outputModelSelector.setMRMLScene( slicer.mrmlScene )
+    self.outputModelSelector.setToolTip( "Pick the output to the algorithm." )
+    parametersFormLayout.addRow("Output Model: ", self.outputModelSelector)
+
+    
     #
     # output volume selector
     #
@@ -122,6 +139,14 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     parametersFormLayout.addRow("Enable Screenshots", self.enableScreenshotsFlagCheckBox)
 
     #
+    # Create Model Button
+    #
+    self.createModelButton = qt.QPushButton("Crete Model")
+    self.createModelButton.toolTip = "Create a surface model."
+    self.createModelButton.enabled = False
+    parametersFormLayout.addRow(self.createModelButton)
+
+    #
     # Apply Button
     #
     self.applyButton = qt.QPushButton("Apply")
@@ -129,9 +154,13 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.applyButton.enabled = False
     parametersFormLayout.addRow(self.applyButton)
 
+
+
     # connections
     self.applyButton.connect('clicked(bool)', self.onApplyButton)
-    self.inputSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
+    self.createModelButton.connect('clicked(bool)', self.onCreateModel)
+    self.inputVolumeSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
+    self.outputModelSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
     self.outputSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
 
     # Add vertical spacer
@@ -144,13 +173,21 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     pass
 
   def onSelect(self):
-    self.applyButton.enabled = self.inputSelector.currentNode() and self.outputSelector.currentNode()
-
+    self.applyButton.enabled = self.inputVolumeSelector.currentNode() and self.outputSelector.currentNode()
+    self.createModelButton.enabled =  self.inputVolumeSelector.currentNode() and self.outputModelSelector.currentNode()
+    
+    
   def onApplyButton(self):
     logic = VentriculostomyPlanningLogic()
     enableScreenshotsFlag = self.enableScreenshotsFlagCheckBox.checked
     imageThreshold = self.imageThresholdSliderWidget.value
-    logic.run(self.inputSelector.currentNode(), self.outputSelector.currentNode(), imageThreshold, enableScreenshotsFlag)
+    logic.run(self.inputVolumeSelector.currentNode(), self.outputSelector.currentNode(), imageThreshold, enableScreenshotsFlag)
+
+  def onCreateModel(self):
+    logic = VentriculostomyPlanningLogic()
+    threshold = -500.0
+    logic.createModel(self.inputVolumeSelector.currentNode(), self.outputModelSelector.currentNode(), threshold)
+    
 
   def onReload(self,moduleName="VentriculostomyPlanning"):
     """Generic reload method for any scripted module.
@@ -261,6 +298,137 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     return True
 
 
+  def createModel(self, inputVolumeNode, outputModelNode, thresholdValue):
+
+    Decimate = 0.25
+
+    if inputVolumeNode == None:
+      return
+    
+    inputImageData = inputVolumeNode.GetImageData()
+    threshold = vtk.vtkImageThreshold()
+    threshold.SetInputData(inputImageData)
+    threshold.ThresholdByLower(thresholdValue)
+    threshold.SetInValue(0)
+    threshold.SetOutValue(1)
+    threshold.ReleaseDataFlagOff()
+    threshold.Update()
+
+    cast = vtk.vtkImageCast()
+    cast.SetInputConnection(threshold.GetOutputPort())
+    cast.SetOutputScalarTypeToUnsignedChar()
+    cast.Update()
+
+    labelVolumeNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLLabelMapVolumeNode")
+    slicer.mrmlScene.AddNode(labelVolumeNode)
+    labelVolumeNode.SetName("Threshold")
+    labelVolumeNode.SetSpacing(inputVolumeNode.GetSpacing())
+    labelVolumeNode.SetOrigin(inputVolumeNode.GetOrigin())
+
+    matrix = vtk.vtkMatrix4x4()
+    inputVolumeNode.GetIJKToRASDirectionMatrix(matrix)
+    labelVolumeNode.SetIJKToRASDirectionMatrix(matrix)
+
+    labelImage = cast.GetOutput()
+    labelVolumeNode.SetAndObserveImageData(labelImage)
+
+    transformIJKtoRAS = vtk.vtkTransform()
+    matrix = vtk.vtkMatrix4x4()
+    labelVolumeNode.GetRASToIJKMatrix(matrix)
+    transformIJKtoRAS.SetMatrix(matrix)
+    transformIJKtoRAS.Inverse()
+
+    padder = vtk.vtkImageConstantPad()
+    padder.SetInputData(labelImage)
+    padder.SetConstant(0)
+    extent = labelImage.GetExtent()
+    padder.SetOutputWholeExtent(extent[0], extent[1] + 2,
+                                extent[2], extent[3] + 2,
+                                extent[4], extent[5] + 2)
+    
+    cubes = vtk.vtkDiscreteMarchingCubes()
+    cubes.SetInputConnection(padder.GetOutputPort())
+    cubes.GenerateValues(1, 1, 1)
+    cubes.Update()
+
+    smoother = vtk.vtkWindowedSincPolyDataFilter()
+    smoother.SetInputConnection(cubes.GetOutputPort())
+    smoother.SetNumberOfIterations(10)
+    smoother.BoundarySmoothingOff()
+    smoother.FeatureEdgeSmoothingOff()
+    smoother.SetFeatureAngle(120.0)
+    smoother.SetPassBand(0.001)
+    smoother.NonManifoldSmoothingOn()
+    smoother.NormalizeCoordinatesOn()
+    smoother.Update()
+
+    pthreshold = vtk.vtkThreshold()
+    pthreshold.SetInputConnection(smoother.GetOutputPort())
+    pthreshold.ThresholdBetween(1, 1); ## Label 1
+    pthreshold.ReleaseDataFlagOn();
+
+    geometryFilter = vtk.vtkGeometryFilter()
+    geometryFilter.SetInputConnection(pthreshold.GetOutputPort())
+    geometryFilter.ReleaseDataFlagOn()
+    
+    decimator = vtk.vtkDecimatePro()
+    decimator.SetInputConnection(geometryFilter.GetOutputPort())
+    decimator.SetFeatureAngle(60)
+    decimator.SplittingOff()
+    decimator.PreserveTopologyOn()
+    decimator.SetMaximumError(1)
+    decimator.SetTargetReduction(0.001)
+    decimator.ReleaseDataFlagOff()
+    decimator.Update()
+    
+    smootherPoly = vtk.vtkSmoothPolyDataFilter()
+    smootherPoly.SetRelaxationFactor(0.33)
+    smootherPoly.SetFeatureAngle(60)
+    smootherPoly.SetConvergence(0)
+
+    if transformIJKtoRAS.GetMatrix().Determinant() < 0:
+      reverser = vtk.vtkReverseSense()
+      reverser.SetInputConnection(decimator.GetOutputPort())
+      reverser.ReverseNormalsOn();
+      reverser.ReleaseDataFlagOn();
+      smootherPoly.SetInputConnection(reverser.GetOutputPort())
+    else:
+      smootherPoly.SetInputConnection(decimator.GetOutputPort())
+
+    Smooth = 10
+    smootherPoly.SetNumberOfIterations(Smooth)
+    smootherPoly.FeatureEdgeSmoothingOff()
+    smootherPoly.BoundarySmoothingOff()
+    smootherPoly.ReleaseDataFlagOn()
+    smootherPoly.Update()
+
+    transformer = vtk.vtkTransformPolyDataFilter()
+    transformer.SetInputConnection(smootherPoly.GetOutputPort())
+    transformer.SetTransform(transformIJKtoRAS)
+    transformer.ReleaseDataFlagOn()
+    transformer.Update()
+    
+    normals = vtk.vtkPolyDataNormals()
+    normals.SetInputConnection(transformer.GetOutputPort())
+    normals.SetFeatureAngle(60)
+    normals.SetSplitting(True)
+    normals.ReleaseDataFlagOn()
+    
+    stripper = vtk.vtkStripper()
+    stripper.SetInputConnection(normals.GetOutputPort())
+    stripper.ReleaseDataFlagOff()
+    stripper.Update()
+    
+    outputModel = stripper.GetOutput()
+    outputModelNode.SetAndObservePolyData(outputModel)
+
+    modelDisplayNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelDisplayNode")
+    ModelColor = [0.0, 0.0, 1.0]
+    modelDisplayNode.SetColor(ModelColor)
+    slicer.mrmlScene.AddNode(modelDisplayNode)
+    outputModelNode.SetAndObserveDisplayNodeID(modelDisplayNode.GetID())
+
+  
 class VentriculostomyPlanningTest(ScriptedLoadableModuleTest):
   """
   This is the test case for your scripted module.
