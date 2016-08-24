@@ -291,6 +291,11 @@ class CurveManager:
     
     self.cmLogic.updateCurve()
 
+    # Make slice intersetion visible
+    dnode = self.curveModel.GetDisplayNode()
+    if dnode:
+      dnode.SetSliceIntersectionVisibility(1)
+    
   def startEditLine(self):
 
     if self.curveFiducials == None:
