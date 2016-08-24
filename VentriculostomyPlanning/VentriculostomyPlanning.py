@@ -4,6 +4,7 @@ import vtk, qt, ctk, slicer
 from slicer.ScriptedLoadableModule import *
 import logging
 import tempfile
+import CurveMaker
 
 #
 # VentriculostomyPlanning
@@ -41,6 +42,8 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
   def setup(self):
     ScriptedLoadableModuleWidget.setup(self)
 
+    self.logic = VentriculostomyPlanningLogic()
+        
     # Instantiate and connect widgets ...
 
     ####################
@@ -73,6 +76,43 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     # Layout within the dummy collapsible button
     parametersFormLayout = qt.QFormLayout(parametersCollapsibleButton)
 
+    #
+    # Mid-sagittal line
+    #
+    sagittalLineLayout = qt.QHBoxLayout()
+
+    #-- Curve length
+    self.lengthSagittalLineEdit = qt.QLineEdit()
+    self.lengthSagittalLineEdit.text = '--'
+    self.lengthSagittalLineEdit.readOnly = True
+    self.lengthSagittalLineEdit.frame = True
+    self.lengthSagittalLineEdit.styleSheet = "QLineEdit { background:transparent; }"
+    self.lengthSagittalLineEdit.cursor = qt.QCursor(qt.Qt.IBeamCursor)
+    sagittalLineLayout.addWidget(self.lengthSagittalLineEdit)
+    lengthSagittalLineUnitLabel = qt.QLabel('mm  ')
+    sagittalLineLayout.addWidget(lengthSagittalLineUnitLabel)
+
+    #-- Add Point
+    self.addPointForSagittalLineButton = qt.QPushButton("Add Points")
+    self.addPointForSagittalLineButton.toolTip = "Add points for mid-sagittal line"
+    self.addPointForSagittalLineButton.enabled = True
+    self.addPointForSagittalLineButton.checkable = True    
+    sagittalLineLayout.addWidget(self.addPointForSagittalLineButton)
+
+    #-- Clear Point
+    self.clearPointForSagittalLineButton = qt.QPushButton("Clear")
+    self.clearPointForSagittalLineButton.toolTip = "Remove all points for mid-sagittal line"
+    self.clearPointForSagittalLineButton.enabled = True
+    sagittalLineLayout.addWidget(self.clearPointForSagittalLineButton)
+
+    parametersFormLayout.addRow("Mid-Sagittal Line:", sagittalLineLayout)
+    
+    #
+    # Coronal line
+    #
+
+
+    
     #
     # input volume selector
     #
@@ -159,6 +199,9 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     # connections
     self.applyButton.connect('clicked(bool)', self.onApplyButton)
     self.createModelButton.connect('clicked(bool)', self.onCreateModel)
+    self.addPointForSagittalLineButton.connect('toggled(bool)', self.onEditSagittalLine)
+    self.clearPointForSagittalLineButton.connect('clicked(bool)', self.onClearSagittalLine)
+    
     self.inputVolumeSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
     self.outputModelSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
     self.outputSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
@@ -178,23 +221,108 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     
     
   def onApplyButton(self):
-    logic = VentriculostomyPlanningLogic()
     enableScreenshotsFlag = self.enableScreenshotsFlagCheckBox.checked
     imageThreshold = self.imageThresholdSliderWidget.value
-    logic.run(self.inputVolumeSelector.currentNode(), self.outputSelector.currentNode(), imageThreshold, enableScreenshotsFlag)
+    self.logic.run(self.inputVolumeSelector.currentNode(), self.outputSelector.currentNode(), imageThreshold, enableScreenshotsFlag)
 
   def onCreateModel(self):
-    logic = VentriculostomyPlanningLogic()
+    #logic = VentriculostomyPlanningLogic()
     threshold = -500.0
-    logic.createModel(self.inputVolumeSelector.currentNode(), self.outputModelSelector.currentNode(), threshold)
-    
+    self.logic.createModel(self.inputVolumeSelector.currentNode(), self.outputModelSelector.currentNode(), threshold)
 
+  def onEditSagittalLine(self, switch):
+
+    if switch == True:
+      self.logic.startEditSagittalLine()
+    else:
+      self.logic.endEditSagittalLine()
+
+  def onClearSagittalLine(self):
+    
+    self.logic.clearSagittalLine()
+      
   def onReload(self,moduleName="VentriculostomyPlanning"):
     """Generic reload method for any scripted module.
     ModuleWizard will subsitute correct default moduleName.
     """
     globals()[moduleName] = slicer.util.reloadScriptedModule(moduleName)
+
+
+class CurveManager:
+  
+  def __init__(self):
+    self.cmLogic = CurveMaker.CurveMakerLogic()
+    self.curveFiducials = None
+    self.curveModel = None
+
+    self.curveName = ""
+    self.curveModelName = ""
+
+  def setName(self, name):
+    self.curveName = name
+    self.curveModelName = "%s-Model" % (name)
+
+  def onLineSourceUpdated(self,caller,event):
     
+    self.cmLogic.updateCurve()
+
+  def startEditLine(self):
+
+    if self.curveFiducials == None:
+      self.curveFiducials = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
+      self.curveFiducials.SetName(self.curveName)
+      slicer.mrmlScene.AddNode(self.curveFiducials)
+      
+    if self.curveModel == None:
+      self.curveModel = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
+      self.curveModel.SetName(self.curveModelName)
+      slicer.mrmlScene.AddNode(self.curveModel)
+
+    self.cmLogic.DestinationNode = self.curveModel
+    self.cmLogic.SourceNode = self.curveFiducials
+    self.cmLogic.SourceNode.SetAttribute('CurveMaker.CurveModel', self.cmLogic.DestinationNode.GetID())
+    self.cmLogic.updateCurve()
+
+    self.cmLogic.CurvePoly = vtk.vtkPolyData() ## For CurveMaker bug
+    self.cmLogic.enableAutomaticUpdate(1)
+    self.cmLogic.setInterpolationMethod(1)
+    self.cmLogic.setTubeRadius(1.0)
+
+    self.tagSourceNode = self.cmLogic.SourceNode.AddObserver('ModifiedEvent', self.onLineSourceUpdated)
+
+    #self.tagDestinationNode = self.logic.DestinationNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.onModelModifiedEvent)
+    #self.tagDestinationDispNode = self.logic.DestinationNode.GetDisplayNode().AddObserver(vtk.vtkCommand.ModifiedEvent, self.onModelDisplayModifiedEvent)
+    #self.logic.DestinationNode.RemoveObserver(self.tagDestinationNode)
+    #self.logic.DestinationNode.GetDisplayNode().RemoveObserver(self.tagDestinationDispNode)    
+
+    selectionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSelectionNodeSingleton")
+    interactionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLInteractionNodeSingleton")
+    if (selectionNode == None) or (interactionNode == None):
+      return
+
+    selectionNode.SetReferenceActivePlaceNodeClassName("vtkMRMLMarkupsFiducialNode");
+    selectionNode.SetActivePlaceNodeID(self.curveFiducials.GetID())
+
+    interactionNode.SwitchToPersistentPlaceMode()
+    interactionNode.SetCurrentInteractionMode(slicer.vtkMRMLInteractionNode.Place)
+
+
+  def endEditLine(self):
+
+    #self.cmLogic.enableAutomaticUpdate(0)
+    interactionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLInteractionNodeSingleton")
+    interactionNode.SetCurrentInteractionMode(slicer.vtkMRMLInteractionNode.ViewTransform)  ## Turn off
+
+    #if self.cmLogic.SourceNode:
+    #  self.cmLogic.SourceNode.RemoveObserver(self.tagSourceNode)
+    #  self.cmLogic.SourceNode = None
+    #
+    #if self.cmLogic.DestinationNode:
+    #  self.cmLogic.DestinationNode = None
+      
+  def clearLine(self):
+    if self.curveFiducials:
+      self.curveFiducials.RemoveAllMarkups()
 
 #
 # VentriculostomyPlanningLogic
@@ -210,6 +338,11 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
   https://github.com/Slicer/Slicer/blob/master/Base/Python/slicer/ScriptedLoadableModule.py
   """
 
+  def __init__(self):
+    
+    self.sagittalCurveManager = CurveManager()
+    
+    
   def hasImageData(self,volumeNode):
     """This is an example logic method that
     returns true if the passed in volume
@@ -237,43 +370,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       return False
     return True
 
-  def takeScreenshot(self,name,description,type=-1):
-    # show the message even if not taking a screen shot
-    slicer.util.delayDisplay('Take screenshot: '+description+'.\nResult is available in the Annotations module.', 3000)
-
-    lm = slicer.app.layoutManager()
-    # switch on the type to get the requested window
-    widget = 0
-    if type == slicer.qMRMLScreenShotDialog.FullLayout:
-      # full layout
-      widget = lm.viewport()
-    elif type == slicer.qMRMLScreenShotDialog.ThreeD:
-      # just the 3D window
-      widget = lm.threeDWidget(0).threeDView()
-    elif type == slicer.qMRMLScreenShotDialog.Red:
-      # red slice window
-      widget = lm.sliceWidget("Red")
-    elif type == slicer.qMRMLScreenShotDialog.Yellow:
-      # yellow slice window
-      widget = lm.sliceWidget("Yellow")
-    elif type == slicer.qMRMLScreenShotDialog.Green:
-      # green slice window
-      widget = lm.sliceWidget("Green")
-    else:
-      # default to using the full window
-      widget = slicer.util.mainWindow()
-      # reset the type so that the node is set correctly
-      type = slicer.qMRMLScreenShotDialog.FullLayout
-
-    # grab and convert to vtk image data
-    qpixMap = qt.QPixmap().grabWidget(widget)
-    qimage = qpixMap.toImage()
-    imageData = vtk.vtkImageData()
-    slicer.qMRMLUtils().qImageToVtkImageData(qimage,imageData)
-
-    annotationLogic = slicer.modules.annotations.logic()
-    annotationLogic.CreateSnapShot(name, description, type, 1, imageData)
-
+  
   def run(self, inputVolume, outputVolume, imageThreshold, enableScreenshots=0):
     """
     Run the actual algorithm
@@ -297,7 +394,25 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
 
     return True
 
+  #def onSagittalLineSourceUpdated(self,caller,event):
+  #  
+  #  self.cmSagittalLogic.updateCurve()
+    
+    
+  def startEditSagittalLine(self):
 
+    self.sagittalCurveManager.startEditLine()
+    
+    
+  def endEditSagittalLine(self):
+
+    self.sagittalCurveManager.endEditLine()
+
+  def clearSagittalLine(self):
+    
+    self.sagittalCurveManager.clearLine()
+
+    
   def createModel(self, inputVolumeNode, outputModelNode, thresholdValue):
 
     Decimate = 0.25
