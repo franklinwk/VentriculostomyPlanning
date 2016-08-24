@@ -206,6 +206,8 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.outputModelSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
     self.outputSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
 
+    self.logic.setSagittalLineModifiedEventHandler(self.onSagittalLineModified)
+    
     # Add vertical spacer
     self.layout.addStretch(1)
 
@@ -240,7 +242,10 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
   def onClearSagittalLine(self):
     
     self.logic.clearSagittalLine()
-      
+
+  def onSagittalLineModified(self, caller, event):
+    self.lengthSagittalLineEdit.text = '%.2f' % self.logic.getSagittalLineLength()
+    
   def onReload(self,moduleName="VentriculostomyPlanning"):
     """Generic reload method for any scripted module.
     ModuleWizard will subsitute correct default moduleName.
@@ -258,9 +263,29 @@ class CurveManager:
     self.curveName = ""
     self.curveModelName = ""
 
+    self.tagEventExternal = None
+
   def setName(self, name):
     self.curveName = name
     self.curveModelName = "%s-Model" % (name)
+
+  def setModifiedEventHandler(self, handler):
+
+    self.externalHandler = handler
+    
+    if self.curveModel:
+      self.tagEventExternal = self.curveModel.AddObserver(vtk.vtkCommand.ModifiedEvent, self.externalHandler)
+      return self.tagEventExternal
+    else:
+      return None
+
+  def resetModifiedEventHandle(self):
+    
+    if self.curveModel and self.tagEventExternal:
+      self.curveModel.RemoveObserver(self.tagEventExternal)
+
+    self.externalHandler = None
+    self.tagEventExternal = None
 
   def onLineSourceUpdated(self,caller,event):
     
@@ -278,6 +303,10 @@ class CurveManager:
       self.curveModel.SetName(self.curveModelName)
       slicer.mrmlScene.AddNode(self.curveModel)
 
+    # Set exetrnal handler, if it has not been.
+    if self.tagEventExternal == None and self.externalHandler:
+      self.tagEventExternal = self.curveModel.AddObserver(vtk.vtkCommand.ModifiedEvent, self.externalHandler)
+      
     self.cmLogic.DestinationNode = self.curveModel
     self.cmLogic.SourceNode = self.curveFiducials
     self.cmLogic.SourceNode.SetAttribute('CurveMaker.CurveModel', self.cmLogic.DestinationNode.GetID())
@@ -324,6 +353,10 @@ class CurveManager:
     if self.curveFiducials:
       self.curveFiducials.RemoveAllMarkups()
 
+
+  def getLength(self):
+    return self.cmLogic.CurveLength
+
 #
 # VentriculostomyPlanningLogic
 #
@@ -341,7 +374,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
   def __init__(self):
     
     self.sagittalCurveManager = CurveManager()
-    
+    self.sagittalCurveManager.setName('SAG1')
     
   def hasImageData(self,volumeNode):
     """This is an example logic method that
@@ -411,6 +444,13 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
   def clearSagittalLine(self):
     
     self.sagittalCurveManager.clearLine()
+
+  def setSagittalLineModifiedEventHandler(self, handler):
+
+    self.sagittalCurveManager.setModifiedEventHandler(handler)
+
+  def getSagittalLineLength(self):
+    return self.sagittalCurveManager.getLength()
 
     
   def createModel(self, inputVolumeNode, outputModelNode, thresholdValue):
