@@ -67,14 +67,14 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     ####################
 
     #
-    # Parameters Area
+    # Lines Area
     #
-    parametersCollapsibleButton = ctk.ctkCollapsibleButton()
-    parametersCollapsibleButton.text = "Parameters"
-    self.layout.addWidget(parametersCollapsibleButton)
+    linesCollapsibleButton = ctk.ctkCollapsibleButton()
+    linesCollapsibleButton.text = "Lines"
+    self.layout.addWidget(linesCollapsibleButton)
 
     # Layout within the dummy collapsible button
-    parametersFormLayout = qt.QFormLayout(parametersCollapsibleButton)
+    linesFormLayout = qt.QFormLayout(linesCollapsibleButton)
 
     #
     # Mid-sagittal line
@@ -105,108 +105,103 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.clearPointForSagittalLineButton.enabled = True
     sagittalLineLayout.addWidget(self.clearPointForSagittalLineButton)
 
-    parametersFormLayout.addRow("Mid-Sagittal Line:", sagittalLineLayout)
-    
+    linesFormLayout.addRow("Mid-Sagittal Line:", sagittalLineLayout)
+
+
     #
     # Coronal line
     #
+    coronalLineLayout = qt.QHBoxLayout()
 
+    #-- Curve length
+    self.lengthCoronalLineEdit = qt.QLineEdit()
+    self.lengthCoronalLineEdit.text = '--'
+    self.lengthCoronalLineEdit.readOnly = True
+    self.lengthCoronalLineEdit.frame = True
+    self.lengthCoronalLineEdit.styleSheet = "QLineEdit { background:transparent; }"
+    self.lengthCoronalLineEdit.cursor = qt.QCursor(qt.Qt.IBeamCursor)
+    coronalLineLayout.addWidget(self.lengthCoronalLineEdit)
+    lengthCoronalLineUnitLabel = qt.QLabel('mm  ')
+    coronalLineLayout.addWidget(lengthCoronalLineUnitLabel)
 
+    #-- Add Point
+    self.addPointForCoronalLineButton = qt.QPushButton("Add Points")
+    self.addPointForCoronalLineButton.toolTip = "Add points for coronal line"
+    self.addPointForCoronalLineButton.enabled = True
+    self.addPointForCoronalLineButton.checkable = True    
+    coronalLineLayout.addWidget(self.addPointForCoronalLineButton)
+
+    #-- Clear Point
+    self.clearPointForCoronalLineButton = qt.QPushButton("Clear")
+    self.clearPointForCoronalLineButton.toolTip = "Remove all points for coronal line"
+    self.clearPointForCoronalLineButton.enabled = True
+    coronalLineLayout.addWidget(self.clearPointForCoronalLineButton)
+
+    linesFormLayout.addRow("Coronal Line:", coronalLineLayout)
     
-    #
-    # input volume selector
-    #
-    self.inputVolumeSelector = slicer.qMRMLNodeComboBox()
-    self.inputVolumeSelector.nodeTypes = ["vtkMRMLScalarVolumeNode"]
-    self.inputVolumeSelector.selectNodeUponCreation = True
-    self.inputVolumeSelector.addEnabled = False
-    self.inputVolumeSelector.removeEnabled = False
-    self.inputVolumeSelector.noneEnabled = False
-    self.inputVolumeSelector.showHidden = False
-    self.inputVolumeSelector.showChildNodeTypes = False
-    self.inputVolumeSelector.setMRMLScene( slicer.mrmlScene )
-    self.inputVolumeSelector.setToolTip( "Pick the input to the algorithm." )
-    parametersFormLayout.addRow("Input Volume: ", self.inputVolumeSelector)
 
+    ## PatientModel Area
+    ##
+    #patientModelCollapsibleButton = ctk.ctkCollapsibleButton()
+    #patientModelCollapsibleButton.text = "Patient Model"
+    #self.layout.addWidget(patientModelCollapsibleButton)
     #
-    # output volume selector
+    ## Layout within the dummy collapsible button
+    #patientModelFormLayout = qt.QFormLayout(patientModelCollapsibleButton)
     #
-    self.outputModelSelector = slicer.qMRMLNodeComboBox()
-    self.outputModelSelector.nodeTypes = ["vtkMRMLModelNode"]
-    self.outputModelSelector.selectNodeUponCreation = True
-    self.outputModelSelector.addEnabled = True
-    self.outputModelSelector.removeEnabled = True
-    self.outputModelSelector.noneEnabled = True
-    self.outputModelSelector.showHidden = False
-    self.outputModelSelector.showChildNodeTypes = False
-    self.outputModelSelector.setMRMLScene( slicer.mrmlScene )
-    self.outputModelSelector.setToolTip( "Pick the output to the algorithm." )
-    parametersFormLayout.addRow("Output Model: ", self.outputModelSelector)
-
-    
+    ##
+    ## input volume selector
+    ##
+    #self.inputVolumeSelector = slicer.qMRMLNodeComboBox()
+    #self.inputVolumeSelector.nodeTypes = ["vtkMRMLScalarVolumeNode"]
+    #self.inputVolumeSelector.selectNodeUponCreation = True
+    #self.inputVolumeSelector.addEnabled = False
+    #self.inputVolumeSelector.removeEnabled = False
+    #self.inputVolumeSelector.noneEnabled = False
+    #self.inputVolumeSelector.showHidden = False
+    #self.inputVolumeSelector.showChildNodeTypes = False
+    #self.inputVolumeSelector.setMRMLScene( slicer.mrmlScene )
+    #self.inputVolumeSelector.setToolTip( "Pick the input to the algorithm." )
+    #patientModelFormLayout.addRow("Input Volume: ", self.inputVolumeSelector)
     #
-    # output volume selector
+    ##
+    ## output volume selector
+    ##
+    #self.outputModelSelector = slicer.qMRMLNodeComboBox()
+    #self.outputModelSelector.nodeTypes = ["vtkMRMLModelNode"]
+    #self.outputModelSelector.selectNodeUponCreation = True
+    #self.outputModelSelector.addEnabled = True
+    #self.outputModelSelector.removeEnabled = True
+    #self.outputModelSelector.noneEnabled = True
+    #self.outputModelSelector.showHidden = False
+    #self.outputModelSelector.showChildNodeTypes = False
+    #self.outputModelSelector.setMRMLScene( slicer.mrmlScene )
+    #self.outputModelSelector.setToolTip( "Pick the output to the algorithm." )
+    #patientModelFormLayout.addRow("Output Model: ", self.outputModelSelector)
     #
-    self.outputSelector = slicer.qMRMLNodeComboBox()
-    self.outputSelector.nodeTypes = ["vtkMRMLScalarVolumeNode"]
-    self.outputSelector.selectNodeUponCreation = True
-    self.outputSelector.addEnabled = True
-    self.outputSelector.removeEnabled = True
-    self.outputSelector.noneEnabled = True
-    self.outputSelector.showHidden = False
-    self.outputSelector.showChildNodeTypes = False
-    self.outputSelector.setMRMLScene( slicer.mrmlScene )
-    self.outputSelector.setToolTip( "Pick the output to the algorithm." )
-    parametersFormLayout.addRow("Output Volume: ", self.outputSelector)
-
     #
-    # threshold value
-    #
-    self.imageThresholdSliderWidget = ctk.ctkSliderWidget()
-    self.imageThresholdSliderWidget.singleStep = 0.1
-    self.imageThresholdSliderWidget.minimum = -100
-    self.imageThresholdSliderWidget.maximum = 100
-    self.imageThresholdSliderWidget.value = 0.5
-    self.imageThresholdSliderWidget.setToolTip("Set threshold value for computing the output image. Voxels that have intensities lower than this value will set to zero.")
-    parametersFormLayout.addRow("Image threshold", self.imageThresholdSliderWidget)
-
-    #
-    # check box to trigger taking screen shots for later use in tutorials
-    #
-    self.enableScreenshotsFlagCheckBox = qt.QCheckBox()
-    self.enableScreenshotsFlagCheckBox.checked = 0
-    self.enableScreenshotsFlagCheckBox.setToolTip("If checked, take screen shots for tutorials. Use Save Data to write them to disk.")
-    parametersFormLayout.addRow("Enable Screenshots", self.enableScreenshotsFlagCheckBox)
-
-    #
-    # Create Model Button
-    #
-    self.createModelButton = qt.QPushButton("Crete Model")
-    self.createModelButton.toolTip = "Create a surface model."
-    self.createModelButton.enabled = False
-    parametersFormLayout.addRow(self.createModelButton)
-
-    #
-    # Apply Button
-    #
-    self.applyButton = qt.QPushButton("Apply")
-    self.applyButton.toolTip = "Run the algorithm."
-    self.applyButton.enabled = False
-    parametersFormLayout.addRow(self.applyButton)
-
-
+    ##
+    ## Create Model Button
+    ##
+    #self.createModelButton = qt.QPushButton("Crete Model")
+    #self.createModelButton.toolTip = "Create a surface model."
+    #self.createModelButton.enabled = False
+    #patientModelFormLayout.addRow(self.createModelButton)
 
     # connections
-    self.applyButton.connect('clicked(bool)', self.onApplyButton)
-    self.createModelButton.connect('clicked(bool)', self.onCreateModel)
+    #self.createModelButton.connect('clicked(bool)', self.onCreateModel)
+    #self.inputVolumeSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
+    #self.outputModelSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
+
+    # Sagittal line
     self.addPointForSagittalLineButton.connect('toggled(bool)', self.onEditSagittalLine)
     self.clearPointForSagittalLineButton.connect('clicked(bool)', self.onClearSagittalLine)
-    
-    self.inputVolumeSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
-    self.outputModelSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
-    self.outputSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
-
     self.logic.setSagittalLineModifiedEventHandler(self.onSagittalLineModified)
+
+    # Coronal line
+    self.addPointForCoronalLineButton.connect('toggled(bool)', self.onEditCoronalLine)
+    self.clearPointForCoronalLineButton.connect('clicked(bool)', self.onClearCoronalLine)
+    self.logic.setCoronalLineModifiedEventHandler(self.onCoronalLineModified)
     
     # Add vertical spacer
     self.layout.addStretch(1)
@@ -218,23 +213,21 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     pass
 
   def onSelect(self):
-    self.applyButton.enabled = self.inputVolumeSelector.currentNode() and self.outputSelector.currentNode()
-    self.createModelButton.enabled =  self.inputVolumeSelector.currentNode() and self.outputModelSelector.currentNode()
+    #self.createModelButton.enabled =  self.inputVolumeSelector.currentNode() and self.outputModelSelector.currentNode()
+    pass
     
     
-  def onApplyButton(self):
-    enableScreenshotsFlag = self.enableScreenshotsFlagCheckBox.checked
-    imageThreshold = self.imageThresholdSliderWidget.value
-    self.logic.run(self.inputVolumeSelector.currentNode(), self.outputSelector.currentNode(), imageThreshold, enableScreenshotsFlag)
+  #def onCreateModel(self):
+  #  #logic = VentriculostomyPlanningLogic()
+  #  threshold = -500.0
+  #  self.logic.createModel(self.inputVolumeSelector.currentNode(), self.outputModelSelector.currentNode(), threshold)
 
-  def onCreateModel(self):
-    #logic = VentriculostomyPlanningLogic()
-    threshold = -500.0
-    self.logic.createModel(self.inputVolumeSelector.currentNode(), self.outputModelSelector.currentNode(), threshold)
 
+  # Event handlers for sagittal line
   def onEditSagittalLine(self, switch):
 
     if switch == True:
+      self.addPointForCoronalLineButton.checked = False
       self.logic.startEditSagittalLine()
     else:
       self.logic.endEditSagittalLine()
@@ -245,7 +238,29 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
 
   def onSagittalLineModified(self, caller, event):
     self.lengthSagittalLineEdit.text = '%.2f' % self.logic.getSagittalLineLength()
+
     
+  # Event handlers for coronal line
+  def onEditCoronalLine(self, switch):
+
+    if switch == True:
+      self.addPointForSagittalLineButton.checked = False
+      self.logic.startEditCoronalLine()
+    else:
+      self.logic.endEditCoronalLine()
+
+  def onClearCoronalLine(self):
+    
+    self.logic.clearCoronalLine()
+
+  def onCoronalLineModified(self, caller, event):
+    self.lengthCoronalLineEdit.text = '%.2f' % self.logic.getCoronalLineLength()
+    
+
+
+
+
+
   def onReload(self,moduleName="VentriculostomyPlanning"):
     """Generic reload method for any scripted module.
     ModuleWizard will subsitute correct default moduleName.
@@ -269,6 +284,16 @@ class CurveManager:
     self.curveName = name
     self.curveModelName = "%s-Model" % (name)
 
+  def setModelColor(self, r, g, b):
+
+    self.cmLogic.ModelColor = [r, g, b]
+    
+    # Make slice intersetion visible
+    if self.curveModel:
+      dnode = self.curveModel.GetDisplayNode()
+      if dnode:
+        dnode.SetColor([r, g, b])
+      
   def setModifiedEventHandler(self, handler):
 
     self.externalHandler = handler
@@ -292,9 +317,10 @@ class CurveManager:
     self.cmLogic.updateCurve()
 
     # Make slice intersetion visible
-    dnode = self.curveModel.GetDisplayNode()
-    if dnode:
-      dnode.SetSliceIntersectionVisibility(1)
+    if self.curveModel:
+      dnode = self.curveModel.GetDisplayNode()
+      if dnode:
+        dnode.SetSliceIntersectionVisibility(1)
     
   def startEditLine(self):
 
@@ -324,11 +350,6 @@ class CurveManager:
 
     self.tagSourceNode = self.cmLogic.SourceNode.AddObserver('ModifiedEvent', self.onLineSourceUpdated)
 
-    #self.tagDestinationNode = self.logic.DestinationNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.onModelModifiedEvent)
-    #self.tagDestinationDispNode = self.logic.DestinationNode.GetDisplayNode().AddObserver(vtk.vtkCommand.ModifiedEvent, self.onModelDisplayModifiedEvent)
-    #self.logic.DestinationNode.RemoveObserver(self.tagDestinationNode)
-    #self.logic.DestinationNode.GetDisplayNode().RemoveObserver(self.tagDestinationDispNode)    
-
     selectionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSelectionNodeSingleton")
     interactionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLInteractionNodeSingleton")
     if (selectionNode == None) or (interactionNode == None):
@@ -343,17 +364,9 @@ class CurveManager:
 
   def endEditLine(self):
 
-    #self.cmLogic.enableAutomaticUpdate(0)
     interactionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLInteractionNodeSingleton")
     interactionNode.SetCurrentInteractionMode(slicer.vtkMRMLInteractionNode.ViewTransform)  ## Turn off
-
-    #if self.cmLogic.SourceNode:
-    #  self.cmLogic.SourceNode.RemoveObserver(self.tagSourceNode)
-    #  self.cmLogic.SourceNode = None
-    #
-    #if self.cmLogic.DestinationNode:
-    #  self.cmLogic.DestinationNode = None
-      
+    
   def clearLine(self):
     if self.curveFiducials:
       self.curveFiducials.RemoveAllMarkups()
@@ -380,6 +393,9 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     
     self.sagittalCurveManager = CurveManager()
     self.sagittalCurveManager.setName('SAG1')
+    self.coronalCurveManager = CurveManager()
+    self.coronalCurveManager.setName('COR1')
+    self.coronalCurveManager.setModelColor(1.0, 0.0, 0.0)
     
   def hasImageData(self,volumeNode):
     """This is an example logic method that
@@ -394,53 +410,10 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       return False
     return True
 
-  def isValidInputOutputData(self, inputVolumeNode, outputVolumeNode):
-    """Validates if the output is not the same as input
-    """
-    if not inputVolumeNode:
-      logging.debug('isValidInputOutputData failed: no input volume node defined')
-      return False
-    if not outputVolumeNode:
-      logging.debug('isValidInputOutputData failed: no output volume node defined')
-      return False
-    if inputVolumeNode.GetID()==outputVolumeNode.GetID():
-      logging.debug('isValidInputOutputData failed: input and output volume is the same. Create a new volume for output to avoid this error.')
-      return False
-    return True
 
-  
-  def run(self, inputVolume, outputVolume, imageThreshold, enableScreenshots=0):
-    """
-    Run the actual algorithm
-    """
-
-    if not self.isValidInputOutputData(inputVolume, outputVolume):
-      slicer.util.errorDisplay('Input volume is the same as output volume. Choose a different output volume.')
-      return False
-
-    logging.info('Processing started')
-
-    # Compute the thresholded output volume using the Threshold Scalar Volume CLI module
-    cliParams = {'InputVolume': inputVolume.GetID(), 'OutputVolume': outputVolume.GetID(), 'ThresholdValue' : imageThreshold, 'ThresholdType' : 'Above'}
-    cliNode = slicer.cli.run(slicer.modules.thresholdscalarvolume, None, cliParams, wait_for_completion=True)
-
-    # Capture screenshot
-    if enableScreenshots:
-      self.takeScreenshot('VentriculostomyPlanningTest-Start','MyScreenshot',-1)
-
-    logging.info('Processing completed')
-
-    return True
-
-  #def onSagittalLineSourceUpdated(self,caller,event):
-  #  
-  #  self.cmSagittalLogic.updateCurve()
-    
-    
   def startEditSagittalLine(self):
 
     self.sagittalCurveManager.startEditLine()
-    
     
   def endEditSagittalLine(self):
 
@@ -457,7 +430,28 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
   def getSagittalLineLength(self):
     return self.sagittalCurveManager.getLength()
 
+  def startEditCoronalLine(self):
+
+    self.coronalCurveManager.startEditLine()
     
+  def endEditCoronalLine(self):
+
+    self.coronalCurveManager.endEditLine()
+
+  def clearCoronalLine(self):
+    
+    self.coronalCurveManager.clearLine()
+
+  def setCoronalLineModifiedEventHandler(self, handler):
+
+    self.coronalCurveManager.setModifiedEventHandler(handler)
+
+  def getCoronalLineLength(self):
+    return self.coronalCurveManager.getLength()
+
+
+
+
   def createModel(self, inputVolumeNode, outputModelNode, thresholdValue):
 
     Decimate = 0.25
