@@ -105,8 +105,13 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.clearPointForSagittalLineButton.enabled = True
     sagittalLineLayout.addWidget(self.clearPointForSagittalLineButton)
 
-    linesFormLayout.addRow("Mid-Sagittal Line:", sagittalLineLayout)
+    #-- Move the slice to the curve
+    self.moveSliceSagittalLineButton = qt.QPushButton("Slice")
+    self.moveSliceSagittalLineButton.toolTip = "Move the slice to the mid-sagittal line"
+    self.moveSliceSagittalLineButton.enabled = True
+    sagittalLineLayout.addWidget(self.moveSliceSagittalLineButton)
 
+    linesFormLayout.addRow("Mid-Sagittal Line:", sagittalLineLayout)
 
     #
     # Coronal line
@@ -136,6 +141,12 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.clearPointForCoronalLineButton.toolTip = "Remove all points for coronal line"
     self.clearPointForCoronalLineButton.enabled = True
     coronalLineLayout.addWidget(self.clearPointForCoronalLineButton)
+
+    #-- Move the slice to the curve
+    self.moveSliceCoronalLineButton = qt.QPushButton("Slice")
+    self.moveSliceCoronalLineButton.toolTip = "Move the slice to the coronal line"
+    self.moveSliceCoronalLineButton.enabled = True
+    coronalLineLayout.addWidget(self.moveSliceCoronalLineButton)
 
     linesFormLayout.addRow("Coronal Line:", coronalLineLayout)
     
@@ -196,11 +207,13 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     # Sagittal line
     self.addPointForSagittalLineButton.connect('toggled(bool)', self.onEditSagittalLine)
     self.clearPointForSagittalLineButton.connect('clicked(bool)', self.onClearSagittalLine)
+    self.moveSliceSagittalLineButton.connect('clicked(bool)', self.onMoveSliceSagittalLine)
     self.logic.setSagittalLineModifiedEventHandler(self.onSagittalLineModified)
 
     # Coronal line
     self.addPointForCoronalLineButton.connect('toggled(bool)', self.onEditCoronalLine)
     self.clearPointForCoronalLineButton.connect('clicked(bool)', self.onClearCoronalLine)
+    self.moveSliceCoronalLineButton.connect('clicked(bool)', self.onMoveSliceCoronalLine)
     self.logic.setCoronalLineModifiedEventHandler(self.onCoronalLineModified)
     
     # Add vertical spacer
@@ -239,7 +252,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
   def onSagittalLineModified(self, caller, event):
     self.lengthSagittalLineEdit.text = '%.2f' % self.logic.getSagittalLineLength()
 
-    
   # Event handlers for coronal line
   def onEditCoronalLine(self, switch):
 
@@ -256,10 +268,11 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
   def onCoronalLineModified(self, caller, event):
     self.lengthCoronalLineEdit.text = '%.2f' % self.logic.getCoronalLineLength()
     
+  def onMoveSliceSagittalLine(self):
+    self.logic.moveSliceSagittalLine()
 
-
-
-
+  def onMoveSliceCoronalLine(self):
+    self.logic.moveSliceCoronalLine()
 
   def onReload(self,moduleName="VentriculostomyPlanning"):
     """Generic reload method for any scripted module.
@@ -280,10 +293,25 @@ class CurveManager:
 
     self.tagEventExternal = None
 
+    self.sliceID = "vtkMRMLSliceNodeRed"
+
+    # Slice is aligned to the first point (0) or last point (1)
+    self.slicePosition = 0 
+
   def setName(self, name):
     self.curveName = name
     self.curveModelName = "%s-Model" % (name)
 
+  def setSliceID(self, name):
+    # ID is either "vtkMRMLSliceNodeRed", "vtkMRMLSliceNodeYellow", or "vtkMRMLSliceNodeGreen"
+    self.sliceID = name
+
+  def setDefaultSlicePositionToFirstPoint(self):
+    self.slicePosition = 0
+
+  def setDefaultSlicePositionToLastPoint(self):
+    self.slicePosition = 1
+    
   def setModelColor(self, r, g, b):
 
     self.cmLogic.ModelColor = [r, g, b]
@@ -322,12 +350,15 @@ class CurveManager:
       if dnode:
         dnode.SetSliceIntersectionVisibility(1)
     
-  def startEditLine(self):
+  def startEditLine(self, initPoint=None):
 
     if self.curveFiducials == None:
       self.curveFiducials = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
       self.curveFiducials.SetName(self.curveName)
       slicer.mrmlScene.AddNode(self.curveFiducials)
+      if initPoint != None:
+        self.curveFiducials.AddFiducial(initPoint[0],initPoint[1],initPoint[2])
+        self.moveSliceToLine()
       
     if self.curveModel == None:
       self.curveModel = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
@@ -361,19 +392,68 @@ class CurveManager:
     interactionNode.SwitchToPersistentPlaceMode()
     interactionNode.SetCurrentInteractionMode(slicer.vtkMRMLInteractionNode.Place)
 
-
   def endEditLine(self):
 
     interactionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLInteractionNodeSingleton")
     interactionNode.SetCurrentInteractionMode(slicer.vtkMRMLInteractionNode.ViewTransform)  ## Turn off
     
   def clearLine(self):
+
     if self.curveFiducials:
       self.curveFiducials.RemoveAllMarkups()
 
-
   def getLength(self):
+
     return self.cmLogic.CurveLength
+
+  def getFirstPoint(self, position):
+
+    if self.curveFiducials == None:
+      return False
+    elif self.curveFiducials.GetNumberOfFiducials() == 0:
+      return False
+    else:
+      self.curveFiducials.GetNthFiducialPosition(0,position)
+      return True
+
+  def getLastPoint(self, position):
+    if self.curveFiducials == None:
+      return False
+    else:
+      nFiducials = self.curveFiducials.GetNumberOfFiducials()
+      if nFiducials == 0:
+        return False
+      else:
+        self.curveFiducials.GetNthFiducialPosition(nFiducials-1,position)
+        return True
+
+  def moveSliceToLine(self):
+
+    viewer = slicer.mrmlScene.GetNodeByID(self.sliceID)
+
+    if viewer == None:
+      return
+
+    if self.curveFiducials.GetNumberOfFiducials() == 0:
+      return
+
+    if self.slicePosition == 0:
+      index = 0
+    else:
+      index = self.curveFiducials.GetNumberOfFiducials()-1
+
+    pos = [0.0] * 3
+    self.curveFiducials.GetNthFiducialPosition(index,pos)
+
+    if self.sliceID == "vtkMRMLSliceNodeRed":
+      viewer.SetOrientationToAxial()
+      viewer.SetSliceOffset(pos[2])
+    elif self.sliceID == "vtkMRMLSliceNodeYellow":
+      viewer.SetOrientationToSagittal()
+      viewer.SetSliceOffset(pos[0])
+    elif self.sliceID == "vtkMRMLSliceNodeGreen":
+      viewer.SetOrientationToCoronal()
+      viewer.SetSliceOffset(pos[1])
 
 #
 # VentriculostomyPlanningLogic
@@ -392,10 +472,16 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
   def __init__(self):
     
     self.sagittalCurveManager = CurveManager()
-    self.sagittalCurveManager.setName('SAG1')
+    self.sagittalCurveManager.setName("S1")
+    self.sagittalCurveManager.setSliceID("vtkMRMLSliceNodeYellow")
+    self.sagittalCurveManager.setDefaultSlicePositionToFirstPoint()
+    
     self.coronalCurveManager = CurveManager()
-    self.coronalCurveManager.setName('COR1')
+    self.coronalCurveManager.setName("C1")
+    self.coronalCurveManager.setSliceID("vtkMRMLSliceNodeGreen")
+    self.coronalCurveManager.setDefaultSlicePositionToLastPoint()
     self.coronalCurveManager.setModelColor(1.0, 0.0, 0.0)
+
     
   def hasImageData(self,volumeNode):
     """This is an example logic method that
@@ -430,9 +516,14 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
   def getSagittalLineLength(self):
     return self.sagittalCurveManager.getLength()
 
+  def moveSliceSagittalLine(self):
+    self.sagittalCurveManager.moveSliceToLine()
+
   def startEditCoronalLine(self):
 
-    self.coronalCurveManager.startEditLine()
+    pos = [0.0] * 3
+    self.sagittalCurveManager.getLastPoint(pos)
+    self.coronalCurveManager.startEditLine(pos)
     
   def endEditCoronalLine(self):
 
@@ -449,7 +540,8 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
   def getCoronalLineLength(self):
     return self.coronalCurveManager.getLength()
 
-
+  def moveSliceCoronalLine(self):
+    self.coronalCurveManager.moveSliceToLine()
 
 
   def createModel(self, inputVolumeNode, outputModelNode, thresholdValue):
