@@ -149,6 +149,72 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     coronalLineLayout.addWidget(self.moveSliceCoronalLineButton)
 
     linesFormLayout.addRow("Coronal Line:", coronalLineLayout)
+
+    self.lockInitialLinesCheckBox = qt.QCheckBox()
+    self.lockInitialLinesCheckBox.checked = 0
+    self.lockInitialLinesCheckBox.setToolTip("If checked, the lines will be locked.")
+    linesFormLayout.addRow("Lock:", self.lockInitialLinesCheckBox)
+    
+    #
+    # Trajectory
+    #
+    trajectoryCollapsibleButton = ctk.ctkCollapsibleButton()
+    trajectoryCollapsibleButton.text = "Trajectory"
+    self.layout.addWidget(trajectoryCollapsibleButton)
+    
+    # Layout within the dummy collapsible button
+    trajectoryFormLayout = qt.QFormLayout(trajectoryCollapsibleButton)
+    
+    #
+    # Trajectory
+    #
+    trajectoryLayout = qt.QHBoxLayout()
+
+    #-- Curve length
+    self.lengthTrajectoryEdit = qt.QLineEdit()
+    self.lengthTrajectoryEdit.text = '--'
+    self.lengthTrajectoryEdit.readOnly = True
+    self.lengthTrajectoryEdit.frame = True
+    self.lengthTrajectoryEdit.styleSheet = "QLineEdit { background:transparent; }"
+    self.lengthTrajectoryEdit.cursor = qt.QCursor(qt.Qt.IBeamCursor)
+    trajectoryLayout.addWidget(self.lengthTrajectoryEdit)
+    lengthTrajectoryUnitLabel = qt.QLabel('mm  ')
+    trajectoryLayout.addWidget(lengthTrajectoryUnitLabel)
+
+    #-- Add Point
+    self.addTrajectoryButton = qt.QPushButton("Add Trajectory")
+    self.addTrajectoryButton.toolTip = "Add Trajectory"
+    self.addTrajectoryButton.enabled = True
+    self.addTrajectoryButton.checkable = True    
+    trajectoryLayout.addWidget(self.addTrajectoryButton)
+
+    #-- Clear Point
+    self.clearTrajectoryButton = qt.QPushButton("Clear")
+    self.clearTrajectoryButton.toolTip = "Remove Trajectory"
+    self.clearTrajectoryButton.enabled = True
+    trajectoryLayout.addWidget(self.clearTrajectoryButton)
+
+    trajectoryFormLayout.addRow("Trajectory:", trajectoryLayout)
+
+    self.lockTrajectoryCheckBox = qt.QCheckBox()
+    self.lockTrajectoryCheckBox.checked = 0
+    self.lockTrajectoryCheckBox.setToolTip("If checked, the trajectory will be locked.")
+    trajectoryFormLayout.addRow("Lock:", self.lockTrajectoryCheckBox)
+    
+    #
+    # Inverse Lines
+    #
+    inverseLinesCollapsibleButton = ctk.ctkCollapsibleButton()
+    inverseLinesCollapsibleButton.text = "InverseLines"
+    self.layout.addWidget(inverseLinesCollapsibleButton)
+    
+    # Layout within the dummy collapsible button
+    inverseLinesFormLayout = qt.QFormLayout(inverseLinesCollapsibleButton)
+
+    self.lockInverseLinesCheckBox = qt.QCheckBox()
+    self.lockInverseLinesCheckBox.checked = 0
+    self.lockInverseLinesCheckBox.setToolTip("If checked, the lines will be locked.")
+    inverseLinesFormLayout.addRow("Lock:", self.lockInverseLinesCheckBox)
     
 
     ## PatientModel Area
@@ -215,7 +281,12 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.clearPointForCoronalLineButton.connect('clicked(bool)', self.onClearCoronalLine)
     self.moveSliceCoronalLineButton.connect('clicked(bool)', self.onMoveSliceCoronalLine)
     self.logic.setCoronalLineModifiedEventHandler(self.onCoronalLineModified)
-    
+
+    # Coronal line
+    self.addTrajectoryButton.connect('toggled(bool)', self.onEditTrajectory)
+    self.clearTrajectoryButton.connect('clicked(bool)', self.onClearTrajectory)
+    self.logic.setTrajectoryModifiedEventHandler(self.onTrajectoryModified)
+
     # Add vertical spacer
     self.layout.addStretch(1)
 
@@ -241,6 +312,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
 
     if switch == True:
       self.addPointForCoronalLineButton.checked = False
+      self.addTrajectoryButton.checked = False
       self.logic.startEditSagittalLine()
     else:
       self.logic.endEditSagittalLine()
@@ -252,11 +324,15 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
   def onSagittalLineModified(self, caller, event):
     self.lengthSagittalLineEdit.text = '%.2f' % self.logic.getSagittalLineLength()
 
+  def onMoveSliceSagittalLine(self):
+    self.logic.moveSliceSagittalLine()
+
   # Event handlers for coronal line
   def onEditCoronalLine(self, switch):
 
     if switch == True:
       self.addPointForSagittalLineButton.checked = False
+      self.addTrajectoryButton.checked = False
       self.logic.startEditCoronalLine()
     else:
       self.logic.endEditCoronalLine()
@@ -268,11 +344,24 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
   def onCoronalLineModified(self, caller, event):
     self.lengthCoronalLineEdit.text = '%.2f' % self.logic.getCoronalLineLength()
     
-  def onMoveSliceSagittalLine(self):
-    self.logic.moveSliceSagittalLine()
-
   def onMoveSliceCoronalLine(self):
     self.logic.moveSliceCoronalLine()
+
+  # Event handlers for trajectory
+  def onEditTrajectory(self, switch):
+
+    if switch == True:
+      self.addPointForSagittalLineButton.checked = False
+      self.addPointForCoronalLineButton.checked = False
+      self.logic.startEditTrajectory()
+    else:
+      self.logic.endEditCoronalLine()
+    
+  def onClearTrajectory(self):
+    self.logic.clearTrajectory()
+    
+  def onTrajectoryModified(self, caller, event):
+    self.lengthTrajectoryEdit.text = '%.2f' % self.logic.getTrajectoryLength()
 
   def onReload(self,moduleName="VentriculostomyPlanning"):
     """Generic reload method for any scripted module.
@@ -410,6 +499,12 @@ class CurveManager:
     if self.curveFiducials:
       self.curveFiducials.RemoveAllMarkups()
 
+    self.cmLogic.updateCurve()
+
+    if self.curveModel:
+      pdata = self.curveModel.GetPolyData()
+      pdata.Initialize()
+
   def getLength(self):
 
     return self.cmLogic.CurveLength
@@ -483,13 +578,18 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     self.sagittalCurveManager.setName("S1")
     self.sagittalCurveManager.setSliceID("vtkMRMLSliceNodeYellow")
     self.sagittalCurveManager.setDefaultSlicePositionToFirstPoint()
-    self.sagittalCurveManager.setModelColor(0.0, 0.0, 1.0)
+    self.sagittalCurveManager.setModelColor(1.0, 1.0, 0.0)
     
     self.coronalCurveManager = CurveManager()
     self.coronalCurveManager.setName("C1")
     self.coronalCurveManager.setSliceID("vtkMRMLSliceNodeGreen")
     self.coronalCurveManager.setDefaultSlicePositionToLastPoint()
-    self.coronalCurveManager.setModelColor(1.0, 0.0, 0.0)
+    self.coronalCurveManager.setModelColor(0.0, 1.0, 0.0)
+
+    self.trajectoryManager = CurveManager()
+    self.trajectoryManager.setName("T")
+    self.trajectoryManager.setDefaultSlicePositionToLastPoint()
+    self.trajectoryManager.setModelColor(0.0, 1.0, 1.0)
 
     
   def hasImageData(self,volumeNode):
@@ -552,6 +652,20 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
   def moveSliceCoronalLine(self):
     self.coronalCurveManager.moveSliceToLine()
 
+  def startEditTrajectory(self):
+    self.trajectoryManager.startEditLine()
+
+  def endEditTrajectory(self):
+    self.trajectoryManager.endEditLine()
+
+  def clearTrajectory(self):
+    self.trajectoryManager.clearLine()
+
+  def setTrajectoryModifiedEventHandler(self, handler):
+    self.trajectoryManager.setModifiedEventHandler(handler)
+
+  def getTrajectoryLength(self):
+    return self.trajectoryManager.getLength()
 
   def createModel(self, inputVolumeNode, outputModelNode, thresholdValue):
 
