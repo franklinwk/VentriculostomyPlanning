@@ -321,6 +321,11 @@ class CurveManager:
       dnode = self.curveModel.GetDisplayNode()
       if dnode:
         dnode.SetColor([r, g, b])
+
+    if self.curveFiducials:
+      dnode = self.curveFiducials.GetMarkupsDisplayNode()
+      if dnode:
+        dnode.SetSelectedColor([r, g, b])
       
   def setModifiedEventHandler(self, handler):
 
@@ -356,6 +361,9 @@ class CurveManager:
       self.curveFiducials = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
       self.curveFiducials.SetName(self.curveName)
       slicer.mrmlScene.AddNode(self.curveFiducials)
+      dnode = self.curveFiducials.GetMarkupsDisplayNode()
+      if dnode:
+        dnode.SetSelectedColor(self.cmLogic.ModelColor)
       if initPoint != None:
         self.curveFiducials.AddFiducial(initPoint[0],initPoint[1],initPoint[2])
         self.moveSliceToLine()
@@ -475,6 +483,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     self.sagittalCurveManager.setName("S1")
     self.sagittalCurveManager.setSliceID("vtkMRMLSliceNodeYellow")
     self.sagittalCurveManager.setDefaultSlicePositionToFirstPoint()
+    self.sagittalCurveManager.setModelColor(0.0, 0.0, 1.0)
     
     self.coronalCurveManager = CurveManager()
     self.coronalCurveManager.setName("C1")
