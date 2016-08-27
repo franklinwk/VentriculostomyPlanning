@@ -282,10 +282,14 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.moveSliceCoronalLineButton.connect('clicked(bool)', self.onMoveSliceCoronalLine)
     self.logic.setCoronalLineModifiedEventHandler(self.onCoronalLineModified)
 
-    # Coronal line
+    self.lockInitialLinesCheckBox.connect('toggled(bool)', self.onLock)
+
+    # Needle trajectory
     self.addTrajectoryButton.connect('toggled(bool)', self.onEditTrajectory)
     self.clearTrajectoryButton.connect('clicked(bool)', self.onClearTrajectory)
     self.logic.setTrajectoryModifiedEventHandler(self.onTrajectoryModified)
+    self.lockTrajectoryCheckBox.connect('toggled(bool)', self.onLock)
+
 
     # Add vertical spacer
     self.layout.addStretch(1)
@@ -362,6 +366,20 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     
   def onTrajectoryModified(self, caller, event):
     self.lengthTrajectoryEdit.text = '%.2f' % self.logic.getTrajectoryLength()
+
+  def onLock(self):
+    if self.lockInitialLinesCheckBox.checked == 1:
+      self.addPointForSagittalLineButton.enabled = False
+      self.clearPointForSagittalLineButton.enabled = False
+      self.addPointForCoronalLineButton.enabled = False
+      self.clearPointForCoronalLineButton.enabled = False
+      self.logic.lockInitialLine()
+    else:
+      self.addPointForSagittalLineButton.enabled = True
+      self.clearPointForSagittalLineButton.enabled = True
+      self.addPointForCoronalLineButton.enabled = True
+      self.clearPointForCoronalLineButton.enabled = True
+      self.logic.unlockInitialLine()
 
   def onReload(self,moduleName="VentriculostomyPlanning"):
     """Generic reload method for any scripted module.
@@ -558,6 +576,17 @@ class CurveManager:
       viewer.SetOrientationToCoronal()
       viewer.SetSliceOffset(pos[1])
 
+  def lockLine(self):
+    
+    if (self.curveFiducials):
+      self.curveFiducials.SetDisplayVisibility(0)
+
+  def unlockLine(self):
+    
+    if (self.curveFiducials):
+      self.curveFiducials.SetDisplayVisibility(1)
+      
+
 #
 # VentriculostomyPlanningLogic
 #
@@ -651,6 +680,14 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
 
   def moveSliceCoronalLine(self):
     self.coronalCurveManager.moveSliceToLine()
+
+  def lockInitialLine(self):
+    self.sagittalCurveManager.lockLine()
+    self.coronalCurveManager.lockLine()
+
+  def unlockInitialLine(self):
+    self.sagittalCurveManager.unlockLine()
+    self.coronalCurveManager.unlockLine()
 
   def startEditTrajectory(self):
     self.trajectoryManager.startEditLine()
