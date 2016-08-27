@@ -69,91 +69,91 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     #
     # Lines Area
     #
-    linesCollapsibleButton = ctk.ctkCollapsibleButton()
-    linesCollapsibleButton.text = "Lines"
-    self.layout.addWidget(linesCollapsibleButton)
+    referenceLinesCollapsibleButton = ctk.ctkCollapsibleButton()
+    referenceLinesCollapsibleButton.text = "Reference Lines"
+    self.layout.addWidget(referenceLinesCollapsibleButton)
 
     # Layout within the dummy collapsible button
-    linesFormLayout = qt.QFormLayout(linesCollapsibleButton)
+    referenceLinesFormLayout = qt.QFormLayout(referenceLinesCollapsibleButton)
 
     #
-    # Mid-sagittal line
+    # Mid-sagitalReference line
     #
-    sagittalLineLayout = qt.QHBoxLayout()
+    sagitalReferenceLineLayout = qt.QHBoxLayout()
 
     #-- Curve length
-    self.lengthSagittalLineEdit = qt.QLineEdit()
-    self.lengthSagittalLineEdit.text = '--'
-    self.lengthSagittalLineEdit.readOnly = True
-    self.lengthSagittalLineEdit.frame = True
-    self.lengthSagittalLineEdit.styleSheet = "QLineEdit { background:transparent; }"
-    self.lengthSagittalLineEdit.cursor = qt.QCursor(qt.Qt.IBeamCursor)
-    sagittalLineLayout.addWidget(self.lengthSagittalLineEdit)
-    lengthSagittalLineUnitLabel = qt.QLabel('mm  ')
-    sagittalLineLayout.addWidget(lengthSagittalLineUnitLabel)
+    self.lengthSagitalReferenceLineEdit = qt.QLineEdit()
+    self.lengthSagitalReferenceLineEdit.text = '--'
+    self.lengthSagitalReferenceLineEdit.readOnly = True
+    self.lengthSagitalReferenceLineEdit.frame = True
+    self.lengthSagitalReferenceLineEdit.styleSheet = "QLineEdit { background:transparent; }"
+    self.lengthSagitalReferenceLineEdit.cursor = qt.QCursor(qt.Qt.IBeamCursor)
+    sagitalReferenceLineLayout.addWidget(self.lengthSagitalReferenceLineEdit)
+    lengthSagitalReferenceLineUnitLabel = qt.QLabel('mm  ')
+    sagitalReferenceLineLayout.addWidget(lengthSagitalReferenceLineUnitLabel)
 
     #-- Add Point
-    self.addPointForSagittalLineButton = qt.QPushButton("Add Points")
-    self.addPointForSagittalLineButton.toolTip = "Add points for mid-sagittal line"
-    self.addPointForSagittalLineButton.enabled = True
-    self.addPointForSagittalLineButton.checkable = True    
-    sagittalLineLayout.addWidget(self.addPointForSagittalLineButton)
+    self.addPointForSagitalReferenceLineButton = qt.QPushButton("Add Points")
+    self.addPointForSagitalReferenceLineButton.toolTip = "Add points for mid-sagital reference line"
+    self.addPointForSagitalReferenceLineButton.enabled = True
+    self.addPointForSagitalReferenceLineButton.checkable = True    
+    sagitalReferenceLineLayout.addWidget(self.addPointForSagitalReferenceLineButton)
 
     #-- Clear Point
-    self.clearPointForSagittalLineButton = qt.QPushButton("Clear")
-    self.clearPointForSagittalLineButton.toolTip = "Remove all points for mid-sagittal line"
-    self.clearPointForSagittalLineButton.enabled = True
-    sagittalLineLayout.addWidget(self.clearPointForSagittalLineButton)
+    self.clearPointForSagitalReferenceLineButton = qt.QPushButton("Clear")
+    self.clearPointForSagitalReferenceLineButton.toolTip = "Remove all points for mid-sagital reference line"
+    self.clearPointForSagitalReferenceLineButton.enabled = True
+    sagitalReferenceLineLayout.addWidget(self.clearPointForSagitalReferenceLineButton)
 
     #-- Move the slice to the curve
-    self.moveSliceSagittalLineButton = qt.QPushButton("Slice")
-    self.moveSliceSagittalLineButton.toolTip = "Move the slice to the mid-sagittal line"
-    self.moveSliceSagittalLineButton.enabled = True
-    sagittalLineLayout.addWidget(self.moveSliceSagittalLineButton)
+    self.moveSliceSagitalReferenceLineButton = qt.QPushButton("Slice")
+    self.moveSliceSagitalReferenceLineButton.toolTip = "Move the slice to the mid-sagital reference line"
+    self.moveSliceSagitalReferenceLineButton.enabled = True
+    sagitalReferenceLineLayout.addWidget(self.moveSliceSagitalReferenceLineButton)
 
-    linesFormLayout.addRow("Mid-Sagittal Line:", sagittalLineLayout)
+    referenceLinesFormLayout.addRow("Mid-Sagital Reference Line:", sagitalReferenceLineLayout)
 
     #
-    # Coronal line
+    # CoronalReference line
     #
-    coronalLineLayout = qt.QHBoxLayout()
+    coronalReferenceLineLayout = qt.QHBoxLayout()
 
     #-- Curve length
-    self.lengthCoronalLineEdit = qt.QLineEdit()
-    self.lengthCoronalLineEdit.text = '--'
-    self.lengthCoronalLineEdit.readOnly = True
-    self.lengthCoronalLineEdit.frame = True
-    self.lengthCoronalLineEdit.styleSheet = "QLineEdit { background:transparent; }"
-    self.lengthCoronalLineEdit.cursor = qt.QCursor(qt.Qt.IBeamCursor)
-    coronalLineLayout.addWidget(self.lengthCoronalLineEdit)
-    lengthCoronalLineUnitLabel = qt.QLabel('mm  ')
-    coronalLineLayout.addWidget(lengthCoronalLineUnitLabel)
+    self.lengthCoronalReferenceLineEdit = qt.QLineEdit()
+    self.lengthCoronalReferenceLineEdit.text = '--'
+    self.lengthCoronalReferenceLineEdit.readOnly = True
+    self.lengthCoronalReferenceLineEdit.frame = True
+    self.lengthCoronalReferenceLineEdit.styleSheet = "QLineEdit { background:transparent; }"
+    self.lengthCoronalReferenceLineEdit.cursor = qt.QCursor(qt.Qt.IBeamCursor)
+    coronalReferenceLineLayout.addWidget(self.lengthCoronalReferenceLineEdit)
+    lengthCoronalReferenceLineUnitLabel = qt.QLabel('mm  ')
+    coronalReferenceLineLayout.addWidget(lengthCoronalReferenceLineUnitLabel)
 
     #-- Add Point
-    self.addPointForCoronalLineButton = qt.QPushButton("Add Points")
-    self.addPointForCoronalLineButton.toolTip = "Add points for coronal line"
-    self.addPointForCoronalLineButton.enabled = True
-    self.addPointForCoronalLineButton.checkable = True    
-    coronalLineLayout.addWidget(self.addPointForCoronalLineButton)
+    self.addPointForCoronalReferenceLineButton = qt.QPushButton("Add Points")
+    self.addPointForCoronalReferenceLineButton.toolTip = "Add points for coronal reference line"
+    self.addPointForCoronalReferenceLineButton.enabled = True
+    self.addPointForCoronalReferenceLineButton.checkable = True    
+    coronalReferenceLineLayout.addWidget(self.addPointForCoronalReferenceLineButton)
 
     #-- Clear Point
-    self.clearPointForCoronalLineButton = qt.QPushButton("Clear")
-    self.clearPointForCoronalLineButton.toolTip = "Remove all points for coronal line"
-    self.clearPointForCoronalLineButton.enabled = True
-    coronalLineLayout.addWidget(self.clearPointForCoronalLineButton)
+    self.clearPointForCoronalReferenceLineButton = qt.QPushButton("Clear")
+    self.clearPointForCoronalReferenceLineButton.toolTip = "Remove all points for coronal reference line"
+    self.clearPointForCoronalReferenceLineButton.enabled = True
+    coronalReferenceLineLayout.addWidget(self.clearPointForCoronalReferenceLineButton)
 
     #-- Move the slice to the curve
-    self.moveSliceCoronalLineButton = qt.QPushButton("Slice")
-    self.moveSliceCoronalLineButton.toolTip = "Move the slice to the coronal line"
-    self.moveSliceCoronalLineButton.enabled = True
-    coronalLineLayout.addWidget(self.moveSliceCoronalLineButton)
+    self.moveSliceCoronalReferenceLineButton = qt.QPushButton("Slice")
+    self.moveSliceCoronalReferenceLineButton.toolTip = "Move the slice to the coronal reference line"
+    self.moveSliceCoronalReferenceLineButton.enabled = True
+    coronalReferenceLineLayout.addWidget(self.moveSliceCoronalReferenceLineButton)
 
-    linesFormLayout.addRow("Coronal Line:", coronalLineLayout)
+    referenceLinesFormLayout.addRow("CoronalReference Line:", coronalReferenceLineLayout)
 
-    self.lockInitialLinesCheckBox = qt.QCheckBox()
-    self.lockInitialLinesCheckBox.checked = 0
-    self.lockInitialLinesCheckBox.setToolTip("If checked, the lines will be locked.")
-    linesFormLayout.addRow("Lock:", self.lockInitialLinesCheckBox)
+    self.lockReferenceLinesCheckBox = qt.QCheckBox()
+    self.lockReferenceLinesCheckBox.checked = 0
+    self.lockReferenceLinesCheckBox.setToolTip("If checked, the lines will be locked.")
+    referenceLinesFormLayout.addRow("Lock:", self.lockReferenceLinesCheckBox)
     
     #
     # Trajectory
@@ -270,19 +270,19 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     #self.inputVolumeSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
     #self.outputModelSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
 
-    # Sagittal line
-    self.addPointForSagittalLineButton.connect('toggled(bool)', self.onEditSagittalLine)
-    self.clearPointForSagittalLineButton.connect('clicked(bool)', self.onClearSagittalLine)
-    self.moveSliceSagittalLineButton.connect('clicked(bool)', self.onMoveSliceSagittalLine)
-    self.logic.setSagittalLineModifiedEventHandler(self.onSagittalLineModified)
+    # SagitalReference line
+    self.addPointForSagitalReferenceLineButton.connect('toggled(bool)', self.onEditSagitalReferenceLine)
+    self.clearPointForSagitalReferenceLineButton.connect('clicked(bool)', self.onClearSagitalReferenceLine)
+    self.moveSliceSagitalReferenceLineButton.connect('clicked(bool)', self.onMoveSliceSagitalReferenceLine)
+    self.logic.setSagitalReferenceLineModifiedEventHandler(self.onSagitalReferenceLineModified)
 
-    # Coronal line
-    self.addPointForCoronalLineButton.connect('toggled(bool)', self.onEditCoronalLine)
-    self.clearPointForCoronalLineButton.connect('clicked(bool)', self.onClearCoronalLine)
-    self.moveSliceCoronalLineButton.connect('clicked(bool)', self.onMoveSliceCoronalLine)
-    self.logic.setCoronalLineModifiedEventHandler(self.onCoronalLineModified)
+    # CoronalReference line
+    self.addPointForCoronalReferenceLineButton.connect('toggled(bool)', self.onEditCoronalReferenceLine)
+    self.clearPointForCoronalReferenceLineButton.connect('clicked(bool)', self.onClearCoronalReferenceLine)
+    self.moveSliceCoronalReferenceLineButton.connect('clicked(bool)', self.onMoveSliceCoronalReferenceLine)
+    self.logic.setCoronalReferenceLineModifiedEventHandler(self.onCoronalReferenceLineModified)
 
-    self.lockInitialLinesCheckBox.connect('toggled(bool)', self.onLock)
+    self.lockReferenceLinesCheckBox.connect('toggled(bool)', self.onLock)
 
     # Needle trajectory
     self.addTrajectoryButton.connect('toggled(bool)', self.onEditTrajectory)
@@ -311,55 +311,55 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
   #  self.logic.createModel(self.inputVolumeSelector.currentNode(), self.outputModelSelector.currentNode(), threshold)
 
 
-  # Event handlers for sagittal line
-  def onEditSagittalLine(self, switch):
+  # Event handlers for sagitalReference line
+  def onEditSagitalReferenceLine(self, switch):
 
     if switch == True:
-      self.addPointForCoronalLineButton.checked = False
+      self.addPointForCoronalReferenceLineButton.checked = False
       self.addTrajectoryButton.checked = False
-      self.logic.startEditSagittalLine()
+      self.logic.startEditSagitalReferenceLine()
     else:
-      self.logic.endEditSagittalLine()
+      self.logic.endEditSagitalReferenceLine()
 
-  def onClearSagittalLine(self):
+  def onClearSagitalReferenceLine(self):
     
-    self.logic.clearSagittalLine()
+    self.logic.clearSagitalReferenceLine()
 
-  def onSagittalLineModified(self, caller, event):
-    self.lengthSagittalLineEdit.text = '%.2f' % self.logic.getSagittalLineLength()
+  def onSagitalReferenceLineModified(self, caller, event):
+    self.lengthSagitalReferenceLineEdit.text = '%.2f' % self.logic.getSagitalReferenceLineLength()
 
-  def onMoveSliceSagittalLine(self):
-    self.logic.moveSliceSagittalLine()
+  def onMoveSliceSagitalReferenceLine(self):
+    self.logic.moveSliceSagitalReferenceLine()
 
-  # Event handlers for coronal line
-  def onEditCoronalLine(self, switch):
+  # Event handlers for coronalReference line
+  def onEditCoronalReferenceLine(self, switch):
 
     if switch == True:
-      self.addPointForSagittalLineButton.checked = False
+      self.addPointForSagitalReferenceLineButton.checked = False
       self.addTrajectoryButton.checked = False
-      self.logic.startEditCoronalLine()
+      self.logic.startEditCoronalReferenceLine()
     else:
-      self.logic.endEditCoronalLine()
+      self.logic.endEditCoronalReferenceLine()
 
-  def onClearCoronalLine(self):
+  def onClearCoronalReferenceLine(self):
     
-    self.logic.clearCoronalLine()
+    self.logic.clearCoronalReferenceLine()
 
-  def onCoronalLineModified(self, caller, event):
-    self.lengthCoronalLineEdit.text = '%.2f' % self.logic.getCoronalLineLength()
+  def onCoronalReferenceLineModified(self, caller, event):
+    self.lengthCoronalReferenceLineEdit.text = '%.2f' % self.logic.getCoronalReferenceLineLength()
     
-  def onMoveSliceCoronalLine(self):
-    self.logic.moveSliceCoronalLine()
+  def onMoveSliceCoronalReferenceLine(self):
+    self.logic.moveSliceCoronalReferenceLine()
 
   # Event handlers for trajectory
   def onEditTrajectory(self, switch):
 
     if switch == True:
-      self.addPointForSagittalLineButton.checked = False
-      self.addPointForCoronalLineButton.checked = False
+      self.addPointForSagitalReferenceLineButton.checked = False
+      self.addPointForCoronalReferenceLineButton.checked = False
       self.logic.startEditTrajectory()
     else:
-      self.logic.endEditCoronalLine()
+      self.logic.endEditCoronalReferenceLine()
     
   def onClearTrajectory(self):
     self.logic.clearTrajectory()
@@ -368,18 +368,18 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.lengthTrajectoryEdit.text = '%.2f' % self.logic.getTrajectoryLength()
 
   def onLock(self):
-    if self.lockInitialLinesCheckBox.checked == 1:
-      self.addPointForSagittalLineButton.enabled = False
-      self.clearPointForSagittalLineButton.enabled = False
-      self.addPointForCoronalLineButton.enabled = False
-      self.clearPointForCoronalLineButton.enabled = False
-      self.logic.lockInitialLine()
+    if self.lockReferenceLinesCheckBox.checked == 1:
+      self.addPointForSagitalReferenceLineButton.enabled = False
+      self.clearPointForSagitalReferenceLineButton.enabled = False
+      self.addPointForCoronalReferenceLineButton.enabled = False
+      self.clearPointForCoronalReferenceLineButton.enabled = False
+      self.logic.lockReferenceLine()
     else:
-      self.addPointForSagittalLineButton.enabled = True
-      self.clearPointForSagittalLineButton.enabled = True
-      self.addPointForCoronalLineButton.enabled = True
-      self.clearPointForCoronalLineButton.enabled = True
-      self.logic.unlockInitialLine()
+      self.addPointForSagitalReferenceLineButton.enabled = True
+      self.clearPointForSagitalReferenceLineButton.enabled = True
+      self.addPointForCoronalReferenceLineButton.enabled = True
+      self.clearPointForCoronalReferenceLineButton.enabled = True
+      self.logic.unlockReferenceLine()
 
   def onReload(self,moduleName="VentriculostomyPlanning"):
     """Generic reload method for any scripted module.
@@ -570,7 +570,7 @@ class CurveManager:
       viewer.SetOrientationToAxial()
       viewer.SetSliceOffset(pos[2])
     elif self.sliceID == "vtkMRMLSliceNodeYellow":
-      viewer.SetOrientationToSagittal()
+      viewer.SetOrientationToSagital()
       viewer.SetSliceOffset(pos[0])
     elif self.sliceID == "vtkMRMLSliceNodeGreen":
       viewer.SetOrientationToCoronal()
@@ -603,17 +603,17 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
 
   def __init__(self):
     
-    self.sagittalCurveManager = CurveManager()
-    self.sagittalCurveManager.setName("S1")
-    self.sagittalCurveManager.setSliceID("vtkMRMLSliceNodeYellow")
-    self.sagittalCurveManager.setDefaultSlicePositionToFirstPoint()
-    self.sagittalCurveManager.setModelColor(1.0, 1.0, 0.0)
+    self.sagitalReferenceCurveManager = CurveManager()
+    self.sagitalReferenceCurveManager.setName("S1")
+    self.sagitalReferenceCurveManager.setSliceID("vtkMRMLSliceNodeYellow")
+    self.sagitalReferenceCurveManager.setDefaultSlicePositionToFirstPoint()
+    self.sagitalReferenceCurveManager.setModelColor(1.0, 1.0, 0.0)
     
-    self.coronalCurveManager = CurveManager()
-    self.coronalCurveManager.setName("C1")
-    self.coronalCurveManager.setSliceID("vtkMRMLSliceNodeGreen")
-    self.coronalCurveManager.setDefaultSlicePositionToLastPoint()
-    self.coronalCurveManager.setModelColor(0.0, 1.0, 0.0)
+    self.coronalReferenceCurveManager = CurveManager()
+    self.coronalReferenceCurveManager.setName("C1")
+    self.coronalReferenceCurveManager.setSliceID("vtkMRMLSliceNodeGreen")
+    self.coronalReferenceCurveManager.setDefaultSlicePositionToLastPoint()
+    self.coronalReferenceCurveManager.setModelColor(0.0, 1.0, 0.0)
 
     self.trajectoryManager = CurveManager()
     self.trajectoryManager.setName("T")
@@ -635,59 +635,59 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     return True
 
 
-  def startEditSagittalLine(self):
+  def startEditSagitalReferenceLine(self):
 
-    self.sagittalCurveManager.startEditLine()
+    self.sagitalReferenceCurveManager.startEditLine()
     
-  def endEditSagittalLine(self):
+  def endEditSagitalReferenceLine(self):
 
-    self.sagittalCurveManager.endEditLine()
+    self.sagitalReferenceCurveManager.endEditLine()
 
-  def clearSagittalLine(self):
+  def clearSagitalReferenceLine(self):
     
-    self.sagittalCurveManager.clearLine()
+    self.sagitalReferenceCurveManager.clearLine()
 
-  def setSagittalLineModifiedEventHandler(self, handler):
+  def setSagitalReferenceLineModifiedEventHandler(self, handler):
 
-    self.sagittalCurveManager.setModifiedEventHandler(handler)
+    self.sagitalReferenceCurveManager.setModifiedEventHandler(handler)
 
-  def getSagittalLineLength(self):
-    return self.sagittalCurveManager.getLength()
+  def getSagitalReferenceLineLength(self):
+    return self.sagitalReferenceCurveManager.getLength()
 
-  def moveSliceSagittalLine(self):
-    self.sagittalCurveManager.moveSliceToLine()
+  def moveSliceSagitalReferenceLine(self):
+    self.sagitalReferenceCurveManager.moveSliceToLine()
 
-  def startEditCoronalLine(self):
+  def startEditCoronalReferenceLine(self):
 
     pos = [0.0] * 3
-    self.sagittalCurveManager.getLastPoint(pos)
-    self.coronalCurveManager.startEditLine(pos)
+    self.sagitalReferenceCurveManager.getLastPoint(pos)
+    self.coronalReferenceCurveManager.startEditLine(pos)
     
-  def endEditCoronalLine(self):
+  def endEditCoronalReferenceLine(self):
 
-    self.coronalCurveManager.endEditLine()
+    self.coronalReferenceCurveManager.endEditLine()
 
-  def clearCoronalLine(self):
+  def clearCoronalReferenceLine(self):
     
-    self.coronalCurveManager.clearLine()
+    self.coronalReferenceCurveManager.clearLine()
 
-  def setCoronalLineModifiedEventHandler(self, handler):
+  def setCoronalReferenceLineModifiedEventHandler(self, handler):
 
-    self.coronalCurveManager.setModifiedEventHandler(handler)
+    self.coronalReferenceCurveManager.setModifiedEventHandler(handler)
 
-  def getCoronalLineLength(self):
-    return self.coronalCurveManager.getLength()
+  def getCoronalReferenceLineLength(self):
+    return self.coronalReferenceCurveManager.getLength()
 
-  def moveSliceCoronalLine(self):
-    self.coronalCurveManager.moveSliceToLine()
+  def moveSliceCoronalReferenceLine(self):
+    self.coronalReferenceCurveManager.moveSliceToLine()
 
-  def lockInitialLine(self):
-    self.sagittalCurveManager.lockLine()
-    self.coronalCurveManager.lockLine()
+  def lockReferenceLine(self):
+    self.sagitalReferenceCurveManager.lockLine()
+    self.coronalReferenceCurveManager.lockLine()
 
-  def unlockInitialLine(self):
-    self.sagittalCurveManager.unlockLine()
-    self.coronalCurveManager.unlockLine()
+  def unlockReferenceLine(self):
+    self.sagitalReferenceCurveManager.unlockLine()
+    self.coronalReferenceCurveManager.unlockLine()
 
   def startEditTrajectory(self):
     self.trajectoryManager.startEditLine()
