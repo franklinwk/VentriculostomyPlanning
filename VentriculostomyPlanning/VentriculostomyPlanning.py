@@ -291,58 +291,57 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     planningLinesFormLayout.addRow("Lock:", self.lockPlanningLinesCheckBox)
     
 
-    ## PatientModel Area
-    ##
-    #patientModelCollapsibleButton = ctk.ctkCollapsibleButton()
-    #patientModelCollapsibleButton.text = "Patient Model"
-    #self.layout.addWidget(patientModelCollapsibleButton)
+    # PatientModel Area
     #
-    ## Layout within the dummy collapsible button
-    #patientModelFormLayout = qt.QFormLayout(patientModelCollapsibleButton)
+    patientModelCollapsibleButton = ctk.ctkCollapsibleButton()
+    patientModelCollapsibleButton.text = "Patient Model"
+    self.layout.addWidget(patientModelCollapsibleButton)
+    
+    # Layout within the dummy collapsible button
+    patientModelFormLayout = qt.QFormLayout(patientModelCollapsibleButton)
+    
     #
-    ##
-    ## input volume selector
-    ##
-    #self.inputVolumeSelector = slicer.qMRMLNodeComboBox()
-    #self.inputVolumeSelector.nodeTypes = ["vtkMRMLScalarVolumeNode"]
-    #self.inputVolumeSelector.selectNodeUponCreation = True
-    #self.inputVolumeSelector.addEnabled = False
-    #self.inputVolumeSelector.removeEnabled = False
-    #self.inputVolumeSelector.noneEnabled = False
-    #self.inputVolumeSelector.showHidden = False
-    #self.inputVolumeSelector.showChildNodeTypes = False
-    #self.inputVolumeSelector.setMRMLScene( slicer.mrmlScene )
-    #self.inputVolumeSelector.setToolTip( "Pick the input to the algorithm." )
-    #patientModelFormLayout.addRow("Input Volume: ", self.inputVolumeSelector)
+    # input volume selector
     #
-    ##
-    ## output volume selector
-    ##
-    #self.outputModelSelector = slicer.qMRMLNodeComboBox()
-    #self.outputModelSelector.nodeTypes = ["vtkMRMLModelNode"]
-    #self.outputModelSelector.selectNodeUponCreation = True
-    #self.outputModelSelector.addEnabled = True
-    #self.outputModelSelector.removeEnabled = True
-    #self.outputModelSelector.noneEnabled = True
-    #self.outputModelSelector.showHidden = False
-    #self.outputModelSelector.showChildNodeTypes = False
-    #self.outputModelSelector.setMRMLScene( slicer.mrmlScene )
-    #self.outputModelSelector.setToolTip( "Pick the output to the algorithm." )
-    #patientModelFormLayout.addRow("Output Model: ", self.outputModelSelector)
+    self.inputVolumeSelector = slicer.qMRMLNodeComboBox()
+    self.inputVolumeSelector.nodeTypes = ["vtkMRMLScalarVolumeNode"]
+    self.inputVolumeSelector.selectNodeUponCreation = True
+    self.inputVolumeSelector.addEnabled = False
+    self.inputVolumeSelector.removeEnabled = False
+    self.inputVolumeSelector.noneEnabled = False
+    self.inputVolumeSelector.showHidden = False
+    self.inputVolumeSelector.showChildNodeTypes = False
+    self.inputVolumeSelector.setMRMLScene( slicer.mrmlScene )
+    self.inputVolumeSelector.setToolTip( "Pick the input to the algorithm." )
+    patientModelFormLayout.addRow("Input Volume: ", self.inputVolumeSelector)
+    
     #
+    # output volume selector
     #
-    ##
-    ## Create Model Button
-    ##
-    #self.createModelButton = qt.QPushButton("Crete Model")
-    #self.createModelButton.toolTip = "Create a surface model."
-    #self.createModelButton.enabled = False
-    #patientModelFormLayout.addRow(self.createModelButton)
+    self.outputModelSelector = slicer.qMRMLNodeComboBox()
+    self.outputModelSelector.nodeTypes = ["vtkMRMLModelNode"]
+    self.outputModelSelector.selectNodeUponCreation = True
+    self.outputModelSelector.addEnabled = True
+    self.outputModelSelector.removeEnabled = True
+    self.outputModelSelector.noneEnabled = True
+    self.outputModelSelector.showHidden = False
+    self.outputModelSelector.showChildNodeTypes = False
+    self.outputModelSelector.setMRMLScene( slicer.mrmlScene )
+    self.outputModelSelector.setToolTip( "Pick the output to the algorithm." )
+    patientModelFormLayout.addRow("Output Model: ", self.outputModelSelector)
+    
+    
+    #
+    # Create Model Button
+    #
+    self.createModelButton = qt.QPushButton("Crete Model")
+    self.createModelButton.toolTip = "Create a surface model."
+    self.createModelButton.enabled = True
+    patientModelFormLayout.addRow(self.createModelButton)
 
-    # connections
-    #self.createModelButton.connect('clicked(bool)', self.onCreateModel)
-    #self.inputVolumeSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
-    #self.outputModelSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
+    self.createModelButton.connect('clicked(bool)', self.onCreateModel)
+    self.inputVolumeSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
+    self.outputModelSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
 
     # SagitalReference line
     self.addPointForSagitalReferenceLineButton.connect('toggled(bool)', self.onEditSagitalReferenceLine)
@@ -393,10 +392,10 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     pass
     
     
-  #def onCreateModel(self):
-  #  #logic = VentriculostomyPlanningLogic()
-  #  threshold = -500.0
-  #  self.logic.createModel(self.inputVolumeSelector.currentNode(), self.outputModelSelector.currentNode(), threshold)
+  def onCreateModel(self):
+    #logic = VentriculostomyPlanningLogic()
+    threshold = -500.0
+    self.logic.createModel(self.inputVolumeSelector.currentNode(), self.outputModelSelector.currentNode(), threshold)
 
 
   # Event handlers for sagitalReference line
