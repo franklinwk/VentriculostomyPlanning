@@ -512,9 +512,11 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     if self.lockTrajectoryCheckBox.checked == 1:
       self.addTrajectoryButton.enabled = False
       self.clearTrajectoryButton.enabled = False
+      self.logic.lockTrajectoryLine()
     else:
       self.addTrajectoryButton.enabled = True
       self.clearTrajectoryButton.enabled = True
+      self.logic.unlockTrajectoryLine()
 
     if self.lockPlanningLinesCheckBox.checked == 1:
       self.addPointForSagitalPlanningLineButton.enabled = False
@@ -718,7 +720,7 @@ class CurveManager:
       viewer.SetOrientationToAxial()
       viewer.SetSliceOffset(pos[2])
     elif self.sliceID == "vtkMRMLSliceNodeYellow":
-      viewer.SetOrientationToSagital()
+      viewer.SetOrientationToSagittal()
       viewer.SetSliceOffset(pos[0])
     elif self.sliceID == "vtkMRMLSliceNodeGreen":
       viewer.SetOrientationToCoronal()
@@ -767,6 +769,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     self.trajectoryManager.setName("T")
     self.trajectoryManager.setDefaultSlicePositionToLastPoint()
     self.trajectoryManager.setModelColor(0.0, 1.0, 1.0)
+    self.trajectoryManager.setDefaultSlicePositionToFirstPoint()
 
     self.coronalPlanningCurveManager = CurveManager()
     self.coronalPlanningCurveManager.setName("CP1")
@@ -849,7 +852,9 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     self.coronalReferenceCurveManager.unlockLine()
 
   def startEditTrajectory(self):
-    self.trajectoryManager.startEditLine()
+    pos = [0.0] * 3
+    self.coronalReferenceCurveManager.getLastPoint(pos)
+    self.trajectoryManager.startEditLine(pos)
 
   def endEditTrajectory(self):
     self.trajectoryManager.endEditLine()
@@ -863,32 +868,22 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
   def getTrajectoryLength(self):
     return self.trajectoryManager.getLength()
 
-  def startEditSagitalPlanningLine(self):
+  def lockTrajectoryLine(self):
+    self.trajectoryManager.lockLine()
+    self.trajectoryManager.lockLine()
 
-    self.sagitalPlanningCurveManager.startEditLine()
-    
-  def endEditSagitalPlanningLine(self):
+  def unlockTrajectoryLine(self):
+    self.trajectoryManager.unlockLine()
+    self.trajectoryManager.unlockLine()
 
-    self.sagitalPlanningCurveManager.endEditLine()
+  def moveSliceTrajectory(self):
+    self.trajectoryManager.moveSliceToLine()
 
-  def clearSagitalPlanningLine(self):
-    
-    self.sagitalPlanningCurveManager.clearLine()
-
-  def setSagitalPlanningLineModifiedEventHandler(self, handler):
-
-    self.sagitalPlanningCurveManager.setModifiedEventHandler(handler)
-
-  def getSagitalPlanningLineLength(self):
-    return self.sagitalPlanningCurveManager.getLength()
-
-  def moveSliceSagitalPlanningLine(self):
-    self.sagitalPlanningCurveManager.moveSliceToLine()
 
   def startEditCoronalPlanningLine(self):
 
     pos = [0.0] * 3
-    self.sagitalPlanningCurveManager.getLastPoint(pos)
+    self.trajectoryManager.getFirstPoint(pos)
     self.coronalPlanningCurveManager.startEditLine(pos)
     
   def endEditCoronalPlanningLine(self):
@@ -916,6 +911,34 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
   def unlockPlanningLine(self):
     self.sagitalPlanningCurveManager.unlockLine()
     self.coronalPlanningCurveManager.unlockLine()
+
+
+  def startEditSagitalPlanningLine(self):
+
+    pos = [0.0] * 3
+
+    self.coronalPlanningCurveManager.getLastPoint(pos)
+    self.sagitalPlanningCurveManager.startEditLine(pos)
+    
+  def endEditSagitalPlanningLine(self):
+
+    self.sagitalPlanningCurveManager.endEditLine()
+
+  def clearSagitalPlanningLine(self):
+    
+    self.sagitalPlanningCurveManager.clearLine()
+
+  def setSagitalPlanningLineModifiedEventHandler(self, handler):
+
+    self.sagitalPlanningCurveManager.setModifiedEventHandler(handler)
+
+  def getSagitalPlanningLineLength(self):
+    return self.sagitalPlanningCurveManager.getLength()
+
+  def moveSliceSagitalPlanningLine(self):
+    self.sagitalPlanningCurveManager.moveSliceToLine()
+
+
 
   def createModel(self, inputVolumeNode, outputModelNode, thresholdValue):
 
