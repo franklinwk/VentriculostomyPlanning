@@ -334,7 +334,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     #
     # Create Model Button
     #
-    self.createModelButton = qt.QPushButton("Crete Model")
+    self.createModelButton = qt.QPushButton("Create Model")
     self.createModelButton.toolTip = "Create a surface model."
     self.createModelButton.enabled = True
     patientModelFormLayout.addRow(self.createModelButton)
@@ -342,6 +342,54 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.createModelButton.connect('clicked(bool)', self.onCreateModel)
     self.inputVolumeSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
     self.outputModelSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
+    
+    # Automatic entry point Area
+    #
+    automaticEntryPointCollapsibleButton = ctk.ctkCollapsibleButton()
+    automaticEntryPointCollapsibleButton.text = "CreateEntry"
+    self.layout.addWidget(automaticEntryPointCollapsibleButton)
+    
+    # Layout within the dummy collapsible button
+    automaticEntryPointFormLayout = qt.QFormLayout(automaticEntryPointCollapsibleButton)
+    
+    #
+    # output volume selector
+    #
+    self.inputModelSelector = slicer.qMRMLNodeComboBox()
+    self.inputModelSelector.nodeTypes = ["vtkMRMLModelNode"]
+    self.inputModelSelector.selectNodeUponCreation = True
+    self.inputModelSelector.addEnabled = True
+    self.inputModelSelector.removeEnabled = True
+    self.inputModelSelector.noneEnabled = True
+    self.inputModelSelector.showHidden = False
+    self.inputModelSelector.showChildNodeTypes = False
+    self.inputModelSelector.setMRMLScene( slicer.mrmlScene )
+    self.inputModelSelector.setToolTip( "Pick the input to the algorithm." )
+    automaticEntryPointFormLayout.addRow("Input Model: ", self.inputModelSelector)
+    
+    #
+    # Create Entry point Button
+    #
+    automaticEntryHorizontalLayout = qt.QHBoxLayout()
+    self.selectNasionButton = qt.QPushButton("Select Nasion")
+    self.selectNasionButton.toolTip = "Add a point in the 3D window"
+    self.selectNasionButton.enabled = True
+    automaticEntryHorizontalLayout.addWidget(self.selectNasionButton)
+    
+    self.createEntryPointButton = qt.QPushButton("Create Entry Point")
+    self.createEntryPointButton.toolTip = "Create the initial entry point."
+    self.createEntryPointButton.enabled = True
+    automaticEntryHorizontalLayout.addWidget(self.createEntryPointButton)
+    
+    automaticEntryPointFormLayout.addRow("Automatic Entry Point: ", automaticEntryHorizontalLayout)
+    self.selectNasionButton.connect('clicked(bool)', self.onSelectNasionPoint)
+    self.createEntryPointButton.connect('clicked(bool)', self.onCreateEntryPoint)
+    self.inputModelSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
+    
+    #end of GUI section
+    #####################################
+    
+    
 
     # SagitalReference line
     self.addPointForSagitalReferenceLineButton.connect('toggled(bool)', self.onEditSagitalReferenceLine)
@@ -396,7 +444,12 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     #logic = VentriculostomyPlanningLogic()
     threshold = -500.0
     self.logic.createModel(self.inputVolumeSelector.currentNode(), self.outputModelSelector.currentNode(), threshold)
-
+  
+  def onSelectNasionPoint(self):
+    self.logic.selectNasionPoint()     
+  
+  def onCreateEntryPoint(self):
+    self.logic.creatEntryPoint(self.inputModelSelector.currentNode(), self.selectedNasionPoint)
 
   # Event handlers for sagitalReference line
   def onEditSagitalReferenceLine(self, switch):
@@ -751,7 +804,6 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
   """
 
   def __init__(self):
-    
     self.sagitalReferenceCurveManager = CurveManager()
     self.sagitalReferenceCurveManager.setName("SR1")
     self.sagitalReferenceCurveManager.setSliceID("vtkMRMLSliceNodeYellow")
@@ -782,6 +834,8 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     self.sagitalPlanningCurveManager.setDefaultSlicePositionToFirstPoint()
     self.sagitalPlanningCurveManager.setModelColor(1.0, 1.0, 0.0)
     
+    self.nasionPoint = None
+    
   def hasImageData(self,volumeNode):
     """This is an example logic method that
     returns true if the passed in volume
@@ -794,7 +848,6 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       logging.debug('hasImageData failed: no image data in volume node')
       return False
     return True
-
 
   def startEditSagitalReferenceLine(self):
 
@@ -1068,6 +1121,51 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     modelDisplayNode.SetColor(ModelColor)
     slicer.mrmlScene.AddNode(modelDisplayNode)
     outputModelNode.SetAndObserveDisplayNodeID(modelDisplayNode.GetID())
+    
+  def updatePosition(self, nasionNode, eventID):
+    pos = [0.0]*4
+    nasionNode.GetNthFiducialWorldCoordinates(0,pos)
+    viewerRed = slicer.mrmlScene.GetNodeByID("vtkMRMLSliceNodeRed")
+    viewerRed.SetOrientationToAxial()
+    viewerRed.SetSliceOffset(pos[2])
+    viewerYellow = slicer.mrmlScene.GetNodeByID("vtkMRMLSliceNodeYellow")
+    viewerYellow.SetOrientationToSagittal()
+    viewerYellow.SetSliceOffset(pos[0])
+    viewerBlue = slicer.mrmlScene.GetNodeByID("vtkMRMLSliceNodeGreen")
+    viewerBlue.SetOrientationToCoronal()
+    viewerBlue.SetSliceOffset(pos[1])
+    pass
+    
+  def selectNasionPoint(self, initPoint = None):
+    if self.nasionPoint == None:
+      self.nasionPoint = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
+      self.nasionPoint.SetName("NasionPoint")
+      slicer.mrmlScene.AddNode(self.nasionPoint)
+      self.nasionPoint.AddObserver(vtk.vtkCommand.ModifiedEvent, self.updatePosition)
+      dnode = self.nasionPoint.GetMarkupsDisplayNode()
+      if dnode:
+        rgbColor = [1.0, 0.0, 1.0]
+        dnode.SetSelectedColor(rgbColor)
+      pos = [0.0] * 3
+      if initPoint != None:
+        self.nasionPoint.AddFiducial(initPoint[0],initPoint[1],initPoint[2])
+        pos = initPoint
+      viewerRed = slicer.mrmlScene.GetNodeByID("vtkMRMLSliceNodeRed")
+      viewerRed.SetOrientationToAxial()
+      viewerRed.SetSliceOffset(pos[2])
+      viewerYellow = slicer.mrmlScene.GetNodeByID("vtkMRMLSliceNodeYellow")
+      viewerYellow.SetOrientationToSagittal()
+      viewerYellow.SetSliceOffset(pos[0])
+      viewerBlue = slicer.mrmlScene.GetNodeByID("vtkMRMLSliceNodeGreen")
+      viewerBlue.SetOrientationToCoronal()
+      viewerBlue.SetSliceOffset(pos[1])
+        
+        
+  
+  def creatEntryPoint(self, inputModelNode, selectedNasionPoint) :
+    pass
+    
+    
 
   
 class VentriculostomyPlanningTest(ScriptedLoadableModuleTest):
