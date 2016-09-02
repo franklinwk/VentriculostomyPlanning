@@ -382,7 +382,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     automaticEntryHorizontalLayout.addWidget(self.createEntryPointButton)
     
     automaticEntryPointFormLayout.addRow("Automatic Entry Point: ", automaticEntryHorizontalLayout)
-    self.selectNasionButton.connect('clicked(bool)', self.onSelectNasionPoint)
+    self.selectNasionButton.connect('clicked(bool)', self.onSelectnasionPointNode)
     self.createEntryPointButton.connect('clicked(bool)', self.onCreateEntryPoint)
     self.inputModelSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelectModelForEntryPoint)
     
@@ -449,8 +449,8 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     threshold = -500.0
     self.logic.createModel(self.inputVolumeSelector.currentNode(), self.outputModelSelector.currentNode(), threshold)
   
-  def onSelectNasionPoint(self):
-    self.logic.selectNasionPoint(self.inputModelSelector.currentNode())     
+  def onSelectnasionPointNode(self):
+    self.logic.selectnasionPointNode(self.inputModelSelector.currentNode())     
   
   def onCreateEntryPoint(self):
     self.logic.creatEntryPoint()
@@ -841,8 +841,9 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     self.sagitalPlanningCurveManager.setDefaultSlicePositionToFirstPoint()
     self.sagitalPlanningCurveManager.setModelColor(1.0, 1.0, 0.0)
     
-    self.nasionPoint = None
+    self.nasionPointNode = None
     self.inputModel = None
+    self.topPoint = []
     
   def hasImageData(self,volumeNode):
     """This is an example logic method that
@@ -1168,22 +1169,22 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     viewerBlue.SetSliceOffset(pos[1])
     pass
     
-  def selectNasionPoint(self, inputCreatedModel, initPoint = None):
-    if self.nasionPoint:
-      slicer.mrmlScene.RemoveNode(self.nasionPoint)
-      self.nasionPoint = None
+  def selectnasionPointNode(self, inputCreatedModel, initPoint = None):
+    if self.nasionPointNode:
+      slicer.mrmlScene.RemoveNode(self.nasionPointNode)
+      self.nasionPointNode = None
     self.inputModel= inputCreatedModel
-    self.nasionPoint = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
-    self.nasionPoint.SetName("NasionPoint")
-    slicer.mrmlScene.AddNode(self.nasionPoint)
-    self.nasionPoint.AddObserver(vtk.vtkCommand.ModifiedEvent, self.updatePosition)
-    dnode = self.nasionPoint.GetMarkupsDisplayNode()
+    self.nasionPointNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
+    self.nasionPointNode.SetName("nasionPointNode")
+    slicer.mrmlScene.AddNode(self.nasionPointNode)
+    self.nasionPointNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.updatePosition)
+    dnode = self.nasionPointNode.GetMarkupsDisplayNode()
     if dnode:
       rgbColor = [1.0, 0.0, 1.0]
       dnode.SetSelectedColor(rgbColor)
     pos = [0.0] * 3
     if initPoint != None:
-      self.nasionPoint.AddFiducial(initPoint[0],initPoint[1],initPoint[2])
+      self.nasionPointNode.AddFiducial(initPoint[0],initPoint[1],initPoint[2])
       pos = initPoint
     viewerRed = slicer.mrmlScene.GetNodeByID("vtkMRMLSliceNodeRed")
     viewerRed.SetOrientationToAxial()
@@ -1200,7 +1201,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       return
 
     selectionNode.SetReferenceActivePlaceNodeClassName("vtkMRMLMarkupsFiducialNode");
-    selectionNode.SetActivePlaceNodeID(self.nasionPoint.GetID())
+    selectionNode.SetActivePlaceNodeID(self.nasionPointNode.GetID())
 
     interactionNode.SwitchToSinglePlaceMode ()
     interactionNode.SetCurrentInteractionMode(slicer.vtkMRMLInteractionNode.Place) 
@@ -1208,185 +1209,142 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     interactionNode.AddObserver(interactionNode.EndPlacementEvent, self.endPlacement) 
     
   
-  def endPlacement(self, interactionNode, selectedNasionPoint):
+  def endPlacement(self, interactionNode, selectednasionPointNode):
     interactionNode.SetCurrentInteractionMode(slicer.vtkMRMLInteractionNode.ViewTransform)
     #self.creatEntryPoint() 
     pass
   
+  def sortPoints(self, inputPointVector, referencePoint):
+    minDistanceIndex = 0
+    minDistance = 1e10
+    for iPos in range(inputPointVector.GetNumberOfPoints()):
+      currentPos = numpy.array(inputPointVector.GetPoint(iPos))
+      minDistance = numpy.linalg.norm(currentPos-referencePoint)
+      minDistanceIndex = iPos
+      for jPos in range(iPos, inputPointVector.GetNumberOfPoints()):
+        posModelPost = numpy.array(inputPointVector.GetPoint(jPos))
+        distanceModelPostNasion = numpy.linalg.norm(posModelPost-referencePoint)
+        if distanceModelPostNasion <  minDistance:
+          minDistanceIndex = jPos
+          minDistance = distanceModelPostNasion
+      inputPointVector.SetPoint(iPos,inputPointVector.GetPoint(minDistanceIndex))
+      inputPointVector.SetPoint(minDistanceIndex,currentPos)
+      
+  def constructCurve(self, CurveManager,points, axis):
+    step = 20 
+    ApproximityPos = 25.0
+    DestiationPos = 30.0
+    if axis == 0:
+      step = 50
+      ApproximityPos = 85.0
+      DestiationPos = 100.0
+  
+    if CurveManager.curveModel == None:
+      CurveManager.curveModel = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
+      CurveManager.curveModel.SetName(CurveManager.curveModelName)
+      slicer.mrmlScene.AddNode(CurveManager.curveModel)
+    if CurveManager.curveFiducials == None:
+      CurveManager.curveFiducials = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
+      CurveManager.curveFiducials.SetName(CurveManager.curveName)
+      slicer.mrmlScene.AddNode(CurveManager.curveFiducials) 
+    else:
+      CurveManager.curveFiducials.RemoveAllMarkups()
+      CurveManager.cmLogic.updateCurve()
+    iPos = 0
+    iPosValid = iPos
+    posModel = numpy.array(points.GetPoint(iPos))
+    CurveManager.cmLogic.DestinationNode = CurveManager.curveModel
+    CurveManager.curveFiducials.AddFiducial(posModel[0],posModel[1],posModel[2]) 
+    for iPos in range(step,points.GetNumberOfPoints(),step):
+      posModel = numpy.array(points.GetPoint(iPos))
+      posModelValid = numpy.array(points.GetPoint(iPosValid))
+      if  numpy.linalg.norm(posModel-posModelValid)> 50.0:
+        continue
+      iPosValid = iPos
+      CurveManager.curveFiducials.AddFiducial(posModel[0],posModel[1],posModel[2]) #adding fiducials takes too long, check the event triggered by this operation
+      CurveManager.cmLogic.SourceNode = CurveManager.curveFiducials
+      CurveManager.cmLogic.updateCurve()
+      if CurveManager.cmLogic.CurveLength>ApproximityPos:
+        break
+    jPos = iPosValid 
+    jPosValid = jPos
+    posApprox = numpy.array(points.GetPoint(iPos))
+    for jPos in range(iPosValid,points.GetNumberOfPoints(), 1):
+      posModel = numpy.array(points.GetPoint(jPos))
+      posModelValid = numpy.array(points.GetPoint(jPosValid))
+      if  numpy.linalg.norm(posModel-posModelValid)> 50.0:
+        continue
+      jPosValid = jPos
+      distance = numpy.linalg.norm(posModel-posApprox)+ CurveManager.cmLogic.CurveLength
+      if (distance>DestiationPos) or (jPos==points.GetNumberOfPoints()-1):
+        CurveManager.curveFiducials.AddFiducial(posModel[0],posModel[1],posModel[2])  
+        break  
+    CurveManager.cmLogic.SourceNode.SetAttribute('CurveMaker.CurveModel', CurveManager.cmLogic.DestinationNode.GetID())
+    CurveManager.cmLogic.updateCurve()
+    CurveManager.cmLogic.CurvePoly = vtk.vtkPolyData() ## For CurveMaker bug
+    CurveManager.cmLogic.enableAutomaticUpdate(1)
+    CurveManager.cmLogic.setInterpolationMethod(1)
+    CurveManager.cmLogic.setTubeRadius(0.5)  
+    if axis == 0:
+      self.topPoint = points.GetPoint(jPos)
+    else:
+      self.topPoint = []
+  
+  def getIntersectPoints(self, polyData, plane, referencePoint, axis, intersectPoints):
+    targetDistance = 30
+    if axis == 0:
+      targetDistance = 100.0 
+    cutter = vtk.vtkCutter()
+    cutter.SetCutFunction(plane)
+    cutter.SetInputData(polyData)
+    cutter.Update()
+    cuttedPolyData = cutter.GetOutput()
+    points = cuttedPolyData.GetPoints()      
+    for iPos in range(points.GetNumberOfPoints()):
+      posModel = numpy.array(points.GetPoint(iPos))
+      ## distance calculation could be simplified if the patient is well aligned in the scanner
+      distanceModelNasion = numpy.linalg.norm(posModel-referencePoint)
+      valid = False
+      if axis == 0:
+        valid = posModel[2]>=referencePoint[2]
+      elif axis == 1:
+        valid = posModel[0]>=referencePoint[0]
+      if (distanceModelNasion < targetDistance) and valid:        
+          intersectPoints.InsertNextPoint(posModel)
+  
   def creatEntryPoint(self) :
     ###All caculation is based on the RAS coordinates system
-    if self.inputModel and (self.inputModel.GetClassName() == "vtkMRMLModelNode") and self.nasionPoint:
-      posNasion = numpy.array([0.0,0.0,0.0])
-      self.nasionPoint.GetNthFiducialPosition(0,posNasion)
-      self.cutSkullModel(self.inputModel, posNasion)
-      torelance = 0.35
+    if self.inputModel and (self.inputModel.GetClassName() == "vtkMRMLModelNode") and self.nasionPointNode:
       polyData = self.inputModel.GetPolyData()
-      if polyData:
+      if polyData: 
+        posNasion = numpy.array([0.0,0.0,0.0])
+        self.nasionPointNode.GetNthFiducialPosition(0,posNasion)
+        #self.cutSkullModel(self.inputModel, posNasion)
         plane = vtk.vtkPlane()
         plane.SetOrigin(posNasion[0],0,0)
         plane.SetNormal(1,0,0)
-        cutter = vtk.vtkCutter()
-        cutter.SetCutFunction(plane)
-        cutter.SetInputData(polyData)
-        cutter.Update()
-        cuttedPolyData = cutter.GetOutput()
-        points = cuttedPolyData.GetPoints()      
         sagittalPoints = vtk.vtkPoints()
-        for iPos in range(points.GetNumberOfPoints()):
-          posModel = numpy.array(points.GetPoint(iPos))
-          ## distance calculation could be simplified if the patient is well aligned in the scanner
-          distanceModelNasion = numpy.linalg.norm(posModel-posNasion)
-          if (distanceModelNasion < 100.0) and (posModel[2]>posNasion[2]):        
-              sagittalPoints.InsertNextPoint(posModel)
+        self.getIntersectPoints(polyData, plane,posNasion,0, sagittalPoints)
               
-        ## Sorting      
-        minDistanceIndex = 0
-        minDistance = 1e10
-        for iPos in range(sagittalPoints.GetNumberOfPoints()):
-          currentPos = numpy.array(sagittalPoints.GetPoint(iPos))
-          minDistance = numpy.linalg.norm(currentPos-posNasion)
-          minDistanceIndex = iPos
-          for jPos in range(iPos, sagittalPoints.GetNumberOfPoints()):
-            posModelPost = numpy.array(sagittalPoints.GetPoint(jPos))
-            distanceModelPostNasion = numpy.linalg.norm(posModelPost-posNasion)
-            if distanceModelPostNasion <  minDistance:
-              minDistanceIndex = jPos
-              minDistance = distanceModelPostNasion
-          sagittalPoints.SetPoint(iPos,sagittalPoints.GetPoint(minDistanceIndex))
-          sagittalPoints.SetPoint(minDistanceIndex,currentPos)
+        ## Sorting   
+        self.sortPoints(sagittalPoints, posNasion)   
         
-        if self.sagitalReferenceCurveManager.curveModel == None:
-          self.sagitalReferenceCurveManager.curveModel = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
-          self.sagitalReferenceCurveManager.curveModel.SetName(self.sagitalReferenceCurveManager.curveModelName)
-          slicer.mrmlScene.AddNode(self.sagitalReferenceCurveManager.curveModel)
-        if self.sagitalReferenceCurveManager.curveFiducials == None:
-          self.sagitalReferenceCurveManager.curveFiducials = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
-          self.sagitalReferenceCurveManager.curveFiducials.SetName(self.sagitalReferenceCurveManager.curveName)
-          slicer.mrmlScene.AddNode(self.sagitalReferenceCurveManager.curveFiducials) 
-        else:
-          self.sagitalReferenceCurveManager.curveFiducials.RemoveAllMarkups()
-          self.sagitalReferenceCurveManager.cmLogic.updateCurve()  
-        
-        self.sagitalReferenceCurveManager.cmLogic.DestinationNode = self.sagitalReferenceCurveManager.curveModel
-        self.sagitalReferenceCurveManager.cmLogic.SourceNode = self.sagitalReferenceCurveManager.curveFiducials
-        self.sagitalReferenceCurveManager.cmLogic.SourceNode.SetAttribute('CurveMaker.CurveModel', self.sagitalReferenceCurveManager.cmLogic.DestinationNode.GetID())  
-        iPos = 0
-        step = 50
-        iPosValid = iPos
-        posModel = numpy.array(sagittalPoints.GetPoint(iPos))
-        self.sagitalReferenceCurveManager.curveFiducials.AddFiducial(posModel[0],posModel[1],posModel[2]) 
-        self.sagitalReferenceCurveManager.cmLogic.updateCurve()
-        for iPos in range(step,sagittalPoints.GetNumberOfPoints(),step):
-          posModel = numpy.array(sagittalPoints.GetPoint(iPos))
-          posModelValid = numpy.array(sagittalPoints.GetPoint(iPosValid))
-          if  numpy.linalg.norm(posModel-posModelValid)> 50.0:
-            continue
-          iPosValid = iPos
-          self.sagitalReferenceCurveManager.curveFiducials.AddFiducial(posModel[0],posModel[1],posModel[2]) #adding fiducials takes too long, check the event triggered by this operation
-          self.sagitalReferenceCurveManager.cmLogic.updateCurve()
-          if self.sagitalReferenceCurveManager.cmLogic.CurveLength>85.0:
-            break
-        jPos = 0  
-        posAround85 = numpy.array(sagittalPoints.GetPoint(iPos))
-        for jPos in range(iPosValid,sagittalPoints.GetNumberOfPoints(), 1):
-          posModel = numpy.array(sagittalPoints.GetPoint(jPos))
-          distance = numpy.linalg.norm(posModel-posAround85)+self.sagitalReferenceCurveManager.cmLogic.CurveLength
-          if distance>100.0 and distance <115.0:
-            self.sagitalReferenceCurveManager.curveFiducials.AddFiducial(posModel[0],posModel[1],posModel[2]) 
-            self.sagitalReferenceCurveManager.cmLogic.updateCurve()
-            break
-    
-        self.sagitalReferenceCurveManager.cmLogic.CurvePoly = vtk.vtkPolyData() ## For CurveMaker bug
-        self.sagitalReferenceCurveManager.cmLogic.enableAutomaticUpdate(1)
-        self.sagitalReferenceCurveManager.cmLogic.setInterpolationMethod(1)
-        self.sagitalReferenceCurveManager.cmLogic.setTubeRadius(0.5)     
+        self.constructCurve(self.sagitalReferenceCurveManager, sagittalPoints, 0)  
             
-        self.sagitalReferenceCurveManager.tagSourceNode = self.sagitalReferenceCurveManager.cmLogic.SourceNode.AddObserver('ModifiedEvent', self.sagitalReferenceCurveManager.onLineSourceUpdated)  
+        #self.sagitalReferenceCurveManager.tagSourceNode = self.sagitalReferenceCurveManager.cmLogic.SourceNode.AddObserver('ModifiedEvent', self.sagitalReferenceCurveManager.onLineSourceUpdated)  
         #localLogic = self.sagitalReferenceCurveManager.cmLogic
         ##To do, calculate the curvature value points by point might be necessary to exclude the outliers   
-        topPointIndex = jPos
-        posNasionBack100 = sagittalPoints.GetPoint(topPointIndex)
-        coronalPoints = vtk.vtkPoints() 
-        plane.SetOrigin(0,posNasionBack100[1],0)
-        plane.SetNormal(0,1,0)
-        cutter.SetCutFunction(plane)
-        cutter.SetInputData(polyData)
-        cutter.Update()
-        cuttedPolyData = cutter.GetOutput()
-        points = cuttedPolyData.GetPoints()    
-        for iPos in range(points.GetNumberOfPoints()):
-          posModel = numpy.array(points.GetPoint(iPos))
-          ## distance calculation could be simplified if the patient is well aligned in the scanner
-          distanceModelNasion = numpy.linalg.norm(posModel-posNasionBack100)
-          if (distanceModelNasion < 30.0) and (posModel[0]>posNasionBack100[0]):
-              coronalPoints.InsertNextPoint(posModel)    
-                  
-        ## Sorting      
-        minDistance = 1e10
-        minDistanceIndex = 0
-        for iPos in range(coronalPoints.GetNumberOfPoints()):
-          currentPos = numpy.array(coronalPoints.GetPoint(iPos))
-          minDistance = numpy.linalg.norm(currentPos-posNasionBack100)
-          minDistanceIndex = iPos
-          for jPos in range(iPos, coronalPoints.GetNumberOfPoints()):
-            posModelPost = numpy.array(coronalPoints.GetPoint(jPos))
-            distanceModelPostNasion = numpy.linalg.norm(posModelPost-posNasionBack100)
-            if distanceModelPostNasion <  minDistance:
-              minDistanceIndex = jPos
-              minDistance = distanceModelPostNasion
-          coronalPoints.SetPoint(iPos,coronalPoints.GetPoint(minDistanceIndex))
-          coronalPoints.SetPoint(minDistanceIndex,currentPos)    
-        
-        if self.coronalReferenceCurveManager.curveModel == None:
-          self.coronalReferenceCurveManager.curveModel = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
-          self.coronalReferenceCurveManager.curveModel.SetName(self.coronalReferenceCurveManager.curveModelName)
-          slicer.mrmlScene.AddNode(self.coronalReferenceCurveManager.curveModel)
-        if self.coronalReferenceCurveManager.curveFiducials == None:
-          self.coronalReferenceCurveManager.curveFiducials = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
-          self.coronalReferenceCurveManager.curveFiducials.SetName(self.coronalReferenceCurveManager.curveName)
-          slicer.mrmlScene.AddNode(self.coronalReferenceCurveManager.curveFiducials) 
-        else:
-          self.coronalReferenceCurveManager.curveFiducials.RemoveAllMarkups()
-          self.coronalReferenceCurveManager.cmLogic.updateCurve()
-        
-        self.sagitalReferenceCurveManager.cmLogic.DestinationNode = self.sagitalReferenceCurveManager.curveModel
-        self.sagitalReferenceCurveManager.cmLogic.SourceNode = self.sagitalReferenceCurveManager.curveFiducials
-        self.sagitalReferenceCurveManager.cmLogic.SourceNode.SetAttribute('CurveMaker.CurveModel', self.sagitalReferenceCurveManager.cmLogic.DestinationNode.GetID())  
-        
-        iPos = 0
-        step = 20
-        iPosValid = iPos
-        posModel = numpy.array(coronalPoints.GetPoint(iPos))
-        self.coronalReferenceCurveManager.cmLogic.DestinationNode = self.coronalReferenceCurveManager.curveModel
-        self.coronalReferenceCurveManager.cmLogic.SourceNode = self.coronalReferenceCurveManager.curveFiducials
-        self.coronalReferenceCurveManager.cmLogic.SourceNode.SetAttribute('CurveMaker.CurveModel', self.coronalReferenceCurveManager.cmLogic.DestinationNode.GetID())
-        self.coronalReferenceCurveManager.curveFiducials.AddFiducial(posModel[0],posModel[1],posModel[2]) 
-        self.coronalReferenceCurveManager.cmLogic.updateCurve()
-        for iPos in range(step,coronalPoints.GetNumberOfPoints(),step):
-          posModel = numpy.array(coronalPoints.GetPoint(iPos))
-          posModelValid = numpy.array(coronalPoints.GetPoint(iPosValid))
-          if  numpy.linalg.norm(posModel-posModelValid)> 50.0:
-            continue
-          iPosValid = iPos
-          self.coronalReferenceCurveManager.curveFiducials.AddFiducial(posModel[0],posModel[1],posModel[2]) #adding fiducials takes too long, check the event triggered by this operation
-          self.coronalReferenceCurveManager.cmLogic.updateCurve()
-          if self.coronalReferenceCurveManager.cmLogic.CurveLength>25.0:
-            break
-        jPos = 0  
-        posAround25 = numpy.array(coronalPoints.GetPoint(iPos))
-        for jPos in range(iPosValid,coronalPoints.GetNumberOfPoints(), 1):
-          posModel = numpy.array(coronalPoints.GetPoint(jPos))
-          distance = numpy.linalg.norm(posModel-posAround25)+self.coronalReferenceCurveManager.cmLogic.CurveLength
-          if distance>30.0 and distance <35.0:
-            self.coronalReferenceCurveManager.curveFiducials.AddFiducial(posModel[0],posModel[1],posModel[2]) 
-            self.coronalReferenceCurveManager.cmLogic.updateCurve()
-            break
-    
-        self.coronalReferenceCurveManager.cmLogic.CurvePoly = vtk.vtkPolyData() ## For CurveMaker bug
-        self.coronalReferenceCurveManager.cmLogic.enableAutomaticUpdate(1)
-        self.coronalReferenceCurveManager.cmLogic.setInterpolationMethod(1)
-        self.coronalReferenceCurveManager.cmLogic.setTubeRadius(0.5)      
-        #self.coronalReferenceCurveManager.tagSourceNode = self.coronalReferenceCurveManager.cmLogic.SourceNode.AddObserver('ModifiedEvent', self.coronalReferenceCurveManager.onLineSourceUpdated)
+        if self.topPoint:
+          posNasionBack100 = self.topPoint
+          coronalPoints = vtk.vtkPoints() 
+          plane.SetOrigin(0,posNasionBack100[1],0)
+          plane.SetNormal(0,1,0)
+          self.getIntersectPoints(polyData, plane,posNasionBack100, 1, coronalPoints) 
+                    
+          ## Sorting      
+          self.sortPoints(coronalPoints, posNasionBack100)  
+          self.constructCurve(self.coronalReferenceCurveManager, coronalPoints, 1)    
+          #self.coronalReferenceCurveManager.tagSourceNode = self.coronalReferenceCurveManager.cmLogic.SourceNode.AddObserver('ModifiedEvent', self.coronalReferenceCurveManager.onLineSourceUpdated)
     pass
     
     
