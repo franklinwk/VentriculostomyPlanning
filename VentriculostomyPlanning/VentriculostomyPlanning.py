@@ -1016,14 +1016,27 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     threshold.ReleaseDataFlagOff()
     threshold.Update()
     dilateErode = vtk.vtkImageDilateErode3D()
-    dilateErode.SetInputConnection(threshold.GetOutputPort());
-    dilateErode.SetDilateValue(1);
-    dilateErode.SetErodeValue(0);
-    dilateErode.SetKernelSize(30, 30, 5);
-    dilateErode.ReleaseDataFlagOff();
+    dilateErode.SetInputData(threshold.GetOutput()) 
+    dilateErode.SetDilateValue(1)
+    dilateErode.SetErodeValue(0)
+    dilateErode.SetKernelSize(50, 50, 15)
+    dilateErode.ReleaseDataFlagOff()
+    dilateErode.Update()
+    erode = vtk.vtkImageDilateErode3D()
+    erode.SetInputData(dilateErode.GetOutput())
+    erode.SetDilateValue(0)
+    erode.SetErodeValue(1)
+    erode.SetKernelSize(50, 50, 15)
+    erode.ReleaseDataFlagOff()
+    erode.Update()
+    #for i in range(1):
+    #  dilateErode.SetInputData(erode.GetOutput()) 
+    #  dilateErode.Update()
+    #  erode.SetInputData(dilateErode.GetOutput())
+    #  erode.Update()
     
     cast = vtk.vtkImageCast()
-    cast.SetInputConnection(dilateErode.GetOutputPort())
+    cast.SetInputData(erode.GetOutput())
     cast.SetOutputScalarTypeToUnsignedChar()
     cast.Update()
 
@@ -1085,7 +1098,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     decimator.SplittingOff()
     decimator.PreserveTopologyOn()
     decimator.SetMaximumError(1)
-    decimator.SetTargetReduction(0.001)
+    decimator.SetTargetReduction(0.5) #0.001 only reduce the points by 0.1%, 0.5 is 50% off
     decimator.ReleaseDataFlagOff()
     decimator.Update()
     
@@ -1133,6 +1146,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     modelDisplayNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelDisplayNode")
     ModelColor = [0.0, 0.0, 1.0]
     modelDisplayNode.SetColor(ModelColor)
+    modelDisplayNode.SetOpacity(0.5)
     slicer.mrmlScene.AddNode(modelDisplayNode)
     outputModelNode.SetAndObserveDisplayNodeID(modelDisplayNode.GetID())
   
@@ -1231,6 +1245,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         for iPos in range(sagittalPoints.GetNumberOfPoints()):
           currentPos = numpy.array(sagittalPoints.GetPoint(iPos))
           minDistance = numpy.linalg.norm(currentPos-posNasion)
+          minDistanceIndex = iPos
           for jPos in range(iPos, sagittalPoints.GetNumberOfPoints()):
             posModelPost = numpy.array(sagittalPoints.GetPoint(jPos))
             distanceModelPostNasion = numpy.linalg.norm(posModelPost-posNasion)
@@ -1251,14 +1266,35 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         else:
           self.sagitalReferenceCurveManager.curveFiducials.RemoveAllMarkups()
           self.sagitalReferenceCurveManager.cmLogic.updateCurve()  
-          
-        for iPos in range(0,sagittalPoints.GetNumberOfPoints(),50):
-          posModel = numpy.array(sagittalPoints.GetPoint(iPos))
-          self.sagitalReferenceCurveManager.curveFiducials.AddFiducial(posModel[0],posModel[1],posModel[2]) #adding fiducials takes too long, check the event triggered by this operation
+        
         self.sagitalReferenceCurveManager.cmLogic.DestinationNode = self.sagitalReferenceCurveManager.curveModel
         self.sagitalReferenceCurveManager.cmLogic.SourceNode = self.sagitalReferenceCurveManager.curveFiducials
-        self.sagitalReferenceCurveManager.cmLogic.SourceNode.SetAttribute('CurveMaker.CurveModel', self.sagitalReferenceCurveManager.cmLogic.DestinationNode.GetID())
+        self.sagitalReferenceCurveManager.cmLogic.SourceNode.SetAttribute('CurveMaker.CurveModel', self.sagitalReferenceCurveManager.cmLogic.DestinationNode.GetID())  
+        iPos = 0
+        step = 50
+        iPosValid = iPos
+        posModel = numpy.array(sagittalPoints.GetPoint(iPos))
+        self.sagitalReferenceCurveManager.curveFiducials.AddFiducial(posModel[0],posModel[1],posModel[2]) 
         self.sagitalReferenceCurveManager.cmLogic.updateCurve()
+        for iPos in range(step,sagittalPoints.GetNumberOfPoints(),step):
+          posModel = numpy.array(sagittalPoints.GetPoint(iPos))
+          posModelValid = numpy.array(sagittalPoints.GetPoint(iPosValid))
+          if  numpy.linalg.norm(posModel-posModelValid)> 50.0:
+            continue
+          iPosValid = iPos
+          self.sagitalReferenceCurveManager.curveFiducials.AddFiducial(posModel[0],posModel[1],posModel[2]) #adding fiducials takes too long, check the event triggered by this operation
+          self.sagitalReferenceCurveManager.cmLogic.updateCurve()
+          if self.sagitalReferenceCurveManager.cmLogic.CurveLength>85.0:
+            break
+        jPos = 0  
+        posAround85 = numpy.array(sagittalPoints.GetPoint(iPos))
+        for jPos in range(iPosValid,sagittalPoints.GetNumberOfPoints(), 1):
+          posModel = numpy.array(sagittalPoints.GetPoint(jPos))
+          distance = numpy.linalg.norm(posModel-posAround85)+self.sagitalReferenceCurveManager.cmLogic.CurveLength
+          if distance>100.0 and distance <115.0:
+            self.sagitalReferenceCurveManager.curveFiducials.AddFiducial(posModel[0],posModel[1],posModel[2]) 
+            self.sagitalReferenceCurveManager.cmLogic.updateCurve()
+            break
     
         self.sagitalReferenceCurveManager.cmLogic.CurvePoly = vtk.vtkPolyData() ## For CurveMaker bug
         self.sagitalReferenceCurveManager.cmLogic.enableAutomaticUpdate(1)
@@ -1268,13 +1304,10 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         self.sagitalReferenceCurveManager.tagSourceNode = self.sagitalReferenceCurveManager.cmLogic.SourceNode.AddObserver('ModifiedEvent', self.sagitalReferenceCurveManager.onLineSourceUpdated)  
         #localLogic = self.sagitalReferenceCurveManager.cmLogic
         ##To do, calculate the curvature value points by point might be necessary to exclude the outliers   
-        topPointIndex = 0
-        for iPos in range(sagittalPoints.GetNumberOfPoints()):
-          if(sagittalPoints.GetPoint(iPos)[2]>sagittalPoints.GetPoint(topPointIndex)[2]):
-            topPointIndex = iPos
-        posNasionBack10 = sagittalPoints.GetPoint(topPointIndex)
+        topPointIndex = jPos
+        posNasionBack100 = sagittalPoints.GetPoint(topPointIndex)
         coronalPoints = vtk.vtkPoints() 
-        plane.SetOrigin(0,posNasionBack10[1],0)
+        plane.SetOrigin(0,posNasionBack100[1],0)
         plane.SetNormal(0,1,0)
         cutter.SetCutFunction(plane)
         cutter.SetInputData(polyData)
@@ -1284,8 +1317,8 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         for iPos in range(points.GetNumberOfPoints()):
           posModel = numpy.array(points.GetPoint(iPos))
           ## distance calculation could be simplified if the patient is well aligned in the scanner
-          distanceModelNasion = numpy.linalg.norm(posModel-posNasionBack10)
-          if (distanceModelNasion < 30.0) and (posModel[0]>posNasionBack10[0]):
+          distanceModelNasion = numpy.linalg.norm(posModel-posNasionBack100)
+          if (distanceModelNasion < 30.0) and (posModel[0]>posNasionBack100[0]):
               coronalPoints.InsertNextPoint(posModel)    
                   
         ## Sorting      
@@ -1293,10 +1326,11 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         minDistanceIndex = 0
         for iPos in range(coronalPoints.GetNumberOfPoints()):
           currentPos = numpy.array(coronalPoints.GetPoint(iPos))
-          minDistance = numpy.linalg.norm(currentPos-posNasionBack10)
+          minDistance = numpy.linalg.norm(currentPos-posNasionBack100)
+          minDistanceIndex = iPos
           for jPos in range(iPos, coronalPoints.GetNumberOfPoints()):
             posModelPost = numpy.array(coronalPoints.GetPoint(jPos))
-            distanceModelPostNasion = numpy.linalg.norm(posModelPost-posNasionBack10)
+            distanceModelPostNasion = numpy.linalg.norm(posModelPost-posNasionBack100)
             if distanceModelPostNasion <  minDistance:
               minDistanceIndex = jPos
               minDistance = distanceModelPostNasion
@@ -1314,14 +1348,39 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         else:
           self.coronalReferenceCurveManager.curveFiducials.RemoveAllMarkups()
           self.coronalReferenceCurveManager.cmLogic.updateCurve()
-          
-        for iPos in range(0,coronalPoints.GetNumberOfPoints(),20):
-          posModel = numpy.array(coronalPoints.GetPoint(iPos))
-          self.coronalReferenceCurveManager.curveFiducials.AddFiducial(posModel[0],posModel[1],posModel[2]) #adding fiducials takes too long, check the event triggered by this operation
+        
+        self.sagitalReferenceCurveManager.cmLogic.DestinationNode = self.sagitalReferenceCurveManager.curveModel
+        self.sagitalReferenceCurveManager.cmLogic.SourceNode = self.sagitalReferenceCurveManager.curveFiducials
+        self.sagitalReferenceCurveManager.cmLogic.SourceNode.SetAttribute('CurveMaker.CurveModel', self.sagitalReferenceCurveManager.cmLogic.DestinationNode.GetID())  
+        
+        iPos = 0
+        step = 20
+        iPosValid = iPos
+        posModel = numpy.array(coronalPoints.GetPoint(iPos))
         self.coronalReferenceCurveManager.cmLogic.DestinationNode = self.coronalReferenceCurveManager.curveModel
         self.coronalReferenceCurveManager.cmLogic.SourceNode = self.coronalReferenceCurveManager.curveFiducials
         self.coronalReferenceCurveManager.cmLogic.SourceNode.SetAttribute('CurveMaker.CurveModel', self.coronalReferenceCurveManager.cmLogic.DestinationNode.GetID())
+        self.coronalReferenceCurveManager.curveFiducials.AddFiducial(posModel[0],posModel[1],posModel[2]) 
         self.coronalReferenceCurveManager.cmLogic.updateCurve()
+        for iPos in range(step,coronalPoints.GetNumberOfPoints(),step):
+          posModel = numpy.array(coronalPoints.GetPoint(iPos))
+          posModelValid = numpy.array(coronalPoints.GetPoint(iPosValid))
+          if  numpy.linalg.norm(posModel-posModelValid)> 50.0:
+            continue
+          iPosValid = iPos
+          self.coronalReferenceCurveManager.curveFiducials.AddFiducial(posModel[0],posModel[1],posModel[2]) #adding fiducials takes too long, check the event triggered by this operation
+          self.coronalReferenceCurveManager.cmLogic.updateCurve()
+          if self.coronalReferenceCurveManager.cmLogic.CurveLength>25.0:
+            break
+        jPos = 0  
+        posAround25 = numpy.array(coronalPoints.GetPoint(iPos))
+        for jPos in range(iPosValid,coronalPoints.GetNumberOfPoints(), 1):
+          posModel = numpy.array(coronalPoints.GetPoint(jPos))
+          distance = numpy.linalg.norm(posModel-posAround25)+self.coronalReferenceCurveManager.cmLogic.CurveLength
+          if distance>30.0 and distance <35.0:
+            self.coronalReferenceCurveManager.curveFiducials.AddFiducial(posModel[0],posModel[1],posModel[2]) 
+            self.coronalReferenceCurveManager.cmLogic.updateCurve()
+            break
     
         self.coronalReferenceCurveManager.cmLogic.CurvePoly = vtk.vtkPolyData() ## For CurveMaker bug
         self.coronalReferenceCurveManager.cmLogic.enableAutomaticUpdate(1)
