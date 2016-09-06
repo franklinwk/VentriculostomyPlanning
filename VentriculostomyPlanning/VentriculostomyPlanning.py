@@ -65,7 +65,77 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.reloadButton.connect('clicked()', self.onReload)
     #
     ####################
+    
+    # PatientModel Area
+    #
+    patientModelCollapsibleButton = ctk.ctkCollapsibleButton()
+    patientModelCollapsibleButton.text = "Patient Model And Entry Point"
+    self.layout.addWidget(patientModelCollapsibleButton)
+    
+    # Layout within the dummy collapsible button
+    patientModelFormLayout = qt.QFormLayout(patientModelCollapsibleButton)
+    
+    #
+    # input volume selector
+    #
+    self.inputVolumeSelector = slicer.qMRMLNodeComboBox()
+    self.inputVolumeSelector.nodeTypes = ["vtkMRMLScalarVolumeNode"]
+    self.inputVolumeSelector.selectNodeUponCreation = True
+    self.inputVolumeSelector.addEnabled = False
+    self.inputVolumeSelector.removeEnabled = False
+    self.inputVolumeSelector.noneEnabled = False
+    self.inputVolumeSelector.showHidden = False
+    self.inputVolumeSelector.showChildNodeTypes = False
+    self.inputVolumeSelector.setMRMLScene( slicer.mrmlScene )
+    self.inputVolumeSelector.setToolTip( "Pick the input to the algorithm." )
+    patientModelFormLayout.addRow("Input Volume: ", self.inputVolumeSelector)
+    
+    #
+    # output volume selector
+    #
+    self.outputModelSelector = slicer.qMRMLNodeComboBox()
+    self.outputModelSelector.nodeTypes = ["vtkMRMLModelNode"]
+    self.outputModelSelector.selectNodeUponCreation = True
+    self.outputModelSelector.addEnabled = True
+    self.outputModelSelector.removeEnabled = True
+    self.outputModelSelector.noneEnabled = True
+    self.outputModelSelector.showHidden = False
+    self.outputModelSelector.showChildNodeTypes = False
+    self.outputModelSelector.setMRMLScene( slicer.mrmlScene )
+    self.outputModelSelector.setToolTip( "Pick the output to the algorithm." )
+    patientModelFormLayout.addRow("Output Model: ", self.outputModelSelector)
+    
+    
+    #
+    # Create Model Button
+    #
+    self.createModelButton = qt.QPushButton("Create Model")
+    self.createModelButton.toolTip = "Create a surface model."
+    self.createModelButton.enabled = True
+    patientModelFormLayout.addRow(self.createModelButton)
 
+    self.createModelButton.connect('clicked(bool)', self.onCreateModel)
+    self.inputVolumeSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
+    self.outputModelSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
+    
+    #
+    # Create Entry point Button
+    #
+    automaticEntryHorizontalLayout = qt.QHBoxLayout()
+    self.selectNasionButton = qt.QPushButton("Select Nasion")
+    self.selectNasionButton.toolTip = "Add a point in the 3D window"
+    self.selectNasionButton.enabled = True
+    automaticEntryHorizontalLayout.addWidget(self.selectNasionButton)
+    self.createEntryPointButton = qt.QPushButton("Create Entry Point")
+    self.createEntryPointButton.toolTip = "Create the initial entry point."
+    self.createEntryPointButton.enabled = True
+    automaticEntryHorizontalLayout.addWidget(self.createEntryPointButton)
+    patientModelFormLayout.addRow("Automatic Entry Point: ", automaticEntryHorizontalLayout)
+    
+    self.selectNasionButton.connect('clicked(bool)', self.onSelectNasionPointNode)
+    self.createEntryPointButton.connect('clicked(bool)', self.onCreateEntryPoint)
+    
+    
     #
     # Lines Area
     #
@@ -79,77 +149,35 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     #
     # Mid-sagitalReference line
     #
-    sagitalReferenceLineLayout = qt.QHBoxLayout()
+    referenceLineLayout = qt.QHBoxLayout()
 
     #-- Curve length
+    lengthSagitalReferenceLineLabel = qt.QLabel('Saggital Length:  ')
+    referenceLineLayout.addWidget(lengthSagitalReferenceLineLabel)
     self.lengthSagitalReferenceLineEdit = qt.QLineEdit()
     self.lengthSagitalReferenceLineEdit.text = '--'
     self.lengthSagitalReferenceLineEdit.readOnly = True
     self.lengthSagitalReferenceLineEdit.frame = True
     self.lengthSagitalReferenceLineEdit.styleSheet = "QLineEdit { background:transparent; }"
     self.lengthSagitalReferenceLineEdit.cursor = qt.QCursor(qt.Qt.IBeamCursor)
-    sagitalReferenceLineLayout.addWidget(self.lengthSagitalReferenceLineEdit)
+    referenceLineLayout.addWidget(self.lengthSagitalReferenceLineEdit)
     lengthSagitalReferenceLineUnitLabel = qt.QLabel('mm  ')
-    sagitalReferenceLineLayout.addWidget(lengthSagitalReferenceLineUnitLabel)
-
-    #-- Add Point
-    self.addPointForSagitalReferenceLineButton = qt.QPushButton("Add Points")
-    self.addPointForSagitalReferenceLineButton.toolTip = "Add points for mid-sagital reference line"
-    self.addPointForSagitalReferenceLineButton.enabled = True
-    self.addPointForSagitalReferenceLineButton.checkable = True    
-    sagitalReferenceLineLayout.addWidget(self.addPointForSagitalReferenceLineButton)
-
-    #-- Clear Point
-    self.clearPointForSagitalReferenceLineButton = qt.QPushButton("Clear")
-    self.clearPointForSagitalReferenceLineButton.toolTip = "Remove all points for mid-sagital reference line"
-    self.clearPointForSagitalReferenceLineButton.enabled = True
-    sagitalReferenceLineLayout.addWidget(self.clearPointForSagitalReferenceLineButton)
-
-    #-- Move the slice to the curve
-    self.moveSliceSagitalReferenceLineButton = qt.QPushButton("Slice")
-    self.moveSliceSagitalReferenceLineButton.toolTip = "Move the slice to the mid-sagital reference line"
-    self.moveSliceSagitalReferenceLineButton.enabled = True
-    sagitalReferenceLineLayout.addWidget(self.moveSliceSagitalReferenceLineButton)
-
-    referenceLinesFormLayout.addRow("Mid-Sagital Reference Line:", sagitalReferenceLineLayout)
-
-    #
-    # CoronalReference line
-    #
-    coronalReferenceLineLayout = qt.QHBoxLayout()
-
-    #-- Curve length
+    referenceLineLayout.addWidget(lengthSagitalReferenceLineUnitLabel)
+    
+    lengthCoronalReferenceLineLabel = qt.QLabel('Coronal Length:  ')
+    referenceLineLayout.addWidget(lengthCoronalReferenceLineLabel)
     self.lengthCoronalReferenceLineEdit = qt.QLineEdit()
     self.lengthCoronalReferenceLineEdit.text = '--'
     self.lengthCoronalReferenceLineEdit.readOnly = True
     self.lengthCoronalReferenceLineEdit.frame = True
     self.lengthCoronalReferenceLineEdit.styleSheet = "QLineEdit { background:transparent; }"
     self.lengthCoronalReferenceLineEdit.cursor = qt.QCursor(qt.Qt.IBeamCursor)
-    coronalReferenceLineLayout.addWidget(self.lengthCoronalReferenceLineEdit)
+    referenceLineLayout.addWidget(self.lengthCoronalReferenceLineEdit)
     lengthCoronalReferenceLineUnitLabel = qt.QLabel('mm  ')
-    coronalReferenceLineLayout.addWidget(lengthCoronalReferenceLineUnitLabel)
+    referenceLineLayout.addWidget(lengthCoronalReferenceLineUnitLabel)
 
-    #-- Add Point
-    self.addPointForCoronalReferenceLineButton = qt.QPushButton("Add Points")
-    self.addPointForCoronalReferenceLineButton.toolTip = "Add points for coronal reference line"
-    self.addPointForCoronalReferenceLineButton.enabled = True
-    self.addPointForCoronalReferenceLineButton.checkable = True    
-    coronalReferenceLineLayout.addWidget(self.addPointForCoronalReferenceLineButton)
-
-    #-- Clear Point
-    self.clearPointForCoronalReferenceLineButton = qt.QPushButton("Clear")
-    self.clearPointForCoronalReferenceLineButton.toolTip = "Remove all points for coronal reference line"
-    self.clearPointForCoronalReferenceLineButton.enabled = True
-    coronalReferenceLineLayout.addWidget(self.clearPointForCoronalReferenceLineButton)
-
-    #-- Move the slice to the curve
-    self.moveSliceCoronalReferenceLineButton = qt.QPushButton("Slice")
-    self.moveSliceCoronalReferenceLineButton.toolTip = "Move the slice to the coronal reference line"
-    self.moveSliceCoronalReferenceLineButton.enabled = True
-    coronalReferenceLineLayout.addWidget(self.moveSliceCoronalReferenceLineButton)
-
-    referenceLinesFormLayout.addRow("CoronalReference Line:", coronalReferenceLineLayout)
-
+    referenceLinesFormLayout.addRow("Reference Line Coordinates:",None)
+    referenceLinesFormLayout.addRow(referenceLineLayout)
     self.lockReferenceLinesCheckBox = qt.QCheckBox()
     self.lockReferenceLinesCheckBox.checked = 0
     self.lockReferenceLinesCheckBox.setToolTip("If checked, the lines will be locked.")
@@ -220,196 +248,45 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     planningLinesFormLayout = qt.QFormLayout(planningLinesCollapsibleButton)
     
     #
-    # CoronalPlanning line
+    # Mid-sagitalReference line
     #
-    coronalPlanningLineLayout = qt.QHBoxLayout()
+    planningLineLayout = qt.QHBoxLayout()
 
     #-- Curve length
-    self.lengthCoronalPlanningLineEdit = qt.QLineEdit()
-    self.lengthCoronalPlanningLineEdit.text = '--'
-    self.lengthCoronalPlanningLineEdit.readOnly = True
-    self.lengthCoronalPlanningLineEdit.frame = True
-    self.lengthCoronalPlanningLineEdit.styleSheet = "QLineEdit { background:transparent; }"
-    self.lengthCoronalPlanningLineEdit.cursor = qt.QCursor(qt.Qt.IBeamCursor)
-    coronalPlanningLineLayout.addWidget(self.lengthCoronalPlanningLineEdit)
-    lengthCoronalPlanningLineUnitLabel = qt.QLabel('mm  ')
-    coronalPlanningLineLayout.addWidget(lengthCoronalPlanningLineUnitLabel)
-
-    #-- Add Point
-    self.addPointForCoronalPlanningLineButton = qt.QPushButton("Add Points")
-    self.addPointForCoronalPlanningLineButton.toolTip = "Add points for coronal planning line"
-    self.addPointForCoronalPlanningLineButton.enabled = True
-    self.addPointForCoronalPlanningLineButton.checkable = True    
-    coronalPlanningLineLayout.addWidget(self.addPointForCoronalPlanningLineButton)
-
-    #-- Clear Point
-    self.clearPointForCoronalPlanningLineButton = qt.QPushButton("Clear")
-    self.clearPointForCoronalPlanningLineButton.toolTip = "Remove all points for coronal planning line"
-    self.clearPointForCoronalPlanningLineButton.enabled = True
-    coronalPlanningLineLayout.addWidget(self.clearPointForCoronalPlanningLineButton)
-
-    #-- Move the slice to the curve
-    self.moveSliceCoronalPlanningLineButton = qt.QPushButton("Slice")
-    self.moveSliceCoronalPlanningLineButton.toolTip = "Move the slice to the coronal planning line"
-    self.moveSliceCoronalPlanningLineButton.enabled = True
-    coronalPlanningLineLayout.addWidget(self.moveSliceCoronalPlanningLineButton)
-
-    planningLinesFormLayout.addRow("CoronalPlanning Line:", coronalPlanningLineLayout)
-
-    #
-    # Mid-sagital planning line
-    #
-    sagitalPlanningLineLayout = qt.QHBoxLayout()
-
-    #-- Curve length
+    lengthSagitalPlanningLineLabel = qt.QLabel('Saggital Length:  ')
+    planningLineLayout.addWidget(lengthSagitalPlanningLineLabel)
     self.lengthSagitalPlanningLineEdit = qt.QLineEdit()
     self.lengthSagitalPlanningLineEdit.text = '--'
     self.lengthSagitalPlanningLineEdit.readOnly = True
     self.lengthSagitalPlanningLineEdit.frame = True
     self.lengthSagitalPlanningLineEdit.styleSheet = "QLineEdit { background:transparent; }"
     self.lengthSagitalPlanningLineEdit.cursor = qt.QCursor(qt.Qt.IBeamCursor)
-    sagitalPlanningLineLayout.addWidget(self.lengthSagitalPlanningLineEdit)
+    planningLineLayout.addWidget(self.lengthSagitalPlanningLineEdit)
     lengthSagitalPlanningLineUnitLabel = qt.QLabel('mm  ')
-    sagitalPlanningLineLayout.addWidget(lengthSagitalPlanningLineUnitLabel)
+    planningLineLayout.addWidget(lengthSagitalPlanningLineUnitLabel)
+    
+    lengthCoronalPlanningLineLabel = qt.QLabel('Coronal Length:  ')
+    planningLineLayout.addWidget(lengthCoronalPlanningLineLabel)
+    self.lengthCoronalPlanningLineEdit = qt.QLineEdit()
+    self.lengthCoronalPlanningLineEdit.text = '--'
+    self.lengthCoronalPlanningLineEdit.readOnly = True
+    self.lengthCoronalPlanningLineEdit.frame = True
+    self.lengthCoronalPlanningLineEdit.styleSheet = "QLineEdit { background:transparent; }"
+    self.lengthCoronalPlanningLineEdit.cursor = qt.QCursor(qt.Qt.IBeamCursor)
+    planningLineLayout.addWidget(self.lengthCoronalPlanningLineEdit)
+    lengthCoronalPlanningLineUnitLabel = qt.QLabel('mm  ')
+    planningLineLayout.addWidget(lengthCoronalPlanningLineUnitLabel)
 
-    #-- Add Point
-    self.addPointForSagitalPlanningLineButton = qt.QPushButton("Add Points")
-    self.addPointForSagitalPlanningLineButton.toolTip = "Add points for mid-sagital planning line"
-    self.addPointForSagitalPlanningLineButton.enabled = True
-    self.addPointForSagitalPlanningLineButton.checkable = True    
-    sagitalPlanningLineLayout.addWidget(self.addPointForSagitalPlanningLineButton)
-
-    #-- Clear Point
-    self.clearPointForSagitalPlanningLineButton = qt.QPushButton("Clear")
-    self.clearPointForSagitalPlanningLineButton.toolTip = "Remove all points for mid-sagital planning line"
-    self.clearPointForSagitalPlanningLineButton.enabled = True
-    sagitalPlanningLineLayout.addWidget(self.clearPointForSagitalPlanningLineButton)
-
-    #-- Move the slice to the curve
-    self.moveSliceSagitalPlanningLineButton = qt.QPushButton("Slice")
-    self.moveSliceSagitalPlanningLineButton.toolTip = "Move the slice to the mid-sagital planning line"
-    self.moveSliceSagitalPlanningLineButton.enabled = True
-    sagitalPlanningLineLayout.addWidget(self.moveSliceSagitalPlanningLineButton)
-
-    planningLinesFormLayout.addRow("Mid-Sagital Planning Line:", sagitalPlanningLineLayout)
-
+    planningLinesFormLayout.addRow("Planning Line Coordinates:", None)
+    planningLinesFormLayout.addRow(planningLineLayout)
     self.lockPlanningLinesCheckBox = qt.QCheckBox()
     self.lockPlanningLinesCheckBox.checked = 0
     self.lockPlanningLinesCheckBox.setToolTip("If checked, the lines will be locked.")
     planningLinesFormLayout.addRow("Lock:", self.lockPlanningLinesCheckBox)
-    
 
-    # PatientModel Area
-    #
-    patientModelCollapsibleButton = ctk.ctkCollapsibleButton()
-    patientModelCollapsibleButton.text = "Patient Model"
-    self.layout.addWidget(patientModelCollapsibleButton)
-    
-    # Layout within the dummy collapsible button
-    patientModelFormLayout = qt.QFormLayout(patientModelCollapsibleButton)
-    
-    #
-    # input volume selector
-    #
-    self.inputVolumeSelector = slicer.qMRMLNodeComboBox()
-    self.inputVolumeSelector.nodeTypes = ["vtkMRMLScalarVolumeNode"]
-    self.inputVolumeSelector.selectNodeUponCreation = True
-    self.inputVolumeSelector.addEnabled = False
-    self.inputVolumeSelector.removeEnabled = False
-    self.inputVolumeSelector.noneEnabled = False
-    self.inputVolumeSelector.showHidden = False
-    self.inputVolumeSelector.showChildNodeTypes = False
-    self.inputVolumeSelector.setMRMLScene( slicer.mrmlScene )
-    self.inputVolumeSelector.setToolTip( "Pick the input to the algorithm." )
-    patientModelFormLayout.addRow("Input Volume: ", self.inputVolumeSelector)
-    
-    #
-    # output volume selector
-    #
-    self.outputModelSelector = slicer.qMRMLNodeComboBox()
-    self.outputModelSelector.nodeTypes = ["vtkMRMLModelNode"]
-    self.outputModelSelector.selectNodeUponCreation = True
-    self.outputModelSelector.addEnabled = True
-    self.outputModelSelector.removeEnabled = True
-    self.outputModelSelector.noneEnabled = True
-    self.outputModelSelector.showHidden = False
-    self.outputModelSelector.showChildNodeTypes = False
-    self.outputModelSelector.setMRMLScene( slicer.mrmlScene )
-    self.outputModelSelector.setToolTip( "Pick the output to the algorithm." )
-    patientModelFormLayout.addRow("Output Model: ", self.outputModelSelector)
-    
-    
-    #
-    # Create Model Button
-    #
-    self.createModelButton = qt.QPushButton("Create Model")
-    self.createModelButton.toolTip = "Create a surface model."
-    self.createModelButton.enabled = True
-    patientModelFormLayout.addRow(self.createModelButton)
-
-    self.createModelButton.connect('clicked(bool)', self.onCreateModel)
-    self.inputVolumeSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
-    self.outputModelSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
-    
-    # Automatic entry point Area
-    #
-    automaticEntryPointCollapsibleButton = ctk.ctkCollapsibleButton()
-    automaticEntryPointCollapsibleButton.text = "CreateEntry"
-    self.layout.addWidget(automaticEntryPointCollapsibleButton)
-    
-    # Layout within the dummy collapsible button
-    automaticEntryPointFormLayout = qt.QFormLayout(automaticEntryPointCollapsibleButton)
-    
-    #
-    # output volume selector
-    #
-    self.inputModelSelector = slicer.qMRMLNodeComboBox()
-    self.inputModelSelector.nodeTypes = ["vtkMRMLModelNode"]
-    self.inputModelSelector.selectNodeUponCreation = True
-    self.inputModelSelector.addEnabled = True
-    self.inputModelSelector.removeEnabled = True
-    self.inputModelSelector.noneEnabled = True
-    self.inputModelSelector.showHidden = False
-    self.inputModelSelector.showChildNodeTypes = False
-    self.inputModelSelector.setMRMLScene( slicer.mrmlScene )
-    self.inputModelSelector.setToolTip( "Pick the input to the algorithm." )
-    automaticEntryPointFormLayout.addRow("Input Model: ", self.inputModelSelector)
-    
-    #
-    # Create Entry point Button
-    #
-    automaticEntryHorizontalLayout = qt.QHBoxLayout()
-    self.selectNasionButton = qt.QPushButton("Select Nasion")
-    self.selectNasionButton.toolTip = "Add a point in the 3D window"
-    self.selectNasionButton.enabled = True
-    automaticEntryHorizontalLayout.addWidget(self.selectNasionButton)
-    
-    self.createEntryPointButton = qt.QPushButton("Create Entry Point")
-    self.createEntryPointButton.toolTip = "Create the initial entry point."
-    self.createEntryPointButton.enabled = True
-    automaticEntryHorizontalLayout.addWidget(self.createEntryPointButton)
-    
-    automaticEntryPointFormLayout.addRow("Automatic Entry Point: ", automaticEntryHorizontalLayout)
-    self.selectNasionButton.connect('clicked(bool)', self.onSelectnasionPointNode)
-    self.createEntryPointButton.connect('clicked(bool)', self.onCreateEntryPoint)
-    self.inputModelSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelectModelForEntryPoint)
-    
     #end of GUI section
     #####################################
     
-    
-
-    # SagitalReference line
-    self.addPointForSagitalReferenceLineButton.connect('toggled(bool)', self.onEditSagitalReferenceLine)
-    self.clearPointForSagitalReferenceLineButton.connect('clicked(bool)', self.onClearSagitalReferenceLine)
-    self.moveSliceSagitalReferenceLineButton.connect('clicked(bool)', self.onMoveSliceSagitalReferenceLine)
-    self.logic.setSagitalReferenceLineModifiedEventHandler(self.onSagitalReferenceLineModified)
-
-    # CoronalReference line
-    self.addPointForCoronalReferenceLineButton.connect('toggled(bool)', self.onEditCoronalReferenceLine)
-    self.clearPointForCoronalReferenceLineButton.connect('clicked(bool)', self.onClearCoronalReferenceLine)
-    self.moveSliceCoronalReferenceLineButton.connect('clicked(bool)', self.onMoveSliceCoronalReferenceLine)
-    self.logic.setCoronalReferenceLineModifiedEventHandler(self.onCoronalReferenceLineModified)
 
     self.lockReferenceLinesCheckBox.connect('toggled(bool)', self.onLock)
 
@@ -418,19 +295,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.clearTrajectoryButton.connect('clicked(bool)', self.onClearTrajectory)
     self.logic.setTrajectoryModifiedEventHandler(self.onTrajectoryModified)
     self.lockTrajectoryCheckBox.connect('toggled(bool)', self.onLock)
-
-
-    # SagitalPlanning line
-    self.addPointForSagitalPlanningLineButton.connect('toggled(bool)', self.onEditSagitalPlanningLine)
-    self.clearPointForSagitalPlanningLineButton.connect('clicked(bool)', self.onClearSagitalPlanningLine)
-    self.moveSliceSagitalPlanningLineButton.connect('clicked(bool)', self.onMoveSliceSagitalPlanningLine)
-    self.logic.setSagitalPlanningLineModifiedEventHandler(self.onSagitalPlanningLineModified)
-
-    # CoronalPlanning line
-    self.addPointForCoronalPlanningLineButton.connect('toggled(bool)', self.onEditCoronalPlanningLine)
-    self.clearPointForCoronalPlanningLineButton.connect('clicked(bool)', self.onClearCoronalPlanningLine)
-    self.moveSliceCoronalPlanningLineButton.connect('clicked(bool)', self.onMoveSliceCoronalPlanningLine)
-    self.logic.setCoronalPlanningLineModifiedEventHandler(self.onCoronalPlanningLineModified)
 
     self.lockPlanningLinesCheckBox.connect('toggled(bool)', self.onLock)
 
@@ -444,11 +308,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     pass
   
   def onSelect(self):
-    pass
-
-  def onSelectModelForEntryPoint(self):
-    #self.createModelButton.enabled =  self.inputVolumeSelector.currentNode() and self.outputModelSelector.currentNode()
-    self.logic.inputModel = self.inputModelSelector.currentNode()
+    self.logic.inputModel = self.outputModelSelector.currentNode()
     pass
     
   def onCreatePlanningLine(self):
@@ -462,8 +322,8 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     threshold = -500.0
     self.logic.createModel(self.inputVolumeSelector.currentNode(), self.outputModelSelector.currentNode(), threshold)
   
-  def onSelectnasionPointNode(self):
-    self.logic.selectnasionPointNode(self.inputModelSelector.currentNode())     
+  def onSelectNasionPointNode(self):
+    self.logic.selectnasionPointNode(self.outputModelSelector.currentNode())     
   
   def onCreateEntryPoint(self):
     self.logic.creatEntryPoint()
@@ -475,14 +335,12 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
   def onEditSagitalReferenceLine(self, switch):
 
     if switch == True:
-      self.addPointForCoronalReferenceLineButton.checked = False
       self.addTrajectoryButton.checked = False
       self.logic.startEditSagitalReferenceLine()
     else:
       self.logic.endEditSagitalReferenceLine()
 
   def onClearSagitalReferenceLine(self):
-    
     self.logic.clearSagitalReferenceLine()
 
   def onSagitalReferenceLineModified(self, caller, event):
@@ -495,14 +353,12 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
   def onEditCoronalReferenceLine(self, switch):
 
     if switch == True:
-      self.addPointForSagitalReferenceLineButton.checked = False
       self.addTrajectoryButton.checked = False
       self.logic.startEditCoronalReferenceLine()
     else:
       self.logic.endEditCoronalReferenceLine()
 
   def onClearCoronalReferenceLine(self):
-    
     self.logic.clearCoronalReferenceLine()
 
   def onCoronalReferenceLineModified(self, caller, event):
@@ -515,8 +371,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
   def onEditTrajectory(self, switch):
 
     if switch == True:
-      self.addPointForSagitalReferenceLineButton.checked = False
-      self.addPointForCoronalReferenceLineButton.checked = False
       self.logic.startEditTrajectory()
     else:
       self.logic.endEditCoronalReferenceLine()
@@ -531,7 +385,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
   def onEditSagitalPlanningLine(self, switch):
 
     if switch == True:
-      self.addPointForCoronalPlanningLineButton.checked = False
       self.addTrajectoryButton.checked = False
       self.logic.startEditSagitalPlanningLine()
     else:
@@ -551,7 +404,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
   def onEditCoronalPlanningLine(self, switch):
 
     if switch == True:
-      self.addPointForSagitalPlanningLineButton.checked = False
       self.addTrajectoryButton.checked = False
       self.logic.startEditCoronalPlanningLine()
     else:
@@ -569,16 +421,8 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
 
   def onLock(self):
     if self.lockReferenceLinesCheckBox.checked == 1:
-      self.addPointForSagitalReferenceLineButton.enabled = False
-      self.clearPointForSagitalReferenceLineButton.enabled = False
-      self.addPointForCoronalReferenceLineButton.enabled = False
-      self.clearPointForCoronalReferenceLineButton.enabled = False
       self.logic.lockReferenceLine()
     else:
-      self.addPointForSagitalReferenceLineButton.enabled = True
-      self.clearPointForSagitalReferenceLineButton.enabled = True
-      self.addPointForCoronalReferenceLineButton.enabled = True
-      self.clearPointForCoronalReferenceLineButton.enabled = True
       self.logic.unlockReferenceLine()
 
     if self.lockTrajectoryCheckBox.checked == 1:
@@ -591,16 +435,8 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       self.logic.unlockTrajectoryLine()
 
     if self.lockPlanningLinesCheckBox.checked == 1:
-      self.addPointForSagitalPlanningLineButton.enabled = False
-      self.clearPointForSagitalPlanningLineButton.enabled = False
-      self.addPointForCoronalPlanningLineButton.enabled = False
-      self.clearPointForCoronalPlanningLineButton.enabled = False
       self.logic.lockPlanningLine()
     else:
-      self.addPointForSagitalPlanningLineButton.enabled = True
-      self.clearPointForSagitalPlanningLineButton.enabled = True
-      self.addPointForCoronalPlanningLineButton.enabled = True
-      self.clearPointForCoronalPlanningLineButton.enabled = True
       self.logic.unlockPlanningLine()
 
   def onReload(self,moduleName="VentriculostomyPlanning"):
@@ -1283,6 +1119,8 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     CurveManager.curveFiducials.AddFiducial(posModel[0],posModel[1],posModel[2]) 
     CurveManager.cmLogic.CurvePoly = vtk.vtkPolyData() ## For CurveMaker bug
     CurveManager.cmLogic.enableAutomaticUpdate(1)
+    CurveManager.cmLogic.setInterpolationMethod(1)
+    CurveManager.cmLogic.setTubeRadius(1.0)
     for iPos in range(step,points.GetNumberOfPoints(),step):
       posModel = numpy.array(points.GetPoint(iPos))
       posModelValid = numpy.array(points.GetPoint(iPosValid))
@@ -1343,6 +1181,8 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       CurveManager.curveFiducials.AddFiducial(posModel[0],posModel[1],posModel[2]) 
       CurveManager.cmLogic.CurvePoly = vtk.vtkPolyData() ## For CurveMaker bug
       CurveManager.cmLogic.enableAutomaticUpdate(1)
+      CurveManager.cmLogic.setInterpolationMethod(1)
+      CurveManager.cmLogic.setTubeRadius(1.0)
       for iPos in range(step,points.GetNumberOfPoints(),step):
         posModel = numpy.array(points.GetPoint(iPos))
         posModelValid = numpy.array(points.GetPoint(iPosValid))
