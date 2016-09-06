@@ -195,11 +195,19 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     trajectoryLayout.addWidget(self.clearTrajectoryButton)
 
     trajectoryFormLayout.addRow("Trajectory:", trajectoryLayout)
-
+    
+    createPlanningLineHorizontalLayout = qt.QHBoxLayout()
     self.lockTrajectoryCheckBox = qt.QCheckBox()
     self.lockTrajectoryCheckBox.checked = 0
     self.lockTrajectoryCheckBox.setToolTip("If checked, the trajectory will be locked.")
-    trajectoryFormLayout.addRow("Lock:", self.lockTrajectoryCheckBox)
+    createPlanningLineHorizontalLayout.addWidget(self.lockTrajectoryCheckBox)
+    self.createPlanningLineButton = qt.QPushButton("Create planning Line")
+    self.createPlanningLineButton.toolTip = "Create the planning line."
+    self.createPlanningLineButton.enabled = True
+    createPlanningLineHorizontalLayout.addWidget(self.createPlanningLineButton)
+    trajectoryFormLayout.addRow("Lock: ", createPlanningLineHorizontalLayout)
+    
+    self.createPlanningLineButton.connect('clicked(bool)', self.onCreatePlanningLine)
     
     #
     # Planning Lines
@@ -443,6 +451,11 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.logic.inputModel = self.inputModelSelector.currentNode()
     pass
     
+  def onCreatePlanningLine(self):
+    self.logic.creatPlanningLine()  
+    self.lengthSagitalPlanningLineEdit.text = '%.2f' % self.logic.getSagitalPlanningLineLength()
+    self.lengthCoronalPlanningLineEdit.text = '%.2f' % self.logic.getCoronalPlanningLineLength()
+    pass 
     
   def onCreateModel(self):
     #logic = VentriculostomyPlanningLogic()
@@ -725,6 +738,10 @@ class CurveManager:
 
     if self.curveFiducials:
       self.curveFiducials.RemoveAllMarkups()
+      slicer.mrmlScene.RemoveNode(self.curveFiducials)
+      self.curveFiducials = None
+      #To trigger the initializaton, when the user clear the trajectory and restart the planning, 
+      #the last point of the coronal reference line should be added to the trajectory
 
     self.cmLogic.updateCurve()
 
@@ -815,14 +832,20 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     self.sagitalReferenceCurveManager.setName("SR1")
     self.sagitalReferenceCurveManager.setSliceID("vtkMRMLSliceNodeYellow")
     self.sagitalReferenceCurveManager.setDefaultSlicePositionToFirstPoint()
+    self.sagitalReferenceCurveManager.curveModel = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
+    self.sagitalReferenceCurveManager.curveModel.SetName(self.sagitalReferenceCurveManager.curveModelName)
+    slicer.mrmlScene.AddNode(self.sagitalReferenceCurveManager.curveModel)
     self.sagitalReferenceCurveManager.setModelColor(1.0, 1.0, 0.5)
     
     self.coronalReferenceCurveManager = CurveManager()
     self.coronalReferenceCurveManager.setName("CR1")
     self.coronalReferenceCurveManager.setSliceID("vtkMRMLSliceNodeGreen")
     self.coronalReferenceCurveManager.setDefaultSlicePositionToLastPoint()
+    self.coronalReferenceCurveManager.curveModel = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
+    self.coronalReferenceCurveManager.curveModel.SetName(self.coronalReferenceCurveManager.curveModelName)
+    slicer.mrmlScene.AddNode(self.coronalReferenceCurveManager.curveModel)
     self.coronalReferenceCurveManager.setModelColor(0.5, 1.0, 0.5)
-
+    
     self.trajectoryManager = CurveManager()
     self.trajectoryManager.setName("T")
     self.trajectoryManager.setDefaultSlicePositionToLastPoint()
@@ -833,12 +856,18 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     self.coronalPlanningCurveManager.setName("CP1")
     self.coronalPlanningCurveManager.setSliceID("vtkMRMLSliceNodeGreen")
     self.coronalPlanningCurveManager.setDefaultSlicePositionToLastPoint()
+    self.coronalPlanningCurveManager.curveModel = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
+    self.coronalPlanningCurveManager.curveModel.SetName(self.coronalPlanningCurveManager.curveModelName)
+    slicer.mrmlScene.AddNode(self.coronalPlanningCurveManager.curveModel)
     self.coronalPlanningCurveManager.setModelColor(0.0, 1.0, 0.0)
 
     self.sagitalPlanningCurveManager = CurveManager()
     self.sagitalPlanningCurveManager.setName("SP1")
     self.sagitalPlanningCurveManager.setSliceID("vtkMRMLSliceNodeYellow")
     self.sagitalPlanningCurveManager.setDefaultSlicePositionToFirstPoint()
+    self.sagitalPlanningCurveManager.curveModel = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
+    self.sagitalPlanningCurveManager.curveModel.SetName(self.sagitalPlanningCurveManager.curveModelName)
+    slicer.mrmlScene.AddNode(self.sagitalPlanningCurveManager.curveModel)
     self.sagitalPlanningCurveManager.setModelColor(1.0, 1.0, 0.0)
     
     self.nasionPointNode = None
@@ -1230,7 +1259,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       inputPointVector.SetPoint(iPos,inputPointVector.GetPoint(minDistanceIndex))
       inputPointVector.SetPoint(minDistanceIndex,currentPos)
       
-  def constructCurve(self, CurveManager,points, axis):
+  def constructCurveReference(self, CurveManager,points, axis):
     step = 20 
     ApproximityPos = 25.0
     DestiationPos = 30.0
@@ -1239,10 +1268,6 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       ApproximityPos = 85.0
       DestiationPos = 100.0
   
-    if CurveManager.curveModel == None:
-      CurveManager.curveModel = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
-      CurveManager.curveModel.SetName(CurveManager.curveModelName)
-      slicer.mrmlScene.AddNode(CurveManager.curveModel)
     if CurveManager.curveFiducials == None:
       CurveManager.curveFiducials = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
       CurveManager.curveFiducials.SetName(CurveManager.curveName)
@@ -1250,11 +1275,14 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     else:
       CurveManager.curveFiducials.RemoveAllMarkups()
       CurveManager.cmLogic.updateCurve()
+      
     iPos = 0
     iPosValid = iPos
     posModel = numpy.array(points.GetPoint(iPos))
     CurveManager.cmLogic.DestinationNode = CurveManager.curveModel
     CurveManager.curveFiducials.AddFiducial(posModel[0],posModel[1],posModel[2]) 
+    CurveManager.cmLogic.CurvePoly = vtk.vtkPolyData() ## For CurveMaker bug
+    CurveManager.cmLogic.enableAutomaticUpdate(1)
     for iPos in range(step,points.GetNumberOfPoints(),step):
       posModel = numpy.array(points.GetPoint(iPos))
       posModelValid = numpy.array(points.GetPoint(iPosValid))
@@ -1264,6 +1292,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       CurveManager.curveFiducials.AddFiducial(posModel[0],posModel[1],posModel[2]) #adding fiducials takes too long, check the event triggered by this operation
       CurveManager.cmLogic.SourceNode = CurveManager.curveFiducials
       CurveManager.cmLogic.updateCurve()
+      print CurveManager.cmLogic.CurveLength
       if CurveManager.cmLogic.CurveLength>ApproximityPos:
         break
     jPos = iPosValid 
@@ -1290,10 +1319,67 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     else:
       self.topPoint = []
   
-  def getIntersectPoints(self, polyData, plane, referencePoint, axis, intersectPoints):
-    targetDistance = 30
-    if axis == 0:
-      targetDistance = 100.0 
+  def constructCurvePlanning(self, CurveManager,points, axis):
+    if self.nasionPointNode:
+      posNasion = numpy.array([0.0,0.0,0.0])
+      self.nasionPointNode.GetNthFiducialPosition(0,posNasion)
+      step = 20 
+      if axis == 0:
+        step = 50
+    
+      if CurveManager.curveFiducials == None:
+        CurveManager.curveFiducials = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
+        CurveManager.curveFiducials.SetName(CurveManager.curveName)
+        slicer.mrmlScene.AddNode(CurveManager.curveFiducials) 
+      else:
+        CurveManager.curveFiducials.RemoveAllMarkups()
+        CurveManager.cmLogic.updateCurve()
+        
+      iPos = 0
+      iPosValid = iPos
+      posModel = numpy.array(points.GetPoint(iPos))
+      CurveManager.cmLogic.DestinationNode = CurveManager.curveModel
+      CurveManager.curveFiducials.AddFiducial(posModel[0],posModel[1],posModel[2]) 
+      CurveManager.cmLogic.CurvePoly = vtk.vtkPolyData() ## For CurveMaker bug
+      CurveManager.cmLogic.enableAutomaticUpdate(1)
+      for iPos in range(step,points.GetNumberOfPoints(),step):
+        posModel = numpy.array(points.GetPoint(iPos))
+        posModelValid = numpy.array(points.GetPoint(iPosValid))
+        if  numpy.linalg.norm(posModel-posModelValid)> 50.0:
+          continue
+        iPosValid = iPos
+        if axis == 0 and posModel[2]<posNasion[2]:
+          break
+        if axis == 1 and posModel[0]<posNasion[0]:
+          break
+        CurveManager.curveFiducials.AddFiducial(posModel[0],posModel[1],posModel[2]) #adding fiducials takes too long, check the event triggered by this operation
+      jPos = iPos-step
+      jPosValid = jPos
+      for jPos in range(iPos-step, points.GetNumberOfPoints(), 1):
+        posModel = numpy.array(points.GetPoint(jPos))
+        posModelValid = numpy.array(points.GetPoint(jPosValid))
+        if  numpy.linalg.norm(posModel-posModelValid)> 50.0:
+          continue
+        jPosValid = jPos
+        if  axis == 0 and posModel[2]<posNasion[2]:
+          break
+        if  axis == 1 and posModel[0]<posNasion[0]:
+          break
+      posModel = numpy.array(points.GetPoint(jPos-1))  
+      CurveManager.curveFiducials.AddFiducial(posModel[0],posModel[1],posModel[2]) 
+      
+      CurveManager.cmLogic.SourceNode = CurveManager.curveFiducials
+      CurveManager.cmLogic.updateCurve()
+      CurveManager.cmLogic.SourceNode.SetAttribute('CurveMaker.CurveModel', CurveManager.cmLogic.DestinationNode.GetID())  
+      CurveManager.cmLogic.enableAutomaticUpdate(1)
+      CurveManager.cmLogic.setInterpolationMethod(1)
+      CurveManager.cmLogic.setTubeRadius(0.5)  
+    if axis == 1:
+      self.topPoint = points.GetPoint(jPos-1)
+    else:
+      self.topPoint = []
+      
+  def getIntersectPoints(self, polyData, plane, referencePoint, targetDistance, axis, intersectPoints):
     cutter = vtk.vtkCutter()
     cutter.SetCutFunction(plane)
     cutter.SetInputData(polyData)
@@ -1311,9 +1397,28 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         valid = posModel[0]>=referencePoint[0]
       if (distanceModelNasion < targetDistance) and valid:        
           intersectPoints.InsertNextPoint(posModel)
+          
+  def getIntersectPointsPlanning(self, polyData, plane, referencePoint, axis, intersectPoints):
+    cutter = vtk.vtkCutter()
+    cutter.SetCutFunction(plane)
+    cutter.SetInputData(polyData)
+    cutter.Update()
+    cuttedPolyData = cutter.GetOutput()
+    points = cuttedPolyData.GetPoints()      
+    for iPos in range(points.GetNumberOfPoints()):
+      posModel = numpy.array(points.GetPoint(iPos))
+      ## distance calculation could be simplified if the patient is well aligned in the scanner
+      distanceModelNasion = numpy.linalg.norm(posModel-referencePoint)
+      valid = False
+      if axis == 0:
+        valid = posModel[2]<=referencePoint[2]
+      elif axis == 1:
+        valid = posModel[0]<=referencePoint[0]
+      if valid:        
+          intersectPoints.InsertNextPoint(posModel)        
   
   def creatEntryPoint(self) :
-    ###All caculation is based on the RAS coordinates system
+    ###All calculation is based on the RAS coordinates system
     if self.inputModel and (self.inputModel.GetClassName() == "vtkMRMLModelNode") and self.nasionPointNode:
       polyData = self.inputModel.GetPolyData()
       if polyData: 
@@ -1324,29 +1429,58 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         plane.SetOrigin(posNasion[0],0,0)
         plane.SetNormal(1,0,0)
         sagittalPoints = vtk.vtkPoints()
-        self.getIntersectPoints(polyData, plane,posNasion,0, sagittalPoints)
+        self.getIntersectPoints(polyData, plane, posNasion, 100, 0, sagittalPoints)
               
         ## Sorting   
         self.sortPoints(sagittalPoints, posNasion)   
-        
-        self.constructCurve(self.sagitalReferenceCurveManager, sagittalPoints, 0)  
+        self.constructCurveReference(self.sagitalReferenceCurveManager, sagittalPoints, 0)  
             
-        #self.sagitalReferenceCurveManager.tagSourceNode = self.sagitalReferenceCurveManager.cmLogic.SourceNode.AddObserver('ModifiedEvent', self.sagitalReferenceCurveManager.onLineSourceUpdated)  
-        #localLogic = self.sagitalReferenceCurveManager.cmLogic
         ##To do, calculate the curvature value points by point might be necessary to exclude the outliers   
         if self.topPoint:
           posNasionBack100 = self.topPoint
           coronalPoints = vtk.vtkPoints() 
           plane.SetOrigin(0,posNasionBack100[1],0)
           plane.SetNormal(0,1,0)
-          self.getIntersectPoints(polyData, plane,posNasionBack100, 1, coronalPoints) 
+          self.getIntersectPoints(polyData, plane, posNasionBack100, 30, 1, coronalPoints) 
                     
           ## Sorting      
           self.sortPoints(coronalPoints, posNasionBack100)  
-          self.constructCurve(self.coronalReferenceCurveManager, coronalPoints, 1)    
-          #self.coronalReferenceCurveManager.tagSourceNode = self.coronalReferenceCurveManager.cmLogic.SourceNode.AddObserver('ModifiedEvent', self.coronalReferenceCurveManager.onLineSourceUpdated)
+          self.constructCurveReference(self.coronalReferenceCurveManager, coronalPoints, 1)    
     pass
-    
+   
+  def creatPlanningLine(self):
+    ###All calculation is based on the RAS coordinates system
+    if self.inputModel and (self.inputModel.GetClassName() == "vtkMRMLModelNode") and self.nasionPointNode:
+      polyData = self.inputModel.GetPolyData()
+      if polyData: 
+        posNasion = numpy.array([0.0,0.0,0.0])
+        self.nasionPointNode.GetNthFiducialPosition(0,posNasion)
+        posTrajectory = numpy.array([0.0,0.0,0.0])
+        self.trajectoryManager.getFirstPoint(posTrajectory)
+        #self.cutSkullModel(self.inputModel, posNasion)
+        plane = vtk.vtkPlane()
+        plane.SetOrigin(0,posTrajectory[1],0)
+        plane.SetNormal(0,1,0)
+        coronalPoints = vtk.vtkPoints()
+        self.getIntersectPointsPlanning(polyData, plane, posTrajectory, 1 , coronalPoints)
+              
+        ## Sorting   
+        self.sortPoints(coronalPoints, posTrajectory)   
+        
+        self.constructCurvePlanning(self.coronalPlanningCurveManager, coronalPoints, 1)  
+            
+        ##To do, calculate the curvature value points by point might be necessary to exclude the outliers   
+        if self.topPoint:
+          posTractoryBack = self.topPoint
+          saggitalPoints = vtk.vtkPoints() 
+          plane.SetOrigin(posTractoryBack[0],0,0)
+          plane.SetNormal(1,0,0)
+          self.getIntersectPointsPlanning(polyData, plane, posTractoryBack, 0, saggitalPoints) 
+                    
+          ## Sorting      
+          self.sortPoints(saggitalPoints, posTractoryBack)  
+          self.constructCurvePlanning(self.sagitalPlanningCurveManager, saggitalPoints, 0)
+    pass  
     
 
   
