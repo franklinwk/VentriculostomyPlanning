@@ -6,6 +6,8 @@ import logging
 import tempfile
 import CurveMaker
 import numpy
+import SimpleITK as sitk
+import sitkUtils
 #
 # VentriculostomyPlanning
 #
@@ -103,6 +105,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.outputModelSelector.showChildNodeTypes = False
     self.outputModelSelector.setMRMLScene( slicer.mrmlScene )
     self.outputModelSelector.setToolTip( "Pick the output to the algorithm." )
+    self.outputModelSelector.sortFilterProxyModel().setFilterRegExp("^\\b(Model)" )
     patientModelFormLayout.addRow("Output Model: ", self.outputModelSelector)
     
     
@@ -312,7 +315,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     pass
     
   def onCreatePlanningLine(self):
-    self.logic.creatPlanningLine()  
+    self.logic.createPlanningLine()  
     self.lengthSagitalPlanningLineEdit.text = '%.2f' % self.logic.getSagitalPlanningLineLength()
     self.lengthCoronalPlanningLineEdit.text = '%.2f' % self.logic.getCoronalPlanningLineLength()
     pass 
@@ -323,10 +326,10 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.logic.createModel(self.inputVolumeSelector.currentNode(), self.outputModelSelector.currentNode(), threshold)
   
   def onSelectNasionPointNode(self):
-    self.logic.selectnasionPointNode(self.outputModelSelector.currentNode())     
+    self.logic.selectNasionPointNode(self.outputModelSelector.currentNode())     
   
   def onCreateEntryPoint(self):
-    self.logic.creatEntryPoint()
+    self.logic.createEntryPoint()
     self.lengthSagitalReferenceLineEdit.text = '%.2f' % self.logic.getSagitalReferenceLineLength()
     self.lengthCoronalReferenceLineEdit.text = '%.2f' % self.logic.getCoronalReferenceLineLength()
     
@@ -873,148 +876,148 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     if inputVolumeNode == None:
       return
     
-    inputImageData = inputVolumeNode.GetImageData()    
-    threshold = vtk.vtkImageThreshold()
-    threshold.SetInputData(inputImageData)
-    threshold.ThresholdByLower(thresholdValue)
-    threshold.SetInValue(0)
-    threshold.SetOutValue(1)
-    threshold.ReleaseDataFlagOff()
-    threshold.Update()
-    dilateErode = vtk.vtkImageDilateErode3D()
-    dilateErode.SetInputData(threshold.GetOutput()) 
-    dilateErode.SetDilateValue(1)
-    dilateErode.SetErodeValue(0)
-    dilateErode.SetKernelSize(50, 50, 15)
-    dilateErode.ReleaseDataFlagOff()
-    dilateErode.Update()
-    erode = vtk.vtkImageDilateErode3D()
-    erode.SetInputData(dilateErode.GetOutput())
-    erode.SetDilateValue(0)
-    erode.SetErodeValue(1)
-    erode.SetKernelSize(50, 50, 15)
-    erode.ReleaseDataFlagOff()
-    erode.Update()
-    #for i in range(1):
-    #  dilateErode.SetInputData(erode.GetOutput()) 
-    #  dilateErode.Update()
-    #  erode.SetInputData(dilateErode.GetOutput())
-    #  erode.Update()
-    
-    cast = vtk.vtkImageCast()
-    cast.SetInputData(erode.GetOutput())
-    cast.SetOutputScalarTypeToUnsignedChar()
-    cast.Update()
-
-    labelVolumeNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLLabelMapVolumeNode")
-    slicer.mrmlScene.AddNode(labelVolumeNode)
-    labelVolumeNode.SetName("Threshold")
-    labelVolumeNode.SetSpacing(inputVolumeNode.GetSpacing())
-    labelVolumeNode.SetOrigin(inputVolumeNode.GetOrigin())
-
-    matrix = vtk.vtkMatrix4x4()
-    inputVolumeNode.GetIJKToRASDirectionMatrix(matrix)
-    labelVolumeNode.SetIJKToRASDirectionMatrix(matrix)
-
-    labelImage = cast.GetOutput()
-    labelVolumeNode.SetAndObserveImageData(labelImage)
-
-    transformIJKtoRAS = vtk.vtkTransform()
-    matrix = vtk.vtkMatrix4x4()
-    labelVolumeNode.GetRASToIJKMatrix(matrix)
-    transformIJKtoRAS.SetMatrix(matrix)
-    transformIJKtoRAS.Inverse()
-
-    padder = vtk.vtkImageConstantPad()
-    padder.SetInputData(labelImage)
-    padder.SetConstant(0)
-    extent = labelImage.GetExtent()
-    padder.SetOutputWholeExtent(extent[0], extent[1] + 2,
-                                extent[2], extent[3] + 2,
-                                extent[4], extent[5] + 2)
-    
-    cubes = vtk.vtkDiscreteMarchingCubes()
-    cubes.SetInputConnection(padder.GetOutputPort())
-    cubes.GenerateValues(1, 1, 1)
-    cubes.Update()
-
-    smoother = vtk.vtkWindowedSincPolyDataFilter()
-    smoother.SetInputConnection(cubes.GetOutputPort())
-    smoother.SetNumberOfIterations(10)
-    smoother.BoundarySmoothingOff()
-    smoother.FeatureEdgeSmoothingOff()
-    smoother.SetFeatureAngle(120.0)
-    smoother.SetPassBand(0.001)
-    smoother.NonManifoldSmoothingOn()
-    smoother.NormalizeCoordinatesOn()
-    smoother.Update()
-
-    pthreshold = vtk.vtkThreshold()
-    pthreshold.SetInputConnection(smoother.GetOutputPort())
-    pthreshold.ThresholdBetween(1, 1); ## Label 1
-    pthreshold.ReleaseDataFlagOn();
-
-    geometryFilter = vtk.vtkGeometryFilter()
-    geometryFilter.SetInputConnection(pthreshold.GetOutputPort())
-    geometryFilter.ReleaseDataFlagOn()
-    
-    decimator = vtk.vtkDecimatePro()
-    decimator.SetInputConnection(geometryFilter.GetOutputPort())
-    decimator.SetFeatureAngle(60)
-    decimator.SplittingOff()
-    decimator.PreserveTopologyOn()
-    decimator.SetMaximumError(1)
-    decimator.SetTargetReduction(0.5) #0.001 only reduce the points by 0.1%, 0.5 is 50% off
-    decimator.ReleaseDataFlagOff()
-    decimator.Update()
-    
-    smootherPoly = vtk.vtkSmoothPolyDataFilter()
-    smootherPoly.SetRelaxationFactor(0.33)
-    smootherPoly.SetFeatureAngle(60)
-    smootherPoly.SetConvergence(0)
-
-    if transformIJKtoRAS.GetMatrix().Determinant() < 0:
-      reverser = vtk.vtkReverseSense()
-      reverser.SetInputConnection(decimator.GetOutputPort())
-      reverser.ReverseNormalsOn();
-      reverser.ReleaseDataFlagOn();
-      smootherPoly.SetInputConnection(reverser.GetOutputPort())
-    else:
-      smootherPoly.SetInputConnection(decimator.GetOutputPort())
-
-    Smooth = 10
-    smootherPoly.SetNumberOfIterations(Smooth)
-    smootherPoly.FeatureEdgeSmoothingOff()
-    smootherPoly.BoundarySmoothingOff()
-    smootherPoly.ReleaseDataFlagOn()
-    smootherPoly.Update()
-
-    transformer = vtk.vtkTransformPolyDataFilter()
-    transformer.SetInputConnection(smootherPoly.GetOutputPort())
-    transformer.SetTransform(transformIJKtoRAS)
-    transformer.ReleaseDataFlagOn()
-    transformer.Update()
-    
-    normals = vtk.vtkPolyDataNormals()
-    normals.SetInputConnection(transformer.GetOutputPort())
-    normals.SetFeatureAngle(60)
-    normals.SetSplitting(True)
-    normals.ReleaseDataFlagOn()
-    
-    stripper = vtk.vtkStripper()
-    stripper.SetInputConnection(normals.GetOutputPort())
-    stripper.ReleaseDataFlagOff()
-    stripper.Update()
-    
-    outputModel = stripper.GetOutput()
-    outputModelNode.SetAndObservePolyData(outputModel)
-
-    modelDisplayNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelDisplayNode")
-    ModelColor = [0.0, 0.0, 1.0]
-    modelDisplayNode.SetColor(ModelColor)
-    modelDisplayNode.SetOpacity(0.5)
-    slicer.mrmlScene.AddNode(modelDisplayNode)
-    outputModelNode.SetAndObserveDisplayNodeID(modelDisplayNode.GetID())
+    #inputImageData = inputVolumeNode.GetImageData() 
+    resampleFilter = sitk.ResampleImageFilter()
+    originImage = sitk.Cast(sitkUtils.PullFromSlicer(inputVolumeNode.GetID()), sitk.sitkInt16)   
+    SamplingFactor = 2
+    resampleFilter.SetSize(numpy.array(originImage.GetSize())/SamplingFactor)
+    resampleFilter.SetOutputSpacing(numpy.array(originImage.GetSpacing())*SamplingFactor)
+    resampleFilter.SetOutputOrigin(numpy.array(originImage.GetOrigin()))
+    resampledImage = resampleFilter.Execute(originImage)
+    thresholdFilter = sitk.BinaryThresholdImageFilter()
+    thresholdImage = thresholdFilter.Execute(resampledImage,-500,10000,1,0)
+    dilateFilter = sitk.BinaryDilateImageFilter()
+    dilateFilter.SetKernelRadius([12,12,6])
+    dilateFilter.SetBackgroundValue(0)
+    dilateFilter.SetForegroundValue(1)
+    dilatedImage = dilateFilter.Execute(thresholdImage)
+    erodeFilter = sitk.BinaryErodeImageFilter()
+    erodeFilter.SetKernelRadius([12,12,6])
+    erodeFilter.SetBackgroundValue(0)
+    erodeFilter.SetForegroundValue(1)
+    erodedImage = erodeFilter.Execute(dilatedImage)
+    fillHoleFilter = sitk.BinaryFillholeImageFilter()
+    holefilledImage = fillHoleFilter.Execute(erodedImage)
+    sitkUtils.PushToSlicer(holefilledImage, "holefilledImage", 0, True)
+    imageCollection = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLScalarVolumeNode","holefilledImage")
+    if imageCollection:
+      holefilledImageNode = imageCollection.GetItemAsObject(0)
+      holefilledImageData = holefilledImageNode.GetImageData()
+      
+      cast = vtk.vtkImageCast()
+      cast.SetInputData(holefilledImageData)
+      cast.SetOutputScalarTypeToUnsignedChar()
+      cast.Update()
+  
+      labelVolumeNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLLabelMapVolumeNode")
+      slicer.mrmlScene.AddNode(labelVolumeNode)
+      labelVolumeNode.SetName("Threshold")
+      labelVolumeNode.SetSpacing(holefilledImageData.GetSpacing())
+      labelVolumeNode.SetOrigin(holefilledImageData.GetOrigin())
+  
+      matrix = vtk.vtkMatrix4x4()
+      holefilledImageNode.GetIJKToRASMatrix(matrix)
+      labelVolumeNode.SetIJKToRASMatrix(matrix)
+  
+      labelImage = cast.GetOutput()
+      labelVolumeNode.SetAndObserveImageData(labelImage)
+  
+      transformIJKtoRAS = vtk.vtkTransform()
+      matrix = vtk.vtkMatrix4x4()
+      labelVolumeNode.GetRASToIJKMatrix(matrix)
+      transformIJKtoRAS.SetMatrix(matrix)
+      transformIJKtoRAS.Inverse()
+  
+      padder = vtk.vtkImageConstantPad()
+      padder.SetInputData(labelImage)
+      padder.SetConstant(0)
+      extent = labelImage.GetExtent()
+      padder.SetOutputWholeExtent(extent[0], extent[1] + 2,
+                                  extent[2], extent[3] + 2,
+                                  extent[4], extent[5] + 2)
+      
+      cubes = vtk.vtkDiscreteMarchingCubes()
+      cubes.SetInputConnection(padder.GetOutputPort())
+      cubes.GenerateValues(1, 1, 1)
+      cubes.Update()
+  
+      smoother = vtk.vtkWindowedSincPolyDataFilter()
+      smoother.SetInputConnection(cubes.GetOutputPort())
+      smoother.SetNumberOfIterations(10)
+      smoother.BoundarySmoothingOff()
+      smoother.FeatureEdgeSmoothingOff()
+      smoother.SetFeatureAngle(120.0)
+      smoother.SetPassBand(0.001)
+      smoother.NonManifoldSmoothingOn()
+      smoother.NormalizeCoordinatesOn()
+      smoother.Update()
+  
+      pthreshold = vtk.vtkThreshold()
+      pthreshold.SetInputConnection(smoother.GetOutputPort())
+      pthreshold.ThresholdBetween(1, 1); ## Label 1
+      pthreshold.ReleaseDataFlagOn();
+  
+      geometryFilter = vtk.vtkGeometryFilter()
+      geometryFilter.SetInputConnection(pthreshold.GetOutputPort())
+      geometryFilter.ReleaseDataFlagOn()
+      
+      decimator = vtk.vtkDecimatePro()
+      decimator.SetInputConnection(geometryFilter.GetOutputPort())
+      decimator.SetFeatureAngle(60)
+      decimator.SplittingOff()
+      decimator.PreserveTopologyOn()
+      decimator.SetMaximumError(1)
+      decimator.SetTargetReduction(0.5) #0.001 only reduce the points by 0.1%, 0.5 is 50% off
+      decimator.ReleaseDataFlagOff()
+      decimator.Update()
+      
+      smootherPoly = vtk.vtkSmoothPolyDataFilter()
+      smootherPoly.SetRelaxationFactor(0.33)
+      smootherPoly.SetFeatureAngle(60)
+      smootherPoly.SetConvergence(0)
+  
+      if transformIJKtoRAS.GetMatrix().Determinant() < 0:
+        reverser = vtk.vtkReverseSense()
+        reverser.SetInputConnection(decimator.GetOutputPort())
+        reverser.ReverseNormalsOn();
+        reverser.ReleaseDataFlagOn();
+        smootherPoly.SetInputConnection(reverser.GetOutputPort())
+      else:
+        smootherPoly.SetInputConnection(decimator.GetOutputPort())
+  
+      Smooth = 10
+      smootherPoly.SetNumberOfIterations(Smooth)
+      smootherPoly.FeatureEdgeSmoothingOff()
+      smootherPoly.BoundarySmoothingOff()
+      smootherPoly.ReleaseDataFlagOn()
+      smootherPoly.Update()
+  
+      transformer = vtk.vtkTransformPolyDataFilter()
+      transformer.SetInputConnection(smootherPoly.GetOutputPort())
+      transformer.SetTransform(transformIJKtoRAS)
+      transformer.ReleaseDataFlagOn()
+      transformer.Update()
+      
+      normals = vtk.vtkPolyDataNormals()
+      normals.SetInputConnection(transformer.GetOutputPort())
+      normals.SetFeatureAngle(60)
+      normals.SetSplitting(True)
+      normals.ReleaseDataFlagOn()
+      
+      stripper = vtk.vtkStripper()
+      stripper.SetInputConnection(normals.GetOutputPort())
+      stripper.ReleaseDataFlagOff()
+      stripper.Update()
+      
+      outputModel = stripper.GetOutput()
+      outputModelNode.SetAndObservePolyData(outputModel)
+  
+      modelDisplayNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelDisplayNode")
+      ModelColor = [0.0, 0.0, 1.0]
+      modelDisplayNode.SetColor(ModelColor)
+      modelDisplayNode.SetOpacity(0.5)
+      slicer.mrmlScene.AddNode(modelDisplayNode)
+      outputModelNode.SetAndObserveDisplayNodeID(modelDisplayNode.GetID())
   
   def cutSkullModel(self, inputModelNode, posNasion):
     pass
@@ -1034,7 +1037,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     viewerBlue.SetSliceOffset(pos[1])
     pass
     
-  def selectnasionPointNode(self, inputCreatedModel, initPoint = None):
+  def selectNasionPointNode(self, inputCreatedModel, initPoint = None):
     if self.nasionPointNode:
       slicer.mrmlScene.RemoveNode(self.nasionPointNode)
       self.nasionPointNode = None
@@ -1076,7 +1079,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
   
   def endPlacement(self, interactionNode, selectednasionPointNode):
     interactionNode.SetCurrentInteractionMode(slicer.vtkMRMLInteractionNode.ViewTransform)
-    #self.creatEntryPoint() 
+    #self.createEntryPoint() 
     pass
   
   def sortPoints(self, inputPointVector, referencePoint):
@@ -1258,7 +1261,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       if valid:        
           intersectPoints.InsertNextPoint(posModel)        
   
-  def creatEntryPoint(self) :
+  def createEntryPoint(self) :
     ###All calculation is based on the RAS coordinates system
     if self.inputModel and (self.inputModel.GetClassName() == "vtkMRMLModelNode") and self.nasionPointNode:
       polyData = self.inputModel.GetPolyData()
@@ -1289,7 +1292,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
           self.constructCurveReference(self.coronalReferenceCurveManager, coronalPoints, 1)    
     pass
    
-  def creatPlanningLine(self):
+  def createPlanningLine(self):
     ###All calculation is based on the RAS coordinates system
     if self.inputModel and (self.inputModel.GetClassName() == "vtkMRMLModelNode") and self.nasionPointNode:
       polyData = self.inputModel.GetPolyData()
