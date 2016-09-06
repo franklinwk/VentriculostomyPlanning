@@ -1303,11 +1303,12 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       posModelValid = numpy.array(points.GetPoint(jPosValid))
       if  numpy.linalg.norm(posModel-posModelValid)> 50.0:
         continue
-      jPosValid = jPos
       distance = numpy.linalg.norm(posModel-posApprox)+ CurveManager.cmLogic.CurveLength
       if (distance>DestiationPos) or (jPos==points.GetNumberOfPoints()-1):
         CurveManager.curveFiducials.AddFiducial(posModel[0],posModel[1],posModel[2])  
-        break  
+        jPosValid = jPos 
+        break
+       
     CurveManager.cmLogic.SourceNode.SetAttribute('CurveMaker.CurveModel', CurveManager.cmLogic.DestinationNode.GetID())
     CurveManager.cmLogic.updateCurve()
     CurveManager.cmLogic.CurvePoly = vtk.vtkPolyData() ## For CurveMaker bug
@@ -1347,25 +1348,25 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         posModelValid = numpy.array(points.GetPoint(iPosValid))
         if  numpy.linalg.norm(posModel-posModelValid)> 50.0:
           continue
-        iPosValid = iPos
         if axis == 0 and posModel[2]<posNasion[2]:
           break
         if axis == 1 and posModel[0]<posNasion[0]:
           break
+        iPosValid = iPos
         CurveManager.curveFiducials.AddFiducial(posModel[0],posModel[1],posModel[2]) #adding fiducials takes too long, check the event triggered by this operation
-      jPos = iPos-step
+      jPos = iPosValid
       jPosValid = jPos
-      for jPos in range(iPos-step, points.GetNumberOfPoints(), 1):
+      for jPos in range(iPosValid, points.GetNumberOfPoints(), 1):
         posModel = numpy.array(points.GetPoint(jPos))
         posModelValid = numpy.array(points.GetPoint(jPosValid))
         if  numpy.linalg.norm(posModel-posModelValid)> 50.0:
           continue
-        jPosValid = jPos
         if  axis == 0 and posModel[2]<posNasion[2]:
           break
         if  axis == 1 and posModel[0]<posNasion[0]:
           break
-      posModel = numpy.array(points.GetPoint(jPos-1))  
+        jPosValid = jPos
+      posModel = numpy.array(points.GetPoint(jPosValid))  
       CurveManager.curveFiducials.AddFiducial(posModel[0],posModel[1],posModel[2]) 
       
       CurveManager.cmLogic.SourceNode = CurveManager.curveFiducials
@@ -1375,7 +1376,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       CurveManager.cmLogic.setInterpolationMethod(1)
       CurveManager.cmLogic.setTubeRadius(0.5)  
     if axis == 1:
-      self.topPoint = points.GetPoint(jPos-1)
+      self.topPoint = points.GetPoint(jPosValid)
     else:
       self.topPoint = []
       
