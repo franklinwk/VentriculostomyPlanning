@@ -47,28 +47,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.logic = VentriculostomyPlanningLogic()
         
     # Instantiate and connect widgets ...
-    '''
-    ####################
-    # For debugging
-    #
-    # Reload and Test area
-    #
-    reloadCollapsibleButton = ctk.ctkCollapsibleButton()
-    reloadCollapsibleButton.text = "Reload && Test"
-    self.layout.addWidget(reloadCollapsibleButton)
-    reloadFormLayout = qt.QFormLayout(reloadCollapsibleButton)
-    
-    # reload button
-    # (use this during development, but remove it when delivering
-    #  your module to users)
-    self.reloadButton = qt.QPushButton("Reload")
-    self.reloadButton.toolTip = "Reload this module."
-    self.reloadButton.name = "VentriculostomyPlanning Reload"
-    reloadFormLayout.addWidget(self.reloadButton)
-    self.reloadButton.connect('clicked()', self.onReload)
-    #
-    ####################
-    '''
     #
     # Lines Area
     #
@@ -113,16 +91,17 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     
     # PatientModel Area
     #
-    patientModelCollapsibleButton = ctk.ctkCollapsibleButton()
-    patientModelCollapsibleButton.text = "Patient Model And Entry Point"
-    self.layout.addWidget(patientModelCollapsibleButton)
+    referenceCollapsibleButton = ctk.ctkCollapsibleButton()
+    referenceCollapsibleButton.text = "Reference Generating "
+    self.layout.addWidget(referenceCollapsibleButton)
     
     # Layout within the dummy collapsible button
-    patientModelFormLayout = qt.QFormLayout(patientModelCollapsibleButton)
+    referenceFormLayout = qt.QFormLayout(referenceCollapsibleButton)
     
     #
     # input volume selector
     #
+    volumeModelLayout = qt.QHBoxLayout()
     self.inputVolumeSelector = slicer.qMRMLNodeComboBox()
     self.inputVolumeSelector.nodeTypes = ["vtkMRMLScalarVolumeNode"]
     self.inputVolumeSelector.selectNodeUponCreation = True
@@ -133,11 +112,13 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.inputVolumeSelector.showChildNodeTypes = False
     self.inputVolumeSelector.setMRMLScene( slicer.mrmlScene )
     self.inputVolumeSelector.setToolTip( "Pick the input to the algorithm." )
-    patientModelFormLayout.addRow("Input Volume: ", self.inputVolumeSelector)
+    
+    volumeModelLayout.addWidget(self.inputVolumeSelector)
     
     #
     # output volume selector
     #
+    '''
     self.outputModelSelector = slicer.qMRMLNodeComboBox()
     self.outputModelSelector.nodeTypes = ["vtkMRMLModelNode"]
     self.outputModelSelector.selectNodeUponCreation = True
@@ -148,22 +129,20 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.outputModelSelector.showChildNodeTypes = False
     self.outputModelSelector.setMRMLScene( slicer.mrmlScene )
     self.outputModelSelector.setToolTip( "Pick the output to the algorithm." )
-    self.outputModelSelector.sortFilterProxyModel().setFilterRegExp("^\\b(Model)" )
-    patientModelFormLayout.addRow("Output Model: ", self.outputModelSelector)
-    
-    
+    self.outputModelSelector.sortFilterProxyModel().setFilterRegExp("^\\b(Model)" )    
+    '''
     #
     # Create Model Button
     #
     self.createModelButton = qt.QPushButton("Create Model")
     self.createModelButton.toolTip = "Create a surface model."
     self.createModelButton.enabled = True
-    patientModelFormLayout.addRow(self.createModelButton)
+    volumeModelLayout.addWidget(self.createModelButton)
 
     self.createModelButton.connect('clicked(bool)', self.onCreateModel)
     self.inputVolumeSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
-    self.outputModelSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
-    
+    #self.outputModelSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
+    referenceFormLayout.addRow("Input Volume: ", volumeModelLayout)
     #
     # Create Entry point Button
     #
@@ -176,7 +155,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.createEntryPointButton.toolTip = "Create the initial entry point."
     self.createEntryPointButton.enabled = True
     automaticEntryHorizontalLayout.addWidget(self.createEntryPointButton)
-    patientModelFormLayout.addRow("Automatic Entry Point: ", automaticEntryHorizontalLayout)
+    referenceFormLayout.addRow("Automatic Entry Point: ", automaticEntryHorizontalLayout)
     
     self.selectNasionButton.connect('clicked(bool)', self.onSelectNasionPointNode)
     self.createEntryPointButton.connect('clicked(bool)', self.onCreateEntryPoint)
@@ -184,18 +163,25 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     #
     # Trajectory
     #
-    trajectoryCollapsibleButton = ctk.ctkCollapsibleButton()
-    trajectoryCollapsibleButton.text = "Trajectory"
-    self.layout.addWidget(trajectoryCollapsibleButton)
+    planningCollapsibleButton = ctk.ctkCollapsibleButton()
+    planningCollapsibleButton.text = "Planning"
+    self.layout.addWidget(planningCollapsibleButton)
     
     # Layout within the dummy collapsible button
-    trajectoryFormLayout = qt.QFormLayout(trajectoryCollapsibleButton)
+    planningFormLayout = qt.QFormLayout(planningCollapsibleButton)
     
     #
     # Trajectory
     #
     trajectoryLayout = qt.QHBoxLayout()
 
+    #-- Add Point
+    self.addTrajectoryButton = qt.QPushButton("Add Trajectory")
+    self.addTrajectoryButton.toolTip = "Add Trajectory"
+    self.addTrajectoryButton.enabled = True
+    self.addTrajectoryButton.checkable = True    
+    trajectoryLayout.addWidget(self.addTrajectoryButton)
+    
     #-- Curve length
     self.lengthTrajectoryEdit = qt.QLineEdit()
     self.lengthTrajectoryEdit.text = '--'
@@ -207,20 +193,13 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     lengthTrajectoryUnitLabel = qt.QLabel('mm  ')
     trajectoryLayout.addWidget(lengthTrajectoryUnitLabel)
 
-    #-- Add Point
-    self.addTrajectoryButton = qt.QPushButton("Add Trajectory")
-    self.addTrajectoryButton.toolTip = "Add Trajectory"
-    self.addTrajectoryButton.enabled = True
-    self.addTrajectoryButton.checkable = True    
-    trajectoryLayout.addWidget(self.addTrajectoryButton)
 
     #-- Clear Point
     self.clearTrajectoryButton = qt.QPushButton("Clear")
     self.clearTrajectoryButton.toolTip = "Remove Trajectory"
     self.clearTrajectoryButton.enabled = True
     trajectoryLayout.addWidget(self.clearTrajectoryButton)
-
-    trajectoryFormLayout.addRow("Trajectory:", trajectoryLayout)
+    planningFormLayout.addRow(trajectoryLayout)
     
     createPlanningLineHorizontalLayout = qt.QHBoxLayout()
     self.lockTrajectoryCheckBox = qt.QCheckBox()
@@ -231,20 +210,12 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.createPlanningLineButton.toolTip = "Create the planning line."
     self.createPlanningLineButton.enabled = True
     createPlanningLineHorizontalLayout.addWidget(self.createPlanningLineButton)
-    trajectoryFormLayout.addRow("Lock: ", createPlanningLineHorizontalLayout)
-    
     self.createPlanningLineButton.connect('clicked(bool)', self.onCreatePlanningLine)
+    planningFormLayout.addRow("Lock:", createPlanningLineHorizontalLayout)
+
     
-    #
-    # Planning Lines
-    #
-    planningLinesCollapsibleButton = ctk.ctkCollapsibleButton()
-    planningLinesCollapsibleButton.text = "Planning Lines"
-    self.layout.addWidget(planningLinesCollapsibleButton)
     
-    # Layout within the dummy collapsible button
-    planningLinesFormLayout = qt.QFormLayout(planningLinesCollapsibleButton)
-    
+
     #
     # Mid-sagitalReference line
     #
@@ -274,9 +245,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     planningLineLayout.addWidget(self.lengthCoronalPlanningLineEdit)
     lengthCoronalPlanningLineUnitLabel = qt.QLabel('mm  ')
     planningLineLayout.addWidget(lengthCoronalPlanningLineUnitLabel)
-
-    planningLinesFormLayout.addRow("Planning Line Coordinates:", None)
-    planningLinesFormLayout.addRow(planningLineLayout)
+    planningFormLayout.addRow(planningLineLayout)
 
     #end of GUI section
     #####################################
@@ -297,7 +266,10 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     pass
   
   def onSelect(self):
-    self.logic.inputModel = self.outputModelSelector.currentNode()
+    if self.inputVolumeSelector.currentNode():
+      modelID = self.logic.modelDict.get(self.inputVolumeSelector.currentNode().GetID())
+      if modelID:
+        self.logic.enalbeOnlyTheCurrentModel(modelID)
     pass
     
   def onCreatePlanningLine(self):
@@ -309,10 +281,18 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
   def onCreateModel(self):
     #logic = VentriculostomyPlanningLogic()
     threshold = -500.0
-    self.logic.createModel(self.inputVolumeSelector.currentNode(), self.outputModelSelector.currentNode(), threshold)
+    self.logic.createModel(self.inputVolumeSelector.currentNode(), threshold)
   
   def onSelectNasionPointNode(self):
-    self.logic.selectNasionPointNode(self.outputModelSelector.currentNode())     
+    #model = self.outputModelSelector.currentNode()
+    inputVolumeNode = self.inputVolumeSelector.currentNode()
+    if inputVolumeNode:
+      modelID = self.logic.modelDict.get(inputVolumeNode.GetID())
+      if not modelID:
+        self.onCreateModel()
+        modelID = self.logic.modelDict.get(inputVolumeNode.GetID())
+      model = slicer.mrmlScene.GetNodeByID(modelID)
+      self.logic.selectNasionPointNode(model) 
   
   def onCreateEntryPoint(self):
     self.logic.createEntryPoint(float(self.lengthSagitalReferenceLineEdit.text), float(self.lengthCoronalReferenceLineEdit.text))
@@ -689,6 +669,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     self.samplingFactor = 1
     self.inputModel = None
     self.topPoint = []
+    self.modelDict = {}
     
   def hasImageData(self,volumeNode):
     """This is an example logic method that
@@ -846,164 +827,180 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
 
 
 
-  def createModel(self, inputVolumeNode, outputModelNode, thresholdValue):
+  def createModel(self, inputVolumeNode, thresholdValue):
 
     Decimate = 0.05
 
     if inputVolumeNode == None:
       return
+    outputModelNodeID =  self.modelDict.get(inputVolumeNode.GetID())
+    if outputModelNodeID:
+      outputModelNode = slicer.mrmlScene.GetNodeByID(outputModelNodeID) 
+    if (not outputModelNodeID) or (not outputModelNode):
+      outputModelNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
+      slicer.mrmlScene.AddNode(outputModelNode)
+      self.modelDict[inputVolumeNode.GetID()] = outputModelNode.GetID() 
+      resampleFilter = sitk.ResampleImageFilter()
+      originImage = sitk.Cast(sitkUtils.PullFromSlicer(inputVolumeNode.GetID()), sitk.sitkInt16)   
+      self.samplingFactor = 2
+      resampleFilter.SetSize(numpy.array(originImage.GetSize())/self.samplingFactor)
+      resampleFilter.SetOutputSpacing(numpy.array(originImage.GetSpacing())*self.samplingFactor)
+      resampleFilter.SetOutputOrigin(numpy.array(originImage.GetOrigin()))
+      resampledImage = resampleFilter.Execute(originImage)
+      thresholdFilter = sitk.BinaryThresholdImageFilter()
+      thresholdImage = thresholdFilter.Execute(resampledImage,-500,10000,1,0)
+      dilateFilter = sitk.BinaryDilateImageFilter()
+      dilateFilter.SetKernelRadius([12,12,6])
+      dilateFilter.SetBackgroundValue(0)
+      dilateFilter.SetForegroundValue(1)
+      dilatedImage = dilateFilter.Execute(thresholdImage)
+      erodeFilter = sitk.BinaryErodeImageFilter()
+      erodeFilter.SetKernelRadius([12,12,6])
+      erodeFilter.SetBackgroundValue(0)
+      erodeFilter.SetForegroundValue(1)
+      erodedImage = erodeFilter.Execute(dilatedImage)
+      fillHoleFilter = sitk.BinaryFillholeImageFilter()
+      holefilledImage = fillHoleFilter.Execute(erodedImage)
+      sitkUtils.PushToSlicer(holefilledImage, "holefilledImage", 0, True)
+      imageCollection = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLScalarVolumeNode","holefilledImage")
+      if imageCollection:
+        holefilledImageNode = imageCollection.GetItemAsObject(0)
+        holefilledImageData = holefilledImageNode.GetImageData()
+        
+        cast = vtk.vtkImageCast()
+        cast.SetInputData(holefilledImageData)
+        cast.SetOutputScalarTypeToUnsignedChar()
+        cast.Update()
     
-    #inputImageData = inputVolumeNode.GetImageData() 
-    resampleFilter = sitk.ResampleImageFilter()
-    originImage = sitk.Cast(sitkUtils.PullFromSlicer(inputVolumeNode.GetID()), sitk.sitkInt16)   
-    self.samplingFactor = 2
-    resampleFilter.SetSize(numpy.array(originImage.GetSize())/self.samplingFactor)
-    resampleFilter.SetOutputSpacing(numpy.array(originImage.GetSpacing())*self.samplingFactor)
-    resampleFilter.SetOutputOrigin(numpy.array(originImage.GetOrigin()))
-    resampledImage = resampleFilter.Execute(originImage)
-    thresholdFilter = sitk.BinaryThresholdImageFilter()
-    thresholdImage = thresholdFilter.Execute(resampledImage,-500,10000,1,0)
-    dilateFilter = sitk.BinaryDilateImageFilter()
-    dilateFilter.SetKernelRadius([12,12,6])
-    dilateFilter.SetBackgroundValue(0)
-    dilateFilter.SetForegroundValue(1)
-    dilatedImage = dilateFilter.Execute(thresholdImage)
-    erodeFilter = sitk.BinaryErodeImageFilter()
-    erodeFilter.SetKernelRadius([12,12,6])
-    erodeFilter.SetBackgroundValue(0)
-    erodeFilter.SetForegroundValue(1)
-    erodedImage = erodeFilter.Execute(dilatedImage)
-    fillHoleFilter = sitk.BinaryFillholeImageFilter()
-    holefilledImage = fillHoleFilter.Execute(erodedImage)
-    sitkUtils.PushToSlicer(holefilledImage, "holefilledImage", 0, True)
-    imageCollection = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLScalarVolumeNode","holefilledImage")
-    if imageCollection:
-      holefilledImageNode = imageCollection.GetItemAsObject(0)
-      holefilledImageData = holefilledImageNode.GetImageData()
-      
-      cast = vtk.vtkImageCast()
-      cast.SetInputData(holefilledImageData)
-      cast.SetOutputScalarTypeToUnsignedChar()
-      cast.Update()
+        labelVolumeNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLLabelMapVolumeNode")
+        slicer.mrmlScene.AddNode(labelVolumeNode)
+        labelVolumeNode.SetName("Threshold")
+        labelVolumeNode.SetSpacing(holefilledImageData.GetSpacing())
+        labelVolumeNode.SetOrigin(holefilledImageData.GetOrigin())
+    
+        matrix = vtk.vtkMatrix4x4()
+        holefilledImageNode.GetIJKToRASMatrix(matrix)
+        labelVolumeNode.SetIJKToRASMatrix(matrix)
+    
+        labelImage = cast.GetOutput()
+        labelVolumeNode.SetAndObserveImageData(labelImage)
+    
+        transformIJKtoRAS = vtk.vtkTransform()
+        matrix = vtk.vtkMatrix4x4()
+        labelVolumeNode.GetRASToIJKMatrix(matrix)
+        transformIJKtoRAS.SetMatrix(matrix)
+        transformIJKtoRAS.Inverse()
+    
+        padder = vtk.vtkImageConstantPad()
+        padder.SetInputData(labelImage)
+        padder.SetConstant(0)
+        extent = labelImage.GetExtent()
+        padder.SetOutputWholeExtent(extent[0], extent[1] + 2,
+                                    extent[2], extent[3] + 2,
+                                    extent[4], extent[5] + 2)
+        
+        cubes = vtk.vtkDiscreteMarchingCubes()
+        cubes.SetInputConnection(padder.GetOutputPort())
+        cubes.GenerateValues(1, 1, 1)
+        cubes.Update()
+    
+        smoother = vtk.vtkWindowedSincPolyDataFilter()
+        smoother.SetInputConnection(cubes.GetOutputPort())
+        smoother.SetNumberOfIterations(10)
+        smoother.BoundarySmoothingOff()
+        smoother.FeatureEdgeSmoothingOff()
+        smoother.SetFeatureAngle(120.0)
+        smoother.SetPassBand(0.001)
+        smoother.NonManifoldSmoothingOn()
+        smoother.NormalizeCoordinatesOn()
+        smoother.Update()
+    
+        pthreshold = vtk.vtkThreshold()
+        pthreshold.SetInputConnection(smoother.GetOutputPort())
+        pthreshold.ThresholdBetween(1, 1); ## Label 1
+        pthreshold.ReleaseDataFlagOn();
+    
+        geometryFilter = vtk.vtkGeometryFilter()
+        geometryFilter.SetInputConnection(pthreshold.GetOutputPort())
+        geometryFilter.ReleaseDataFlagOn()
+        
+        decimator = vtk.vtkDecimatePro()
+        decimator.SetInputConnection(geometryFilter.GetOutputPort())
+        decimator.SetFeatureAngle(60)
+        decimator.SplittingOff()
+        decimator.PreserveTopologyOn()
+        decimator.SetMaximumError(1)
+        decimator.SetTargetReduction(0.5) #0.001 only reduce the points by 0.1%, 0.5 is 50% off
+        decimator.ReleaseDataFlagOff()
+        decimator.Update()
+        
+        smootherPoly = vtk.vtkSmoothPolyDataFilter()
+        smootherPoly.SetRelaxationFactor(0.33)
+        smootherPoly.SetFeatureAngle(60)
+        smootherPoly.SetConvergence(0)
+    
+        if transformIJKtoRAS.GetMatrix().Determinant() < 0:
+          reverser = vtk.vtkReverseSense()
+          reverser.SetInputConnection(decimator.GetOutputPort())
+          reverser.ReverseNormalsOn();
+          reverser.ReleaseDataFlagOn();
+          smootherPoly.SetInputConnection(reverser.GetOutputPort())
+        else:
+          smootherPoly.SetInputConnection(decimator.GetOutputPort())
+    
+        Smooth = 10
+        smootherPoly.SetNumberOfIterations(Smooth)
+        smootherPoly.FeatureEdgeSmoothingOff()
+        smootherPoly.BoundarySmoothingOff()
+        smootherPoly.ReleaseDataFlagOn()
+        smootherPoly.Update()
+    
+        transformer = vtk.vtkTransformPolyDataFilter()
+        transformer.SetInputConnection(smootherPoly.GetOutputPort())
+        transformer.SetTransform(transformIJKtoRAS)
+        transformer.ReleaseDataFlagOn()
+        transformer.Update()
+        
+        normals = vtk.vtkPolyDataNormals()
+        normals.SetInputConnection(transformer.GetOutputPort())
+        normals.SetFeatureAngle(60)
+        normals.SetSplitting(True)
+        normals.ReleaseDataFlagOn()
+        
+        stripper = vtk.vtkStripper()
+        stripper.SetInputConnection(normals.GetOutputPort())
+        stripper.ReleaseDataFlagOff()
+        stripper.Update()
+        
+        outputModel = stripper.GetOutput()
+        outputModelNode.SetAndObservePolyData(outputModel)
+    
+        modelDisplayNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelDisplayNode")
+        ModelColor = [0.0, 0.0, 1.0]
+        modelDisplayNode.SetColor(ModelColor)
+        modelDisplayNode.SetOpacity(0.5)
+        slicer.mrmlScene.AddNode(modelDisplayNode)
+        outputModelNode.SetAndObserveDisplayNodeID(modelDisplayNode.GetID())
+        self.enalbeOnlyTheCurrentModel(outputModelNode.GetID())
+      imageCollection = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLScalarVolumeNode","holefilledImage")
+      if imageCollection:
+        holefilledImageNode = imageCollection.GetItemAsObject(0)
+        slicer.mrmlScene.RemoveNode(holefilledImageNode)
+      imageCollection = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLScalarVolumeNode","Threshold")
+      if imageCollection:
+        thresholdImageNode = imageCollection.GetItemAsObject(0)
+        slicer.mrmlScene.RemoveNode(thresholdImageNode)  
   
-      labelVolumeNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLLabelMapVolumeNode")
-      slicer.mrmlScene.AddNode(labelVolumeNode)
-      labelVolumeNode.SetName("Threshold")
-      labelVolumeNode.SetSpacing(holefilledImageData.GetSpacing())
-      labelVolumeNode.SetOrigin(holefilledImageData.GetOrigin())
-  
-      matrix = vtk.vtkMatrix4x4()
-      holefilledImageNode.GetIJKToRASMatrix(matrix)
-      labelVolumeNode.SetIJKToRASMatrix(matrix)
-  
-      labelImage = cast.GetOutput()
-      labelVolumeNode.SetAndObserveImageData(labelImage)
-  
-      transformIJKtoRAS = vtk.vtkTransform()
-      matrix = vtk.vtkMatrix4x4()
-      labelVolumeNode.GetRASToIJKMatrix(matrix)
-      transformIJKtoRAS.SetMatrix(matrix)
-      transformIJKtoRAS.Inverse()
-  
-      padder = vtk.vtkImageConstantPad()
-      padder.SetInputData(labelImage)
-      padder.SetConstant(0)
-      extent = labelImage.GetExtent()
-      padder.SetOutputWholeExtent(extent[0], extent[1] + 2,
-                                  extent[2], extent[3] + 2,
-                                  extent[4], extent[5] + 2)
-      
-      cubes = vtk.vtkDiscreteMarchingCubes()
-      cubes.SetInputConnection(padder.GetOutputPort())
-      cubes.GenerateValues(1, 1, 1)
-      cubes.Update()
-  
-      smoother = vtk.vtkWindowedSincPolyDataFilter()
-      smoother.SetInputConnection(cubes.GetOutputPort())
-      smoother.SetNumberOfIterations(10)
-      smoother.BoundarySmoothingOff()
-      smoother.FeatureEdgeSmoothingOff()
-      smoother.SetFeatureAngle(120.0)
-      smoother.SetPassBand(0.001)
-      smoother.NonManifoldSmoothingOn()
-      smoother.NormalizeCoordinatesOn()
-      smoother.Update()
-  
-      pthreshold = vtk.vtkThreshold()
-      pthreshold.SetInputConnection(smoother.GetOutputPort())
-      pthreshold.ThresholdBetween(1, 1); ## Label 1
-      pthreshold.ReleaseDataFlagOn();
-  
-      geometryFilter = vtk.vtkGeometryFilter()
-      geometryFilter.SetInputConnection(pthreshold.GetOutputPort())
-      geometryFilter.ReleaseDataFlagOn()
-      
-      decimator = vtk.vtkDecimatePro()
-      decimator.SetInputConnection(geometryFilter.GetOutputPort())
-      decimator.SetFeatureAngle(60)
-      decimator.SplittingOff()
-      decimator.PreserveTopologyOn()
-      decimator.SetMaximumError(1)
-      decimator.SetTargetReduction(0.5) #0.001 only reduce the points by 0.1%, 0.5 is 50% off
-      decimator.ReleaseDataFlagOff()
-      decimator.Update()
-      
-      smootherPoly = vtk.vtkSmoothPolyDataFilter()
-      smootherPoly.SetRelaxationFactor(0.33)
-      smootherPoly.SetFeatureAngle(60)
-      smootherPoly.SetConvergence(0)
-  
-      if transformIJKtoRAS.GetMatrix().Determinant() < 0:
-        reverser = vtk.vtkReverseSense()
-        reverser.SetInputConnection(decimator.GetOutputPort())
-        reverser.ReverseNormalsOn();
-        reverser.ReleaseDataFlagOn();
-        smootherPoly.SetInputConnection(reverser.GetOutputPort())
-      else:
-        smootherPoly.SetInputConnection(decimator.GetOutputPort())
-  
-      Smooth = 10
-      smootherPoly.SetNumberOfIterations(Smooth)
-      smootherPoly.FeatureEdgeSmoothingOff()
-      smootherPoly.BoundarySmoothingOff()
-      smootherPoly.ReleaseDataFlagOn()
-      smootherPoly.Update()
-  
-      transformer = vtk.vtkTransformPolyDataFilter()
-      transformer.SetInputConnection(smootherPoly.GetOutputPort())
-      transformer.SetTransform(transformIJKtoRAS)
-      transformer.ReleaseDataFlagOn()
-      transformer.Update()
-      
-      normals = vtk.vtkPolyDataNormals()
-      normals.SetInputConnection(transformer.GetOutputPort())
-      normals.SetFeatureAngle(60)
-      normals.SetSplitting(True)
-      normals.ReleaseDataFlagOn()
-      
-      stripper = vtk.vtkStripper()
-      stripper.SetInputConnection(normals.GetOutputPort())
-      stripper.ReleaseDataFlagOff()
-      stripper.Update()
-      
-      outputModel = stripper.GetOutput()
-      outputModelNode.SetAndObservePolyData(outputModel)
-  
-      modelDisplayNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelDisplayNode")
-      ModelColor = [0.0, 0.0, 1.0]
-      modelDisplayNode.SetColor(ModelColor)
-      modelDisplayNode.SetOpacity(0.5)
-      slicer.mrmlScene.AddNode(modelDisplayNode)
-      outputModelNode.SetAndObserveDisplayNodeID(modelDisplayNode.GetID())
-    imageCollection = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLScalarVolumeNode","holefilledImage")
-    if imageCollection:
-      holefilledImageNode = imageCollection.GetItemAsObject(0)
-      slicer.mrmlScene.RemoveNode(holefilledImageNode)
-    imageCollection = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLScalarVolumeNode","Threshold")
-    if imageCollection:
-      thresholdImageNode = imageCollection.GetItemAsObject(0)
-      slicer.mrmlScene.RemoveNode(thresholdImageNode)  
-  
+  def enalbeOnlyTheCurrentModel(self, enabledModelID):
+    model = slicer.mrmlScene.GetNodeByID(enabledModelID)
+    if model: 
+      model = slicer.mrmlScene.GetNodeByID(enabledModelID)   
+      model.GetDisplayNode().SetVisibility(1)
+    for key, value in self.modelDict.items():
+      if not value == enabledModelID: 
+        model = slicer.mrmlScene.GetNodeByID(value)   
+        model.GetDisplayNode().SetVisibility(0)
+   
   def cutSkullModel(self, inputModelNode, posNasion):
     pass
     
