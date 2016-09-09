@@ -8,6 +8,7 @@ import CurveMaker
 import numpy
 import SimpleITK as sitk
 import sitkUtils
+
 #
 # VentriculostomyPlanning
 #
@@ -22,7 +23,7 @@ class VentriculostomyPlanning(ScriptedLoadableModule):
     self.parent.title = "VentriculostomyPlanning" # TODO make this more human readable by adding spaces
     self.parent.categories = ["IGT"]
     self.parent.dependencies = []
-    self.parent.contributors = ["Junichi Tokuda (BWH)"] # replace with "Firstname Lastname (Organization)"
+    self.parent.contributors = ["Junichi Tokuda (BWH)", "Longquan Chen(BWH)"] # replace with "Firstname Lastname (Organization)"
     self.parent.helpText = """
     This is an example of scripted loadable module bundled in an extension.
     It performs a simple thresholding on the input volume and optionally captures a screenshot.
@@ -87,8 +88,8 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
 
     configurationFormLayout.addRow("Reference Line Coordinates:",None)
     configurationFormLayout.addRow(configurationLayout)
-    self.lengthSagitalReferenceLineEdit.connect('textEdited', self.onUpdateMeasureLength)
-    self.lengthCoronalReferenceLineEdit.connect('textEdited', self.onUpdateMeasureLength)
+    self.lengthSagitalReferenceLineEdit.connect('textEdited(QString)', self.onUpdateMeasureLength)
+    self.lengthCoronalReferenceLineEdit.connect('textEdited(QString)', self.onUpdateMeasureLength)
     
     
     # PatientModel Area
@@ -266,9 +267,15 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
   
   def onSelect(self):
     if self.inputVolumeSelector.currentNode():
-      modelID = self.logic.modelDict.get(self.inputVolumeSelector.currentNode().GetID())
+      modelID = self.inputVolumeSelector.currentNode().GetAttribute("vtkMRMLScalarVolumeNode.rel_model")
       if modelID:
         self.logic.enalbeOnlyTheCurrentModel(modelID)
+      nasionID = self.inputVolumeSelector.currentNode().GetAttribute("vtkMRMLScalarVolumeNode.rel_nasion")
+      if nasionID:
+        self.logic.enalbeOnlyTheCurrentNasion(nasionID)
+        self.logic.saggitalReferenceLength = float(self.inputVolumeSelector.currentNode().GetAttribute("vtkMRMLScalarVolumeNode.rel_saggitalLength"))
+        self.logic.coronalReferenceLength = float(self.inputVolumeSelector.currentNode().GetAttribute("vtkMRMLScalarVolumeNode.rel_coronalLength"))
+        self.logic.createEntryPoint()
       red_logic = slicer.app.layoutManager().sliceWidget("Red").sliceLogic()
       red_cn = red_logic.GetSliceCompositeNode()
       red_logic.GetSliceCompositeNode().SetBackgroundVolumeID(self.inputVolumeSelector.currentNode().GetID()) 
@@ -287,27 +294,23 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     pass 
     
   def onCreateModel(self):
-    #logic = VentriculostomyPlanningLogic()
     threshold = -500.0
     self.logic.createModel(self.inputVolumeSelector.currentNode(), threshold)
   
   def onSelectNasionPointNode(self):
-    #model = self.outputModelSelector.currentNode()
     inputVolumeNode = self.inputVolumeSelector.currentNode()
-    if inputVolumeNode:
-      modelID = self.logic.modelDict.get(inputVolumeNode.GetID())
-      if not modelID:
-        self.onCreateModel()
-        modelID = self.logic.modelDict.get(inputVolumeNode.GetID())
-      model = slicer.mrmlScene.GetNodeByID(modelID)
-      self.logic.selectNasionPointNode(model) 
+    self.logic.selectNasionPointNode(inputVolumeNode) 
       
   def onUpdateMeasureLength(self):
     sagitalReferenceLength = float(self.lengthSagitalReferenceLineEdit.text)
     coronalReferenceLength = float(self.lengthCoronalReferenceLineEdit.text)
+    if self.inputVolumeSelector.currentNode():
+      self.inputVolumeSelector.currentNode().SetAttribute("vtkMRMLScalarVolumeNode.rel_saggitalLength", '%.1f' % sagitalReferenceLength)
+      self.inputVolumeSelector.currentNode().SetAttribute("vtkMRMLScalarVolumeNode.rel_coronalLength", '%.1f' % coronalReferenceLength)
     self.logic.updateMeasureLength(sagitalReferenceLength, coronalReferenceLength)
   
   def onCreateEntryPoint(self):
+    self.onUpdateMeasureLength()
     self.logic.createEntryPoint()
     #self.lengthSagitalReferenceLineEdit.text = '%.2f' % self.logic.getSagitalReferenceLineLength()
     #self.lengthCoronalReferenceLineEdit.text = '%.2f' % self.logic.getCoronalReferenceLineLength()
@@ -678,7 +681,6 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     self.samplingFactor = 1
     self.inputModel = None
     self.topPoint = []
-    self.modelDict = {}
     self.saggitalReferenceLength = 100.0
     self.coronalReferenceLength = 30.0
     
@@ -844,13 +846,13 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
 
     if inputVolumeNode == None:
       return
-    outputModelNodeID =  self.modelDict.get(inputVolumeNode.GetID())
+    outputModelNodeID =  inputVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_model")
     if outputModelNodeID:
       outputModelNode = slicer.mrmlScene.GetNodeByID(outputModelNodeID) 
     if (not outputModelNodeID) or (not outputModelNode):
       outputModelNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
       slicer.mrmlScene.AddNode(outputModelNode)
-      self.modelDict[inputVolumeNode.GetID()] = outputModelNode.GetID() 
+      inputVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_model", outputModelNode.GetID())
       resampleFilter = sitk.ResampleImageFilter()
       originImage = sitk.Cast(sitkUtils.PullFromSlicer(inputVolumeNode.GetID()), sitk.sitkInt16)   
       self.samplingFactor = 2
@@ -1007,15 +1009,35 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         slicer.mrmlScene.RemoveNode(thresholdImageNode)  
   
   def enalbeOnlyTheCurrentModel(self, enabledModelID):
-    model = slicer.mrmlScene.GetNodeByID(enabledModelID)
-    if model: 
-      model = slicer.mrmlScene.GetNodeByID(enabledModelID)   
-      model.GetDisplayNode().SetVisibility(1)
-    for key, value in self.modelDict.items():
-      if not value == enabledModelID: 
-        model = slicer.mrmlScene.GetNodeByID(value)   
-        model.GetDisplayNode().SetVisibility(0)
-   
+    modelNode = slicer.mrmlScene.GetNodeByID(enabledModelID)
+    if modelNode: 
+      modelNode = slicer.mrmlScene.GetNodeByID(enabledModelID)   
+      modelNode.GetDisplayNode().SetVisibility(1)
+      self.inputModel = modelNode
+    volumeCollection = slicer.mrmlScene.GetNodesByClass("vtkMRMLScalarVolumeNode") 
+    if volumeCollection:
+      for iVolume in range(volumeCollection.GetNumberOfItems ()):
+        volumeNode = volumeCollection.GetItemAsObject(iVolume)
+        modelID = volumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_model")
+        if modelID and (not  modelID == enabledModelID):
+          modelNode = slicer.mrmlScene.GetNodeByID(modelID)
+          modelNode.GetDisplayNode().SetVisibility(0)
+  
+  def enalbeOnlyTheCurrentNasion(self, enableNasionID):
+    nasionNode = slicer.mrmlScene.GetNodeByID(enableNasionID)
+    if nasionNode: 
+      nasionNode = slicer.mrmlScene.GetNodeByID(enableNasionID)   
+      nasionNode.GetDisplayNode().SetVisibility(1)
+      self.nasionPointNode = nasionNode
+    volumeCollection = slicer.mrmlScene.GetNodesByClass("vtkMRMLScalarVolumeNode") 
+    if volumeCollection:
+      for iVolume in range(volumeCollection.GetNumberOfItems ()):
+        volumeNode = volumeCollection.GetItemAsObject(iVolume)
+        nasionID = volumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_nasion")
+        if nasionID and (not  nasionID == enableNasionID):
+          nasionNode = slicer.mrmlScene.GetNodeByID(nasionID)
+          nasionNode.GetDisplayNode().SetVisibility(0)
+  
   def cutSkullModel(self, inputModelNode, posNasion):
     pass
     
@@ -1035,34 +1057,43 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     viewerBlue = slicer.mrmlScene.GetNodeByID("vtkMRMLSliceNodeGreen")
     viewerBlue.SetOrientationToCoronal()
     viewerBlue.SetSliceOffset(pos[1]) 
-    #self.createEntryPoint()
     pass
     
-  def selectNasionPointNode(self, inputCreatedModel, initPoint = None):
-    if self.nasionPointNode:
-      slicer.mrmlScene.RemoveNode(self.nasionPointNode)
-      self.nasionPointNode = None
-    self.inputModel= inputCreatedModel
-    self.nasionPointNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
-    self.nasionPointNode.SetName("nasionPointNode")
-    slicer.mrmlScene.AddNode(self.nasionPointNode)
-    dnode = self.nasionPointNode.GetMarkupsDisplayNode()
-    if dnode:
-      rgbColor = [1.0, 0.0, 1.0]
-      dnode.SetSelectedColor(rgbColor)
-    selectionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSelectionNodeSingleton")
-    interactionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLInteractionNodeSingleton")
-    if (selectionNode == None) or (interactionNode == None):
-      return
-
-    selectionNode.SetReferenceActivePlaceNodeClassName("vtkMRMLMarkupsFiducialNode");
-    selectionNode.SetActivePlaceNodeID(self.nasionPointNode.GetID())
-
-    interactionNode.SwitchToSinglePlaceMode ()
-    interactionNode.SetCurrentInteractionMode(slicer.vtkMRMLInteractionNode.Place) 
-    
-    interactionNode.AddObserver(interactionNode.EndPlacementEvent, self.endPlacement) 
-    self.nasionPointNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.updatePosition)
+  def selectNasionPointNode(self, inputVolumeNode, initPoint = None):
+    if inputVolumeNode:
+      modelID = inputVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_model")
+      if not modelID:
+        self.onCreateModel()
+        modelID = inputVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_model")
+      modelNode = slicer.mrmlScene.GetNodeByID(modelID)
+      if inputVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_nasion"):
+        nasionNode = slicer.mrmlScene.GetNodeByID(inputVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_nasion"))
+        slicer.mrmlScene.RemoveNode(nasionNode)
+        self.nasionPointNode = None
+      self.inputModel= modelNode
+      self.nasionPointNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
+      self.nasionPointNode.SetName("nasion")
+      slicer.mrmlScene.AddNode(self.nasionPointNode)
+      inputVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_nasion", self.nasionPointNode.GetID())
+      inputVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_saggitalLength", '%.1f' % self.saggitalReferenceLength)
+      inputVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_coronalLength", '%.1f' % self.coronalReferenceLength)
+      dnode = self.nasionPointNode.GetMarkupsDisplayNode()
+      if dnode:
+        rgbColor = [1.0, 0.0, 1.0]
+        dnode.SetSelectedColor(rgbColor)
+      selectionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSelectionNodeSingleton")
+      interactionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLInteractionNodeSingleton")
+      if (selectionNode == None) or (interactionNode == None):
+        return
+  
+      selectionNode.SetReferenceActivePlaceNodeClassName("vtkMRMLMarkupsFiducialNode");
+      selectionNode.SetActivePlaceNodeID(self.nasionPointNode.GetID())
+  
+      interactionNode.SwitchToSinglePlaceMode ()
+      interactionNode.SetCurrentInteractionMode(slicer.vtkMRMLInteractionNode.Place) 
+      
+      interactionNode.AddObserver(interactionNode.EndPlacementEvent, self.endPlacement) 
+      self.nasionPointNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.updatePosition)
     
   def endPlacement(self, interactionNode, selectednasionPointNode):
     interactionNode.SetCurrentInteractionMode(slicer.vtkMRMLInteractionNode.ViewTransform)
@@ -1116,7 +1147,6 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       CurveManager.curveFiducials.AddFiducial(posModel[0],posModel[1],posModel[2]) #adding fiducials takes too long, check the event triggered by this operation
       CurveManager.cmLogic.SourceNode = CurveManager.curveFiducials
       CurveManager.cmLogic.updateCurve()
-      print CurveManager.cmLogic.CurveLength
       if CurveManager.cmLogic.CurveLength>ApproximityPos:
         break
     jPos = iPosValid 
