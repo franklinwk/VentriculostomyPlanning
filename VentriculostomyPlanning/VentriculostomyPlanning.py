@@ -2,6 +2,7 @@ import os
 import unittest
 import vtk, qt, ctk, slicer
 from slicer.ScriptedLoadableModule import *
+from ctk import ctkAxesWidget
 import logging
 import tempfile
 import CurveMaker
@@ -144,7 +145,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
 
     self.createModelButton.connect('clicked(bool)', self.onCreateModel)
     self.inputVolumeSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
-    #self.outputModelSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
+    self.inputVolumeSelector.connect("nodeAdded(vtkMRMLNode*)", self.onAddedNode)
     referenceFormLayout.addRow("Input Volume: ", volumeModelLayout)
     #
     # Create Entry point Button
@@ -274,30 +275,34 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.logic.clearSagitalReferenceLine()
     self.logic.clearCoronalReferenceLine()
   
-  def onSelect(self):
-    if self.inputVolumeSelector.currentNode():
+  def onAddedNode(self, addedNode):
+    if addedNode:
+      self.inputVolumeSelector.setCurrentNode(addedNode)
+      
+  def onSelect(self, selectedNode=None):
+    if selectedNode:        
       self.initialFieldsValue()
-      self.logic.currentVolumeNode = self.inputVolumeSelector.currentNode()
+      self.logic.currentVolumeNode = selectedNode
       self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_model")
       self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_nasion")
       self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_trajectory")
-      self.logic.updateMeasureLength(self.inputVolumeSelector.currentNode(), float(self.lengthSagitalReferenceLineEdit.text), float(self.lengthCoronalReferenceLineEdit.text))
-      self.lengthSagitalReferenceLineEdit.text = self.inputVolumeSelector.currentNode().GetAttribute("vtkMRMLScalarVolumeNode.rel_sagitalLength")
-      self.lengthCoronalReferenceLineEdit.text = self.inputVolumeSelector.currentNode().GetAttribute("vtkMRMLScalarVolumeNode.rel_coronalLength")
-      self.logic.createEntryPoint(self.inputVolumeSelector.currentNode())
-      curveFiducialsID = self.inputVolumeSelector.currentNode().GetAttribute("vtkMRMLScalarVolumeNode.rel_trajectory")
+      self.logic.updateMeasureLength(selectedNode, float(self.lengthSagitalReferenceLineEdit.text), float(self.lengthCoronalReferenceLineEdit.text))
+      self.lengthSagitalReferenceLineEdit.text = selectedNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagitalLength")
+      self.lengthCoronalReferenceLineEdit.text = selectedNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_coronalLength")
+      self.logic.createEntryPoint(selectedNode)
+      curveFiducialsID = selectedNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_trajectory")
       self.logic.trajectoryManager.curveFiducials = slicer.mrmlScene.GetNodeByID(curveFiducialsID)
       self.logic.trajectoryManager.startEditLine()
       self.onCreatePlanningLine()
       red_logic = slicer.app.layoutManager().sliceWidget("Red").sliceLogic()
       red_cn = red_logic.GetSliceCompositeNode()
-      red_cn.SetBackgroundVolumeID(self.inputVolumeSelector.currentNode().GetID()) 
+      red_cn.SetBackgroundVolumeID(selectedNode.GetID()) 
       yellow_logic = slicer.app.layoutManager().sliceWidget("Yellow").sliceLogic()
       yellow_cn = yellow_logic.GetSliceCompositeNode()
-      yellow_cn.SetBackgroundVolumeID(self.inputVolumeSelector.currentNode().GetID())  
+      yellow_cn.SetBackgroundVolumeID(selectedNode.GetID())  
       green_logic = slicer.app.layoutManager().sliceWidget("Green").sliceLogic()
       green_cn = green_logic.GetSliceCompositeNode()
-      green_cn.SetBackgroundVolumeID(self.inputVolumeSelector.currentNode().GetID())     
+      green_cn.SetBackgroundVolumeID(selectedNode.GetID())     
     pass
     
   def onCreatePlanningLine(self):
@@ -762,8 +767,8 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       nasionNode = slicer.mrmlScene.GetNodeByID(nasionID)
       if nasionNode.GetNumberOfFiducials()>0:
         trajectoryNode = slicer.mrmlScene.GetNodeByID(inputVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_trajectory"))
+        slicer.mrmlScene.AddNode(trajectoryNode)
         dnode = trajectoryNode.GetMarkupsDisplayNode()
-        slicer.mrmlScene.AddNode(trajectoryNode)  
         if dnode:
           rgbColor = [0.0, 1.0, 1.0]
           dnode.SetSelectedColor(rgbColor)
@@ -1021,6 +1026,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
           layoutManager = slicer.app.layoutManager()
           threeDWidget = layoutManager.threeDWidget(0)
           threeDView = threeDWidget.threeDView()
+          threeDView.lookFromViewAxis(ctkAxesWidget.Anterior)
           threeDView.resetFocalPoint()
         imageCollection = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLScalarVolumeNode","holefilledImage")
         if imageCollection:
