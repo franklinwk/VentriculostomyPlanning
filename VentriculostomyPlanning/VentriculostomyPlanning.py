@@ -60,35 +60,48 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     #
     # Mid-sagitalReference line
     #
-    configurationLayout = qt.QHBoxLayout()
+    referenceConfigLayout = qt.QHBoxLayout()
 
     #-- Curve length
     lengthSagitalReferenceLineLabel = qt.QLabel('Sagital Length:  ')
-    configurationLayout.addWidget(lengthSagitalReferenceLineLabel)
+    referenceConfigLayout.addWidget(lengthSagitalReferenceLineLabel)
     self.lengthSagitalReferenceLineEdit = qt.QLineEdit()
     self.lengthSagitalReferenceLineEdit.text = '100.0'
     self.lengthSagitalReferenceLineEdit.readOnly = False
     self.lengthSagitalReferenceLineEdit.frame = True
     self.lengthSagitalReferenceLineEdit.styleSheet = "QLineEdit { background:transparent; }"
     self.lengthSagitalReferenceLineEdit.cursor = qt.QCursor(qt.Qt.IBeamCursor)
-    configurationLayout.addWidget(self.lengthSagitalReferenceLineEdit)
+    referenceConfigLayout.addWidget(self.lengthSagitalReferenceLineEdit)
     lengthSagitalReferenceLineUnitLabel = qt.QLabel('mm  ')
-    configurationLayout.addWidget(lengthSagitalReferenceLineUnitLabel)
+    referenceConfigLayout.addWidget(lengthSagitalReferenceLineUnitLabel)
     
     lengthCoronalReferenceLineLabel = qt.QLabel('Coronal Length:  ')
-    configurationLayout.addWidget(lengthCoronalReferenceLineLabel)
+    referenceConfigLayout.addWidget(lengthCoronalReferenceLineLabel)
     self.lengthCoronalReferenceLineEdit = qt.QLineEdit()
     self.lengthCoronalReferenceLineEdit.text = '30.0'
     self.lengthCoronalReferenceLineEdit.readOnly = False
     self.lengthCoronalReferenceLineEdit.frame = True
     self.lengthCoronalReferenceLineEdit.styleSheet = "QLineEdit { background:transparent; }"
     self.lengthCoronalReferenceLineEdit.cursor = qt.QCursor(qt.Qt.IBeamCursor)
-    configurationLayout.addWidget(self.lengthCoronalReferenceLineEdit)
+    referenceConfigLayout.addWidget(self.lengthCoronalReferenceLineEdit)
     lengthCoronalReferenceLineUnitLabel = qt.QLabel('mm  ')
-    configurationLayout.addWidget(lengthCoronalReferenceLineUnitLabel)
-
-    configurationFormLayout.addRow("Reference Line Coordinates:",None)
-    configurationFormLayout.addRow(configurationLayout)
+    referenceConfigLayout.addWidget(lengthCoronalReferenceLineUnitLabel)
+    configurationFormLayout.addRow(referenceConfigLayout)
+    
+    ROIConfigLayout = qt.QHBoxLayout()
+    self.selectROIButton = qt.QPushButton("ROI definition")
+    self.selectROIButton.toolTip = "Add two points in the 2D window"
+    self.selectROIButton.enabled = True
+    ROIConfigLayout.addWidget(self.selectROIButton)
+    
+    self.createROIButton = qt.QPushButton("Crop Volume")
+    self.createROIButton.toolTip = "Created cropped volume"
+    self.createROIButton.enabled = True
+    ROIConfigLayout.addWidget(self.createROIButton)
+    configurationFormLayout.addRow("ROI definition for cropping Volume:",None)
+    configurationFormLayout.addRow(ROIConfigLayout)
+    self.selectROIButton.connect('clicked(bool)',self.onDefineROI)
+    self.createROIButton.connect('clicked(bool)',self.onCreateROI)
     self.lengthSagitalReferenceLineEdit.connect('textEdited(QString)', self.onModifyMeasureLength)
     self.lengthCoronalReferenceLineEdit.connect('textEdited(QString)', self.onModifyMeasureLength)
     
@@ -286,6 +299,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_model")
       self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_nasion")
       self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_trajectory")
+      self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_ROI")
       self.logic.updateMeasureLength(selectedNode, float(self.lengthSagitalReferenceLineEdit.text), float(self.lengthCoronalReferenceLineEdit.text))
       self.lengthSagitalReferenceLineEdit.text = selectedNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagitalLength")
       self.lengthCoronalReferenceLineEdit.text = selectedNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_coronalLength")
@@ -323,6 +337,12 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
   def onSelectNasionPointNode(self):
     inputVolumeNode = self.inputVolumeSelector.currentNode()
     self.logic.selectNasionPointNode(inputVolumeNode) 
+  
+  def onDefineROI(self):
+    self.logic.defineROI(self.inputVolumeSelector.currentNode());
+  
+  def onCreateROI(self):
+    self.logic.createROI(self.inputVolumeSelector.currentNode());
       
   def onModifyMeasureLength(self):
     sagitalReferenceLength = float(self.lengthSagitalReferenceLineEdit.text)
@@ -1048,7 +1068,12 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         nasionNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
         nasionNode.SetName("nasion"+self.currentVolumeNode.GetID()[-1:])
         slicer.mrmlScene.AddNode(nasionNode)
-        self.currentVolumeNode.SetAttribute(attribte, nasionNode.GetID())   
+        self.currentVolumeNode.SetAttribute(attribte, nasionNode.GetID())  
+      elif attribte == "vtkMRMLScalarVolumeNode.rel_ROI":
+        ROINode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLAnnotationROINode")
+        ROINode.SetName("ROI"+self.currentVolumeNode.GetID()[-1:])
+        slicer.mrmlScene.AddNode(ROINode)
+        self.currentVolumeNode.SetAttribute(attribte, ROINode.GetID())     
       elif attribte == "vtkMRMLScalarVolumeNode.rel_trajectory":
         trajectoryNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
         trajectoryNode.SetName("trajectory"+self.currentVolumeNode.GetID()[-1:])
@@ -1101,7 +1126,13 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     viewerBlue.SetOrientationToCoronal()
     viewerBlue.SetSliceOffset(pos[1]) 
     pass
-    
+  
+  def endPlacement(self, interactionNode, event):
+    interactionNode.SetCurrentInteractionMode(slicer.vtkMRMLInteractionNode.ViewTransform)
+    if interactionNode.GetAttribute("vtkMRMLInteractionNode.rel_marker") == "nasion":
+      self.createEntryPoint(self.currentVolumeNode)
+    pass
+   
   def selectNasionPointNode(self, inputVolumeNode, initPoint = None):
     if inputVolumeNode:
       modelID = inputVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_model")
@@ -1126,15 +1157,43 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         selectionNode.SetActivePlaceNodeID(nasionNode.GetID())
     
         interactionNode.SwitchToSinglePlaceMode ()
-        interactionNode.SetCurrentInteractionMode(slicer.vtkMRMLInteractionNode.Place) 
-        interactionNode.SetAttribute("vtkMRMLInteractionNode.rel_marker", "nasion")
+        interactionNode.SetCurrentInteractionMode(slicer.vtkMRMLInteractionNode.Place)
         interactionNode.AddObserver(interactionNode.EndPlacementEvent, self.endPlacement) 
         nasionNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.updatePosition)
+  
+  def createROI(self, inputVolumeNode):
+    cropVolumeLogic = slicer.modules.cropvolume.logic()
+    if inputVolumeNode:
+      if not inputVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_croppedVolume"):
+        croppedVolumeNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLScalarVolumeNode")
+        slicer.mrmlScene.AddNode(croppedVolumeNode)
+        inputVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_croppedVolume",croppedVolumeNode.GetID())
+      croppedVolumeNodeID = inputVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_croppedVolume")
+      croppedVolumeNode = slicer.mrmlScene.GetNodeByID(croppedVolumeNodeID)
+      ROINodeID = inputVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_ROI")
+      ROINode = slicer.mrmlScene.GetNodeByID(ROINodeID)
+      if croppedVolumeNode and ROINode :
+        cropVolumeLogic.CropVoxelBased(ROINode,inputVolumeNode,croppedVolumeNode)
+    pass
     
-  def endPlacement(self, interactionNode, event):
-    interactionNode.SetCurrentInteractionMode(slicer.vtkMRMLInteractionNode.ViewTransform)
-    if interactionNode.GetAttribute("vtkMRMLInteractionNode.rel_marker") == "nasion":
-      self.createEntryPoint(self.currentVolumeNode)
+  
+  def defineROI(self,inputVolumeNode):
+    if inputVolumeNode:
+      selectionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSelectionNodeSingleton")
+      interactionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLInteractionNodeSingleton")
+      if (selectionNode == None) or (interactionNode == None):
+        return
+      ROINode = slicer.mrmlScene.GetNodeByID(inputVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_ROI"))
+      selectionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSelectionNodeSingleton")
+      interactionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLInteractionNodeSingleton")
+      if (selectionNode == None) or (interactionNode == None):
+        return
+  
+      selectionNode.SetReferenceActivePlaceNodeClassName("vtkMRMLAnnotationROINode");
+      selectionNode.SetActivePlaceNodeID(ROINode.GetID())
+  
+      #interactionNode.SwitchToSinglePlaceMode ()
+      interactionNode.SetCurrentInteractionMode(slicer.vtkMRMLInteractionNode.Place)  
     pass
   
   def sortPoints(self, inputPointVector, referencePoint):
