@@ -129,7 +129,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.inputVolumeSelector.showChildNodeTypes = False
     self.inputVolumeSelector.setMRMLScene( slicer.mrmlScene )
     self.inputVolumeSelector.setToolTip( "Pick the input to the algorithm." )
-    
+    #self.inputVolumeSelector.sortFilterProxyModel().setFilterRegExp("^(-originalVolume)$" )    
     volumeModelLayout.addWidget(self.inputVolumeSelector)
     
     #
@@ -289,38 +289,54 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.logic.clearCoronalReferenceLine()
   
   def onAddedNode(self, addedNode):
-    if addedNode:
+    if addedNode and (not addedNode.GetAttribute("vtkMRMLScalarVolumeNode.notShownEntity")):
       self.inputVolumeSelector.setCurrentNode(addedNode)
       
   def onSelect(self, selectedNode=None):
     if selectedNode:        
       self.initialFieldsValue()
-      self.logic.currentVolumeNode = selectedNode
+      self.logic.baseVolumeNode = selectedNode
+      self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_ROI")
       self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_model")
       self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_nasion")
       self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_trajectory")
-      self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_ROI")
-      self.logic.updateMeasureLength(selectedNode, float(self.lengthSagitalReferenceLineEdit.text), float(self.lengthCoronalReferenceLineEdit.text))
-      self.lengthSagitalReferenceLineEdit.text = selectedNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagitalLength")
-      self.lengthCoronalReferenceLineEdit.text = selectedNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_coronalLength")
-      self.logic.createEntryPoint(selectedNode)
-      curveFiducialsID = selectedNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_trajectory")
+      #Set the cropped image for processing
+      if selectedNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_croppedVolume"):
+        self.logic.currentVolumeNode = slicer.mrmlScene.GetNodeByID(selectedNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_croppedVolume"))
+      else:
+        self.logic.currentVolumeNode = selectedNode  
+      self.logic.updateMeasureLength(float(self.lengthSagitalReferenceLineEdit.text), float(self.lengthCoronalReferenceLineEdit.text))
+      self.lengthSagitalReferenceLineEdit.text = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagitalLength")
+      self.lengthCoronalReferenceLineEdit.text = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_coronalLength")
+      self.logic.createEntryPoint()
+      curveFiducialsID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_trajectory")
       self.logic.trajectoryManager.curveFiducials = slicer.mrmlScene.GetNodeByID(curveFiducialsID)
       self.logic.trajectoryManager.startEditLine()
       self.onCreatePlanningLine()
-      red_logic = slicer.app.layoutManager().sliceWidget("Red").sliceLogic()
-      red_cn = red_logic.GetSliceCompositeNode()
-      red_cn.SetBackgroundVolumeID(selectedNode.GetID()) 
-      yellow_logic = slicer.app.layoutManager().sliceWidget("Yellow").sliceLogic()
-      yellow_cn = yellow_logic.GetSliceCompositeNode()
-      yellow_cn.SetBackgroundVolumeID(selectedNode.GetID())  
-      green_logic = slicer.app.layoutManager().sliceWidget("Green").sliceLogic()
-      green_cn = green_logic.GetSliceCompositeNode()
-      green_cn.SetBackgroundVolumeID(selectedNode.GetID())     
+      self.onSetSliceViewer()
+          
+    pass
+  
+  def onSetSliceViewer(self):
+    red_widget = slicer.app.layoutManager().sliceWidget("Red")
+    red_logic = red_widget.sliceLogic()
+    red_cn = red_logic.GetSliceCompositeNode()
+    yellow_widget = slicer.app.layoutManager().sliceWidget("Yellow")
+    yellow_logic = yellow_widget.sliceLogic()
+    yellow_cn = yellow_logic.GetSliceCompositeNode()
+    green_widget = slicer.app.layoutManager().sliceWidget("Green")
+    green_logic = green_widget.sliceLogic()
+    green_cn = green_logic.GetSliceCompositeNode()
+    red_cn.SetBackgroundVolumeID(self.logic.currentVolumeNode.GetID()) 
+    red_widget.fitSliceToBackground()
+    yellow_cn.SetBackgroundVolumeID(self.logic.currentVolumeNode.GetID())  
+    yellow_widget.fitSliceToBackground()
+    green_cn.SetBackgroundVolumeID(self.logic.currentVolumeNode.GetID())   
+    green_widget.fitSliceToBackground()
     pass
     
   def onCreatePlanningLine(self):
-    self.logic.createPlanningLine(self.inputVolumeSelector.currentNode())  
+    self.logic.createPlanningLine()  
     self.lengthSagitalPlanningLineEdit.text = '%.1f' % self.logic.getSagitalPlanningLineLength()
     self.lengthCoronalPlanningLineEdit.text = '%.1f' % self.logic.getCoronalPlanningLineLength()
     pass 
@@ -332,30 +348,37 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       if outputModelNodeID:
         outputModelNode = slicer.mrmlScene.GetNodeByID(outputModelNodeID)
         outputModelNode.SetAttribute("vtkMRMLModelNode.modelCreated","False")
-        self.logic.createModel(self.inputVolumeSelector.currentNode(), threshold)
+        self.inputVolumeSelector.disconnect("nodeAdded(vtkMRMLNode*)")
+        self.logic.createModel(outputModelNode, threshold)
+        self.inputVolumeSelector.connect("nodeAdded(vtkMRMLNode*)", self.onAddedNode)
   
   def onSelectNasionPointNode(self):
-    inputVolumeNode = self.inputVolumeSelector.currentNode()
-    self.logic.selectNasionPointNode(inputVolumeNode) 
+    outputModelNodeID = self.inputVolumeSelector.currentNode().GetAttribute("vtkMRMLScalarVolumeNode.rel_model") 
+    if outputModelNodeID:
+      outputModelNode = slicer.mrmlScene.GetNodeByID(outputModelNodeID)
+      self.logic.selectNasionPointNode(outputModelNode) 
   
   def onDefineROI(self):
-    self.logic.defineROI(self.inputVolumeSelector.currentNode());
+    self.logic.currentVolumeNode = self.logic.baseVolumeNode
+    self.onSetSliceViewer()
+    self.logic.defineROI()
   
   def onCreateROI(self):
-    self.logic.createROI(self.inputVolumeSelector.currentNode());
+    self.logic.createROI()
+    self.onSetSliceViewer()
       
   def onModifyMeasureLength(self):
     sagitalReferenceLength = float(self.lengthSagitalReferenceLineEdit.text)
     coronalReferenceLength = float(self.lengthCoronalReferenceLineEdit.text)
-    if self.inputVolumeSelector.currentNode().GetAttribute("vtkMRMLScalarVolumeNode.rel_sagitalLength"):
-        self.inputVolumeSelector.currentNode().SetAttribute("vtkMRMLScalarVolumeNode.rel_sagitalLength", '%.1f' % sagitalReferenceLength) 
-    if self.inputVolumeSelector.currentNode().GetAttribute("vtkMRMLScalarVolumeNode.rel_coronalLength"):
-        self.inputVolumeSelector.currentNode().SetAttribute("vtkMRMLScalarVolumeNode.rel_coronalLength", '%.1f' % coronalReferenceLength)    
+    if self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagitalLength"):
+        self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_sagitalLength", '%.1f' % sagitalReferenceLength) 
+    if self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_coronalLength"):
+        self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_coronalLength", '%.1f' % coronalReferenceLength)    
     
   
   def onCreateEntryPoint(self):
     self.onModifyMeasureLength()
-    self.logic.createEntryPoint(self.inputVolumeSelector.currentNode())
+    self.logic.createEntryPoint()
     #self.lengthSagitalReferenceLineEdit.text = '%.2f' % self.logic.getSagitalReferenceLineLength()
     #self.lengthCoronalReferenceLineEdit.text = '%.2f' % self.logic.getCoronalReferenceLineLength()
     
@@ -398,8 +421,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
 
   # Event handlers for trajectory
   def onEditTrajectory(self):
-    inputVolumeNode = self.inputVolumeSelector.currentNode()
-    self.logic.startEditTrajectory(inputVolumeNode)
+    self.logic.startEditTrajectory()
     
   def onClearTrajectory(self):
     self.logic.clearTrajectory()
@@ -711,6 +733,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     self.sagitalPlanningCurveManager.setModelColor(1.0, 1.0, 0.0)
     
     self.currentVolumeNode = None
+    self.baseVolumeNode = None
     self.samplingFactor = 1
     self.topPoint = []
     
@@ -781,12 +804,12 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     self.sagitalReferenceCurveManager.unlockLine()
     self.coronalReferenceCurveManager.unlockLine()
 
-  def startEditTrajectory(self, inputVolumeNode):
-    if inputVolumeNode:
-      nasionID = inputVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_nasion")
+  def startEditTrajectory(self):
+    if self.baseVolumeNode:
+      nasionID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_nasion")
       nasionNode = slicer.mrmlScene.GetNodeByID(nasionID)
       if nasionNode.GetNumberOfFiducials()>0:
-        trajectoryNode = slicer.mrmlScene.GetNodeByID(inputVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_trajectory"))
+        trajectoryNode = slicer.mrmlScene.GetNodeByID(self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_trajectory"))
         slicer.mrmlScene.AddNode(trajectoryNode)
         dnode = trajectoryNode.GetMarkupsDisplayNode()
         if dnode:
@@ -898,167 +921,166 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
 
 
 
-  def createModel(self, inputVolumeNode, thresholdValue):
+  def createModel(self, outputModelNode, thresholdValue):
 
     Decimate = 0.05
 
-    if inputVolumeNode == None:
+    if self.baseVolumeNode == None or self.currentVolumeNode == None:
       return
-    outputModelNodeID =  inputVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_model")
-    if outputModelNodeID:
-      outputModelNode = slicer.mrmlScene.GetNodeByID(outputModelNodeID) 
-      if outputModelNode.GetAttribute("vtkMRMLModelNode.modelCreated") == "False":
-        resampleFilter = sitk.ResampleImageFilter()
-        originImage = sitk.Cast(sitkUtils.PullFromSlicer(inputVolumeNode.GetID()), sitk.sitkInt16)   
-        self.samplingFactor = 2
-        resampleFilter.SetSize(numpy.array(originImage.GetSize())/self.samplingFactor)
-        resampleFilter.SetOutputSpacing(numpy.array(originImage.GetSpacing())*self.samplingFactor)
-        resampleFilter.SetOutputOrigin(numpy.array(originImage.GetOrigin()))
-        resampledImage = resampleFilter.Execute(originImage)
-        thresholdFilter = sitk.BinaryThresholdImageFilter()
-        thresholdImage = thresholdFilter.Execute(resampledImage,-500,10000,1,0)
-        dilateFilter = sitk.BinaryDilateImageFilter()
-        dilateFilter.SetKernelRadius([12,12,6])
-        dilateFilter.SetBackgroundValue(0)
-        dilateFilter.SetForegroundValue(1)
-        dilatedImage = dilateFilter.Execute(thresholdImage)
-        erodeFilter = sitk.BinaryErodeImageFilter()
-        erodeFilter.SetKernelRadius([12,12,6])
-        erodeFilter.SetBackgroundValue(0)
-        erodeFilter.SetForegroundValue(1)
-        erodedImage = erodeFilter.Execute(dilatedImage)
-        fillHoleFilter = sitk.BinaryFillholeImageFilter()
-        holefilledImage = fillHoleFilter.Execute(erodedImage)
-        sitkUtils.PushToSlicer(holefilledImage, "holefilledImage", 0, True)
-        imageCollection = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLScalarVolumeNode","holefilledImage")
-        if imageCollection:
-          holefilledImageNode = imageCollection.GetItemAsObject(0)
-          holefilledImageData = holefilledImageNode.GetImageData()
-          
-          cast = vtk.vtkImageCast()
-          cast.SetInputData(holefilledImageData)
-          cast.SetOutputScalarTypeToUnsignedChar()
-          cast.Update()
-      
-          labelVolumeNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLLabelMapVolumeNode")
-          slicer.mrmlScene.AddNode(labelVolumeNode)
-          labelVolumeNode.SetName("Threshold")
-          labelVolumeNode.SetSpacing(holefilledImageData.GetSpacing())
-          labelVolumeNode.SetOrigin(holefilledImageData.GetOrigin())
-      
-          matrix = vtk.vtkMatrix4x4()
-          holefilledImageNode.GetIJKToRASMatrix(matrix)
-          labelVolumeNode.SetIJKToRASMatrix(matrix)
-      
-          labelImage = cast.GetOutput()
-          labelVolumeNode.SetAndObserveImageData(labelImage)
-      
-          transformIJKtoRAS = vtk.vtkTransform()
-          matrix = vtk.vtkMatrix4x4()
-          labelVolumeNode.GetRASToIJKMatrix(matrix)
-          transformIJKtoRAS.SetMatrix(matrix)
-          transformIJKtoRAS.Inverse()
-      
-          padder = vtk.vtkImageConstantPad()
-          padder.SetInputData(labelImage)
-          padder.SetConstant(0)
-          extent = labelImage.GetExtent()
-          padder.SetOutputWholeExtent(extent[0], extent[1] + 2,
-                                      extent[2], extent[3] + 2,
-                                      extent[4], extent[5] + 2)
-          
-          cubes = vtk.vtkDiscreteMarchingCubes()
-          cubes.SetInputConnection(padder.GetOutputPort())
-          cubes.GenerateValues(1, 1, 1)
-          cubes.Update()
-      
-          smoother = vtk.vtkWindowedSincPolyDataFilter()
-          smoother.SetInputConnection(cubes.GetOutputPort())
-          smoother.SetNumberOfIterations(10)
-          smoother.BoundarySmoothingOff()
-          smoother.FeatureEdgeSmoothingOff()
-          smoother.SetFeatureAngle(120.0)
-          smoother.SetPassBand(0.001)
-          smoother.NonManifoldSmoothingOn()
-          smoother.NormalizeCoordinatesOn()
-          smoother.Update()
-      
-          pthreshold = vtk.vtkThreshold()
-          pthreshold.SetInputConnection(smoother.GetOutputPort())
-          pthreshold.ThresholdBetween(1, 1); ## Label 1
-          pthreshold.ReleaseDataFlagOn();
-      
-          geometryFilter = vtk.vtkGeometryFilter()
-          geometryFilter.SetInputConnection(pthreshold.GetOutputPort())
-          geometryFilter.ReleaseDataFlagOn()
-          
-          decimator = vtk.vtkDecimatePro()
-          decimator.SetInputConnection(geometryFilter.GetOutputPort())
-          decimator.SetFeatureAngle(60)
-          decimator.SplittingOff()
-          decimator.PreserveTopologyOn()
-          decimator.SetMaximumError(1)
-          decimator.SetTargetReduction(0.5) #0.001 only reduce the points by 0.1%, 0.5 is 50% off
-          decimator.ReleaseDataFlagOff()
-          decimator.Update()
-          
-          smootherPoly = vtk.vtkSmoothPolyDataFilter()
-          smootherPoly.SetRelaxationFactor(0.33)
-          smootherPoly.SetFeatureAngle(60)
-          smootherPoly.SetConvergence(0)
-      
-          if transformIJKtoRAS.GetMatrix().Determinant() < 0:
-            reverser = vtk.vtkReverseSense()
-            reverser.SetInputConnection(decimator.GetOutputPort())
-            reverser.ReverseNormalsOn();
-            reverser.ReleaseDataFlagOn();
-            smootherPoly.SetInputConnection(reverser.GetOutputPort())
-          else:
-            smootherPoly.SetInputConnection(decimator.GetOutputPort())
-      
-          Smooth = 10
-          smootherPoly.SetNumberOfIterations(Smooth)
-          smootherPoly.FeatureEdgeSmoothingOff()
-          smootherPoly.BoundarySmoothingOff()
-          smootherPoly.ReleaseDataFlagOn()
-          smootherPoly.Update()
-      
-          transformer = vtk.vtkTransformPolyDataFilter()
-          transformer.SetInputConnection(smootherPoly.GetOutputPort())
-          transformer.SetTransform(transformIJKtoRAS)
-          transformer.ReleaseDataFlagOn()
-          transformer.Update()
-          
-          normals = vtk.vtkPolyDataNormals()
-          normals.SetInputConnection(transformer.GetOutputPort())
-          normals.SetFeatureAngle(60)
-          normals.SetSplitting(True)
-          normals.ReleaseDataFlagOn()
-          
-          stripper = vtk.vtkStripper()
-          stripper.SetInputConnection(normals.GetOutputPort())
-          stripper.ReleaseDataFlagOff()
-          stripper.Update()
-          
-          outputModel = stripper.GetOutput()
-          outputModelNode.SetAndObservePolyData(outputModel)
-          outputModelNode.SetAttribute("vtkMRMLModelNode.modelCreated","True")
-          layoutManager = slicer.app.layoutManager()
-          threeDWidget = layoutManager.threeDWidget(0)
-          threeDView = threeDWidget.threeDView()
-          threeDView.lookFromViewAxis(ctkAxesWidget.Anterior)
-          threeDView.resetFocalPoint()
-        imageCollection = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLScalarVolumeNode","holefilledImage")
-        if imageCollection:
-          holefilledImageNode = imageCollection.GetItemAsObject(0)
-          slicer.mrmlScene.RemoveNode(holefilledImageNode)
-        imageCollection = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLScalarVolumeNode","Threshold")
-        if imageCollection:
-          thresholdImageNode = imageCollection.GetItemAsObject(0)
-          slicer.mrmlScene.RemoveNode(thresholdImageNode)  
+    if outputModelNode.GetAttribute("vtkMRMLModelNode.modelCreated") == "False":
+      resampleFilter = sitk.ResampleImageFilter()
+      originImage = sitk.Cast(sitkUtils.PullFromSlicer(self.currentVolumeNode.GetID()), sitk.sitkInt16)   
+      self.samplingFactor = 2
+      resampleFilter.SetSize(numpy.array(originImage.GetSize())/self.samplingFactor)
+      resampleFilter.SetOutputSpacing(numpy.array(originImage.GetSpacing())*self.samplingFactor)
+      resampleFilter.SetOutputOrigin(numpy.array(originImage.GetOrigin()))
+      resampledImage = resampleFilter.Execute(originImage)
+      thresholdFilter = sitk.BinaryThresholdImageFilter()
+      thresholdImage = thresholdFilter.Execute(resampledImage,-500,10000,1,0)
+      dilateFilter = sitk.BinaryDilateImageFilter()
+      dilateFilter.SetKernelRadius([12,12,6])
+      dilateFilter.SetBackgroundValue(0)
+      dilateFilter.SetForegroundValue(1)
+      dilatedImage = dilateFilter.Execute(thresholdImage)
+      erodeFilter = sitk.BinaryErodeImageFilter()
+      erodeFilter.SetKernelRadius([12,12,6])
+      erodeFilter.SetBackgroundValue(0)
+      erodeFilter.SetForegroundValue(1)
+      erodedImage = erodeFilter.Execute(dilatedImage)
+      fillHoleFilter = sitk.BinaryFillholeImageFilter()
+      holefilledImage = fillHoleFilter.Execute(erodedImage)
+      sitkUtils.PushToSlicer(holefilledImage, "holefilledImage", 0, True)
+      imageCollection = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLScalarVolumeNode","holefilledImage")
+      if imageCollection:
+        holefilledImageNode = imageCollection.GetItemAsObject(0)
+        holefilledImageNode.SetAttribute("vtkMRMLScalarVolumeNode.notShownEntity","True")
+        holefilledImageData = holefilledImageNode.GetImageData()
+        
+        cast = vtk.vtkImageCast()
+        cast.SetInputData(holefilledImageData)
+        cast.SetOutputScalarTypeToUnsignedChar()
+        cast.Update()
+    
+        labelVolumeNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLLabelMapVolumeNode")
+        labelVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.notShownEntity","True")
+        slicer.mrmlScene.AddNode(labelVolumeNode)
+        labelVolumeNode.SetName("Threshold")
+        labelVolumeNode.SetSpacing(holefilledImageData.GetSpacing())
+        labelVolumeNode.SetOrigin(holefilledImageData.GetOrigin())
+    
+        matrix = vtk.vtkMatrix4x4()
+        holefilledImageNode.GetIJKToRASMatrix(matrix)
+        labelVolumeNode.SetIJKToRASMatrix(matrix)
+    
+        labelImage = cast.GetOutput()
+        labelVolumeNode.SetAndObserveImageData(labelImage)
+    
+        transformIJKtoRAS = vtk.vtkTransform()
+        matrix = vtk.vtkMatrix4x4()
+        labelVolumeNode.GetRASToIJKMatrix(matrix)
+        transformIJKtoRAS.SetMatrix(matrix)
+        transformIJKtoRAS.Inverse()
+    
+        padder = vtk.vtkImageConstantPad()
+        padder.SetInputData(labelImage)
+        padder.SetConstant(0)
+        extent = labelImage.GetExtent()
+        padder.SetOutputWholeExtent(extent[0], extent[1] + 2,
+                                    extent[2], extent[3] + 2,
+                                    extent[4], extent[5] + 2)
+        
+        cubes = vtk.vtkDiscreteMarchingCubes()
+        cubes.SetInputConnection(padder.GetOutputPort())
+        cubes.GenerateValues(1, 1, 1)
+        cubes.Update()
+    
+        smoother = vtk.vtkWindowedSincPolyDataFilter()
+        smoother.SetInputConnection(cubes.GetOutputPort())
+        smoother.SetNumberOfIterations(10)
+        smoother.BoundarySmoothingOff()
+        smoother.FeatureEdgeSmoothingOff()
+        smoother.SetFeatureAngle(120.0)
+        smoother.SetPassBand(0.001)
+        smoother.NonManifoldSmoothingOn()
+        smoother.NormalizeCoordinatesOn()
+        smoother.Update()
+    
+        pthreshold = vtk.vtkThreshold()
+        pthreshold.SetInputConnection(smoother.GetOutputPort())
+        pthreshold.ThresholdBetween(1, 1); ## Label 1
+        pthreshold.ReleaseDataFlagOn();
+    
+        geometryFilter = vtk.vtkGeometryFilter()
+        geometryFilter.SetInputConnection(pthreshold.GetOutputPort())
+        geometryFilter.ReleaseDataFlagOn()
+        
+        decimator = vtk.vtkDecimatePro()
+        decimator.SetInputConnection(geometryFilter.GetOutputPort())
+        decimator.SetFeatureAngle(60)
+        decimator.SplittingOff()
+        decimator.PreserveTopologyOn()
+        decimator.SetMaximumError(1)
+        decimator.SetTargetReduction(0.5) #0.001 only reduce the points by 0.1%, 0.5 is 50% off
+        decimator.ReleaseDataFlagOff()
+        decimator.Update()
+        
+        smootherPoly = vtk.vtkSmoothPolyDataFilter()
+        smootherPoly.SetRelaxationFactor(0.33)
+        smootherPoly.SetFeatureAngle(60)
+        smootherPoly.SetConvergence(0)
+    
+        if transformIJKtoRAS.GetMatrix().Determinant() < 0:
+          reverser = vtk.vtkReverseSense()
+          reverser.SetInputConnection(decimator.GetOutputPort())
+          reverser.ReverseNormalsOn();
+          reverser.ReleaseDataFlagOn();
+          smootherPoly.SetInputConnection(reverser.GetOutputPort())
+        else:
+          smootherPoly.SetInputConnection(decimator.GetOutputPort())
+    
+        Smooth = 10
+        smootherPoly.SetNumberOfIterations(Smooth)
+        smootherPoly.FeatureEdgeSmoothingOff()
+        smootherPoly.BoundarySmoothingOff()
+        smootherPoly.ReleaseDataFlagOn()
+        smootherPoly.Update()
+    
+        transformer = vtk.vtkTransformPolyDataFilter()
+        transformer.SetInputConnection(smootherPoly.GetOutputPort())
+        transformer.SetTransform(transformIJKtoRAS)
+        transformer.ReleaseDataFlagOn()
+        transformer.Update()
+        
+        normals = vtk.vtkPolyDataNormals()
+        normals.SetInputConnection(transformer.GetOutputPort())
+        normals.SetFeatureAngle(60)
+        normals.SetSplitting(True)
+        normals.ReleaseDataFlagOn()
+        
+        stripper = vtk.vtkStripper()
+        stripper.SetInputConnection(normals.GetOutputPort())
+        stripper.ReleaseDataFlagOff()
+        stripper.Update()
+        
+        outputModel = stripper.GetOutput()
+        outputModelNode.SetAndObservePolyData(outputModel)
+        outputModelNode.SetAttribute("vtkMRMLModelNode.modelCreated","True")
+        layoutManager = slicer.app.layoutManager()
+        threeDWidget = layoutManager.threeDWidget(0)
+        threeDView = threeDWidget.threeDView()
+        threeDView.lookFromViewAxis(ctkAxesWidget.Anterior)
+        threeDView.resetFocalPoint()
+      imageCollection = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLScalarVolumeNode","holefilledImage")
+      if imageCollection:
+        holefilledImageNode = imageCollection.GetItemAsObject(0)
+        slicer.mrmlScene.RemoveNode(holefilledImageNode)
+      imageCollection = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLScalarVolumeNode","Threshold")
+      if imageCollection:
+        thresholdImageNode = imageCollection.GetItemAsObject(0)
+        slicer.mrmlScene.RemoveNode(thresholdImageNode)  
         
   def enableAttribute(self, attribte):
-    enabledAttributeID = self.currentVolumeNode.GetAttribute(attribte)
+    enabledAttributeID = self.baseVolumeNode.GetAttribute(attribte)
     if enabledAttributeID:
       attributeNode = slicer.mrmlScene.GetNodeByID(enabledAttributeID)
       if attributeNode and attributeNode.GetDisplayNode():   
@@ -1066,19 +1088,21 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     else:
       if attribte == "vtkMRMLScalarVolumeNode.rel_nasion":
         nasionNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
-        nasionNode.SetName("nasion"+self.currentVolumeNode.GetID()[-1:])
+        nasionNode.SetName("nasion"+self.baseVolumeNode.GetID()[-1:])
         slicer.mrmlScene.AddNode(nasionNode)
-        self.currentVolumeNode.SetAttribute(attribte, nasionNode.GetID())  
+        self.baseVolumeNode.SetAttribute(attribte, nasionNode.GetID())  
       elif attribte == "vtkMRMLScalarVolumeNode.rel_ROI":
+        ROIListNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLAnnotationHierarchyNode")
+        ROIListNode.SetName("ROI List")
         ROINode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLAnnotationROINode")
-        ROINode.SetName("ROI"+self.currentVolumeNode.GetID()[-1:])
+        ROINode.SetName("ROI"+self.baseVolumeNode.GetID()[-1:])
         slicer.mrmlScene.AddNode(ROINode)
-        self.currentVolumeNode.SetAttribute(attribte, ROINode.GetID())     
+        self.baseVolumeNode.SetAttribute(attribte, ROINode.GetID())     
       elif attribte == "vtkMRMLScalarVolumeNode.rel_trajectory":
         trajectoryNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
-        trajectoryNode.SetName("trajectory"+self.currentVolumeNode.GetID()[-1:])
+        trajectoryNode.SetName("trajectory"+self.baseVolumeNode.GetID()[-1:])
         slicer.mrmlScene.AddNode(trajectoryNode)
-        self.currentVolumeNode.SetAttribute(attribte, trajectoryNode.GetID())  
+        self.baseVolumeNode.SetAttribute(attribte, trajectoryNode.GetID())  
       elif attribte == "vtkMRMLScalarVolumeNode.rel_model":  
         modelNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
         modelNode.SetAttribute("vtkMRMLModelNode.modelCreated", "False")
@@ -1089,8 +1113,8 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         modelDisplayNode.SetOpacity(0.5)
         slicer.mrmlScene.AddNode(modelDisplayNode)
         modelNode.SetAndObserveDisplayNodeID(modelDisplayNode.GetID())
-        self.currentVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_model", modelNode.GetID())
-      enabledAttributeID = self.currentVolumeNode.GetAttribute(attribte)  
+        self.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_model", modelNode.GetID())
+      enabledAttributeID = self.baseVolumeNode.GetAttribute(attribte)  
         # to do update the logic regarding the current attribute // self.nasionPointNode = nasionNode
     volumeCollection = slicer.mrmlScene.GetNodesByClass("vtkMRMLScalarVolumeNode") 
     if volumeCollection:
@@ -1099,19 +1123,17 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         attributeNodeID = volumeNode.GetAttribute(attribte)
         if attributeNodeID and (not  attributeNodeID == enabledAttributeID):
           attributeNode = slicer.mrmlScene.GetNodeByID(attributeNodeID)
-          if attributeNode.GetDisplayNode():
+          if attributeNode and attributeNode.GetDisplayNode():
             attributeNode.GetDisplayNode().SetVisibility(0)
-  
-  def cutSkullModel(self, inputModelNode, posNasion):
-    pass
+
     
-  def updateMeasureLength(self, inputVolumeNode, sagitalReferenceLength=None, coronalReferenceLength=None):
-    if not inputVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagitalLength"):
+  def updateMeasureLength(self, sagitalReferenceLength=None, coronalReferenceLength=None):
+    if not self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagitalLength"):
       if sagitalReferenceLength:
-        inputVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_sagitalLength", '%.1f' % sagitalReferenceLength)      
-    if not inputVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_coronalLength"):    
+        self.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_sagitalLength", '%.1f' % sagitalReferenceLength)      
+    if not self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_coronalLength"):    
       if coronalReferenceLength:
-        inputVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_coronalLength", '%.1f' % coronalReferenceLength)
+        self.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_coronalLength", '%.1f' % coronalReferenceLength)
          
   def updatePosition(self, fiducicalMarkerNode, eventID):
     pos = [0.0]*4
@@ -1130,17 +1152,15 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
   def endPlacement(self, interactionNode, event):
     interactionNode.SetCurrentInteractionMode(slicer.vtkMRMLInteractionNode.ViewTransform)
     if interactionNode.GetAttribute("vtkMRMLInteractionNode.rel_marker") == "nasion":
-      self.createEntryPoint(self.currentVolumeNode)
+      self.createEntryPoint(self.baseVolumeNode)
     pass
    
-  def selectNasionPointNode(self, inputVolumeNode, initPoint = None):
-    if inputVolumeNode:
-      modelID = inputVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_model")
-      modelNode = slicer.mrmlScene.GetNodeByID(modelID)
+  def selectNasionPointNode(self, modelNode, initPoint = None):
+    if self.baseVolumeNode:
       if modelNode.GetAttribute("vtkMRMLModelNode.modelCreated") == "False":
-        self.createModel(inputVolumeNode, -500)
-      if inputVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_nasion"):
-        nasionNode = slicer.mrmlScene.GetNodeByID(inputVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_nasion"))
+        self.createModel(modelNode,-500)
+      if self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_nasion"):
+        nasionNode = slicer.mrmlScene.GetNodeByID(self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_nasion"))
         dnode = nasionNode.GetMarkupsDisplayNode()
         nasionNode.RemoveAllMarkups()
         slicer.mrmlScene.AddNode(nasionNode)  
@@ -1155,47 +1175,59 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     
         selectionNode.SetReferenceActivePlaceNodeClassName("vtkMRMLMarkupsFiducialNode");
         selectionNode.SetActivePlaceNodeID(nasionNode.GetID())
-    
+        
+        interactionNode.SetAttribute("vtkMRMLInteractionNode.rel_marker", "nasion")
         interactionNode.SwitchToSinglePlaceMode ()
         interactionNode.SetCurrentInteractionMode(slicer.vtkMRMLInteractionNode.Place)
         interactionNode.AddObserver(interactionNode.EndPlacementEvent, self.endPlacement) 
         nasionNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.updatePosition)
   
-  def createROI(self, inputVolumeNode):
+  def createROI(self):
     cropVolumeLogic = slicer.modules.cropvolume.logic()
-    if inputVolumeNode:
-      if not inputVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_croppedVolume"):
+    if self.baseVolumeNode:
+      if not self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_croppedVolume"):
         croppedVolumeNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLScalarVolumeNode")
+        croppedVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.notShownEntity","True")
         slicer.mrmlScene.AddNode(croppedVolumeNode)
-        inputVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_croppedVolume",croppedVolumeNode.GetID())
-      croppedVolumeNodeID = inputVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_croppedVolume")
+        self.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_croppedVolume",croppedVolumeNode.GetID())
+      croppedVolumeNodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_croppedVolume")
       croppedVolumeNode = slicer.mrmlScene.GetNodeByID(croppedVolumeNodeID)
-      ROINodeID = inputVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_ROI")
+      ROINodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_ROI")
       ROINode = slicer.mrmlScene.GetNodeByID(ROINodeID)
+      ROIListCollection = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLAnnotationHierarchyNode","ROI List")
+      ROIList = ROIListCollection.GetItemAsObject(0)
+      childrenNodes = vtk.vtkCollection()
+      ROIList.GetChildren(childrenNodes, 1)
+      lastNode = childrenNodes.GetItemAsObject(childrenNodes.GetNumberOfItems()-1)
+      ROINode.Copy(lastNode)
+      #slicer.mrmlScene.RemoveNode(lastNode)
       if croppedVolumeNode and ROINode :
-        cropVolumeLogic.CropVoxelBased(ROINode,inputVolumeNode,croppedVolumeNode)
+        cropVolumeLogic.CropVoxelBased(ROINode,self.baseVolumeNode,croppedVolumeNode)
+        self.currentVolumeNode = croppedVolumeNode
     pass
     
   
-  def defineROI(self,inputVolumeNode):
-    if inputVolumeNode:
+  def defineROI(self):
+    if self.baseVolumeNode:
       selectionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSelectionNodeSingleton")
       interactionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLInteractionNodeSingleton")
       if (selectionNode == None) or (interactionNode == None):
         return
-      ROINode = slicer.mrmlScene.GetNodeByID(inputVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_ROI"))
-      selectionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSelectionNodeSingleton")
-      interactionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLInteractionNodeSingleton")
-      if (selectionNode == None) or (interactionNode == None):
-        return
-  
       selectionNode.SetReferenceActivePlaceNodeClassName("vtkMRMLAnnotationROINode");
+      interactionNode.SetCurrentInteractionMode(slicer.vtkMRMLInteractionNode.Place) 
+      ROINode = slicer.mrmlScene.GetNodeByID(self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_ROI"))
+      ROILists = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLAnnotationHierarchyNode","ROI List")
+      selectionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSelectionNodeSingleton")
+      selectionNode.SetActiveROIListID(ROILists.GetItemAsObject(0).GetID())
       selectionNode.SetActivePlaceNodeID(ROINode.GetID())
   
       #interactionNode.SwitchToSinglePlaceMode ()
-      interactionNode.SetCurrentInteractionMode(slicer.vtkMRMLInteractionNode.Place)  
+      #interactionNode.AddObserver(interactionNode.EndPlacementEvent, self.endROIPlacement) 
     pass
   
+  def endROIPlacement(self,interactionNode, event):
+    pass
+    
   def sortPoints(self, inputPointVector, referencePoint):
     minDistanceIndex = 0
     minDistance = 1e10
@@ -1269,7 +1301,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
   
   def constructCurvePlanning(self, CurveManager,points, axis):
     posNasion = numpy.array([0.0,0.0,0.0])
-    nasionNode = slicer.mrmlScene.GetNodeByID(self.currentVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_nasion"))
+    nasionNode = slicer.mrmlScene.GetNodeByID(self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_nasion"))
     nasionNode.GetNthFiducialPosition(0,posNasion)
     if CurveManager.curveFiducials == None:
       CurveManager.curveFiducials = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
@@ -1367,22 +1399,22 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       if valid:        
           intersectPoints.InsertNextPoint(posModel)        
   
-  def createEntryPoint(self, inputVolumeNode) :
+  def createEntryPoint(self) :
     ###All calculation is based on the RAS coordinates system 
     inputModelNode = None
     nasionNode = None
     sagitalReferenceLength = None
     coronalReferenceLength = None
-    inputModelNodeID =  inputVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_model")
+    inputModelNodeID =  self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_model")
     if inputModelNodeID:
       inputModelNode = slicer.mrmlScene.GetNodeByID(inputModelNodeID) 
-    nasionNodeID = inputVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_nasion")  
+    nasionNodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_nasion")  
     if nasionNodeID:
       nasionNode = slicer.mrmlScene.GetNodeByID(nasionNodeID)  
-    if inputVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagitalLength"):
-      sagitalReferenceLength = float(inputVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagitalLength"))   
-    if inputVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_coronalLength")  :
-      coronalReferenceLength = float(inputVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_coronalLength")  )  
+    if self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagitalLength"):
+      sagitalReferenceLength = float(self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagitalLength"))   
+    if self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_coronalLength")  :
+      coronalReferenceLength = float(self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_coronalLength")  )  
     if inputModelNode and (inputModelNode.GetAttribute("vtkMRMLModelNode.modelCreated") == "True") and (nasionNode.GetNumberOfMarkups()) and sagitalReferenceLength and coronalReferenceLength:
       polyData = inputModelNode.GetPolyData()
       if polyData: 
@@ -1412,16 +1444,16 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     self.lockReferenceLine()        
     pass
    
-  def createPlanningLine(self, inputVolumeNode):
+  def createPlanningLine(self):
     ###All calculation is based on the RAS coordinates system
     inputModelNode = None
     nasionNode = None
     sagitalPlanningLength = None
     coronalPlanningLength = None
-    inputModelNodeID =  inputVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_model")
+    inputModelNodeID =  self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_model")
     if inputModelNodeID:
       inputModelNode = slicer.mrmlScene.GetNodeByID(inputModelNodeID) 
-    nasionNodeID = inputVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_nasion")  
+    nasionNodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_nasion")  
     if nasionNodeID:
       nasionNode = slicer.mrmlScene.GetNodeByID(nasionNodeID)   
     if (inputModelNode.GetAttribute("vtkMRMLModelNode.modelCreated") == "True") and (nasionNode.GetNumberOfMarkups()):
