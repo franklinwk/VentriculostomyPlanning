@@ -266,7 +266,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     lengthCoronalPlanningLineUnitLabel = qt.QLabel('mm  ')
     planningLineLayout.addWidget(lengthCoronalPlanningLineUnitLabel)
     planningFormLayout.addRow(planningLineLayout)
-
+    
     #end of GUI section
     #####################################
 
@@ -736,10 +736,15 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     slicer.mrmlScene.AddNode(self.sagittalPlanningCurveManager.curveModel)
     self.sagittalPlanningCurveManager.setModelColor(1.0, 1.0, 0.0)
     
+    self.ROIListNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLAnnotationHierarchyNode")
+    self.ROIListNode.SetName("ROIListForAllCases")
+    self.ROIListNode.HideFromEditorsOff()
+    slicer.mrmlScene.AddNode(self.ROIListNode)
     self.currentVolumeNode = None
     self.baseVolumeNode = None
     self.samplingFactor = 1
     self.topPoint = []
+    self.resetROI = False 
     
   def hasImageData(self,volumeNode):
     """This is an example logic method that
@@ -1081,31 +1086,33 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         thresholdImageNode = imageCollection.GetItemAsObject(0)
         slicer.mrmlScene.RemoveNode(thresholdImageNode)  
         
-  def enableAttribute(self, attribte):
-    enabledAttributeID = self.baseVolumeNode.GetAttribute(attribte)
+  def enableAttribute(self, attribute):
+    enabledAttributeID = self.baseVolumeNode.GetAttribute(attribute)
     if enabledAttributeID:
       attributeNode = slicer.mrmlScene.GetNodeByID(enabledAttributeID)
-      if attributeNode and attributeNode.GetDisplayNode():   
-        attributeNode.GetDisplayNode().SetVisibility(1)
+      if attributeNode and attributeNode.GetDisplayNode():
+        if attribute == "vtkMRMLScalarVolumeNode.rel_ROI":
+          attributeNode.SetDisplayVisibility(1)
+        else:  
+          attributeNode.GetDisplayNode().SetVisibility(1)
     else:
-      if attribte == "vtkMRMLScalarVolumeNode.rel_nasion":
+      if attribute == "vtkMRMLScalarVolumeNode.rel_nasion":
         nasionNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
         nasionNode.SetName("nasion"+self.baseVolumeNode.GetID()[-1:])
         slicer.mrmlScene.AddNode(nasionNode)
-        self.baseVolumeNode.SetAttribute(attribte, nasionNode.GetID())  
-      elif attribte == "vtkMRMLScalarVolumeNode.rel_ROI":
-        ROIListNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLAnnotationHierarchyNode")
-        ROIListNode.SetName("ROI List")
-        ROINode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLAnnotationROINode")
-        ROINode.SetName("ROI"+self.baseVolumeNode.GetID()[-1:])
-        slicer.mrmlScene.AddNode(ROINode)
-        self.baseVolumeNode.SetAttribute(attribte, ROINode.GetID())     
-      elif attribte == "vtkMRMLScalarVolumeNode.rel_trajectory":
+        self.baseVolumeNode.SetAttribute(attribute, nasionNode.GetID())  
+      elif attribute == "vtkMRMLScalarVolumeNode.rel_ROI":
+        #ROINode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLAnnotationROINode")
+        #ROINode.SetName("ROI"+self.baseVolumeNode.GetID()[-1:])
+        #ROINode.HideFromEditorsOff()
+        #slicer.mrmlScene.AddNode(ROINode)
+        self.baseVolumeNode.SetAttribute(attribute, "")     
+      elif attribute == "vtkMRMLScalarVolumeNode.rel_trajectory":
         trajectoryNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
         trajectoryNode.SetName("trajectory"+self.baseVolumeNode.GetID()[-1:])
         slicer.mrmlScene.AddNode(trajectoryNode)
-        self.baseVolumeNode.SetAttribute(attribte, trajectoryNode.GetID())  
-      elif attribte == "vtkMRMLScalarVolumeNode.rel_model":  
+        self.baseVolumeNode.SetAttribute(attribute, trajectoryNode.GetID())  
+      elif attribute == "vtkMRMLScalarVolumeNode.rel_model":  
         modelNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
         modelNode.SetAttribute("vtkMRMLModelNode.modelCreated", "False")
         slicer.mrmlScene.AddNode(modelNode)
@@ -1116,17 +1123,20 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         slicer.mrmlScene.AddNode(modelDisplayNode)
         modelNode.SetAndObserveDisplayNodeID(modelDisplayNode.GetID())
         self.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_model", modelNode.GetID())
-      enabledAttributeID = self.baseVolumeNode.GetAttribute(attribte)  
+      enabledAttributeID = self.baseVolumeNode.GetAttribute(attribute)  
         # to do update the logic regarding the current attribute // self.nasionPointNode = nasionNode
     volumeCollection = slicer.mrmlScene.GetNodesByClass("vtkMRMLScalarVolumeNode") 
     if volumeCollection:
       for iVolume in range(volumeCollection.GetNumberOfItems ()):
         volumeNode = volumeCollection.GetItemAsObject(iVolume)
-        attributeNodeID = volumeNode.GetAttribute(attribte)
+        attributeNodeID = volumeNode.GetAttribute(attribute)
         if attributeNodeID and (not  attributeNodeID == enabledAttributeID):
           attributeNode = slicer.mrmlScene.GetNodeByID(attributeNodeID)
           if attributeNode and attributeNode.GetDisplayNode():
-            attributeNode.GetDisplayNode().SetVisibility(0)
+            if attribute == "vtkMRMLScalarVolumeNode.rel_ROI":
+              attributeNode.SetDisplayVisibility(0)
+            else:  
+              attributeNode.GetDisplayNode().SetVisibility(0)
 
     
   def updateMeasureLength(self, sagittalReferenceLength=None, coronalReferenceLength=None):
@@ -1194,18 +1204,25 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         self.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_croppedVolume",croppedVolumeNode.GetID())
       croppedVolumeNodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_croppedVolume")
       croppedVolumeNode = slicer.mrmlScene.GetNodeByID(croppedVolumeNodeID)
-      ROINodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_ROI")
-      ROINode = slicer.mrmlScene.GetNodeByID(ROINodeID)
-      ROIListCollection = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLAnnotationHierarchyNode","ROI List")
-      ROIList = ROIListCollection.GetItemAsObject(0)
-      childrenNodes = vtk.vtkCollection()
-      ROIList.GetChildren(childrenNodes, 1)
-      lastNode = childrenNodes.GetItemAsObject(childrenNodes.GetNumberOfItems()-1)
-      ROINode.Copy(lastNode)
-      #slicer.mrmlScene.RemoveNode(lastNode)
-      if croppedVolumeNode and ROINode :
-        cropVolumeLogic.CropVoxelBased(ROINode,self.baseVolumeNode,croppedVolumeNode)
-        self.currentVolumeNode = croppedVolumeNode
+      if self.resetROI:
+        children= vtk.vtkCollection()
+        self.ROIListNode.GetAllChildren(children)
+        ROINodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_ROI")
+        if children.GetNumberOfItems():
+          if ROINodeID and slicer.mrmlScene.GetNodeByID(ROINodeID):
+            slicer.mrmlScene.RemoveNode(slicer.mrmlScene.GetNodeByID(ROINodeID))
+          ROINode = children.GetItemAsObject(children.GetNumberOfItems()-1)
+          self.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_ROI", ROINode.GetID())
+          if croppedVolumeNode and ROINode :
+            cropVolumeLogic.CropVoxelBased(ROINode,self.baseVolumeNode,croppedVolumeNode)
+            self.currentVolumeNode = croppedVolumeNode
+      else:
+        ROINodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_ROI")
+        ROINode = slicer.mrmlScene.GetNodeByID(ROINodeID)
+        if croppedVolumeNode and ROINode :
+          cropVolumeLogic.CropVoxelBased(ROINode,self.baseVolumeNode,croppedVolumeNode)
+          self.currentVolumeNode = croppedVolumeNode      
+    self.resetROI = False   
     pass
     
   
@@ -1217,12 +1234,12 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         return
       selectionNode.SetReferenceActivePlaceNodeClassName("vtkMRMLAnnotationROINode");
       interactionNode.SetCurrentInteractionMode(slicer.vtkMRMLInteractionNode.Place) 
-      ROINode = slicer.mrmlScene.GetNodeByID(self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_ROI"))
-      ROILists = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLAnnotationHierarchyNode","ROI List")
-      selectionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSelectionNodeSingleton")
-      selectionNode.SetActiveROIListID(ROILists.GetItemAsObject(0).GetID())
-      selectionNode.SetActivePlaceNodeID(ROINode.GetID())
-  
+      slicer.modules.annotations.logic().SetActiveHierarchyNodeID(self.ROIListNode.GetID())
+      self.resetROI = True
+      #ROINode = slicer.mrmlScene.GetNodeByID(self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_ROI"))
+      #selectionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSelectionNodeSingleton")
+      #selectionNode.SetActiveROIListID(self.ROIListNode.GetID())
+      #selectionNode.SetActivePlaceNodeID(ROINode.GetID())
       #interactionNode.SwitchToSinglePlaceMode ()
       #interactionNode.AddObserver(interactionNode.EndPlacementEvent, self.endROIPlacement) 
     pass
