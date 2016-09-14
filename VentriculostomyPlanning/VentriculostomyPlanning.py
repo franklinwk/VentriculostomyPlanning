@@ -58,22 +58,22 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     # Layout within the dummy collapsible button
     configurationFormLayout = qt.QFormLayout(configurationCollapsibleButton)
     #
-    # Mid-sagitalReference line
+    # Mid-sagittalReference line
     #
     referenceConfigLayout = qt.QHBoxLayout()
 
     #-- Curve length
-    lengthSagitalReferenceLineLabel = qt.QLabel('Sagital Length:  ')
-    referenceConfigLayout.addWidget(lengthSagitalReferenceLineLabel)
-    self.lengthSagitalReferenceLineEdit = qt.QLineEdit()
-    self.lengthSagitalReferenceLineEdit.text = '100.0'
-    self.lengthSagitalReferenceLineEdit.readOnly = False
-    self.lengthSagitalReferenceLineEdit.frame = True
-    self.lengthSagitalReferenceLineEdit.styleSheet = "QLineEdit { background:transparent; }"
-    self.lengthSagitalReferenceLineEdit.cursor = qt.QCursor(qt.Qt.IBeamCursor)
-    referenceConfigLayout.addWidget(self.lengthSagitalReferenceLineEdit)
-    lengthSagitalReferenceLineUnitLabel = qt.QLabel('mm  ')
-    referenceConfigLayout.addWidget(lengthSagitalReferenceLineUnitLabel)
+    lengthSagittalReferenceLineLabel = qt.QLabel('Sagittal Length:  ')
+    referenceConfigLayout.addWidget(lengthSagittalReferenceLineLabel)
+    self.lengthSagittalReferenceLineEdit = qt.QLineEdit()
+    self.lengthSagittalReferenceLineEdit.text = '100.0'
+    self.lengthSagittalReferenceLineEdit.readOnly = False
+    self.lengthSagittalReferenceLineEdit.frame = True
+    self.lengthSagittalReferenceLineEdit.styleSheet = "QLineEdit { background:transparent; }"
+    self.lengthSagittalReferenceLineEdit.cursor = qt.QCursor(qt.Qt.IBeamCursor)
+    referenceConfigLayout.addWidget(self.lengthSagittalReferenceLineEdit)
+    lengthSagittalReferenceLineUnitLabel = qt.QLabel('mm  ')
+    referenceConfigLayout.addWidget(lengthSagittalReferenceLineUnitLabel)
     
     lengthCoronalReferenceLineLabel = qt.QLabel('Coronal Length:  ')
     referenceConfigLayout.addWidget(lengthCoronalReferenceLineLabel)
@@ -102,7 +102,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     configurationFormLayout.addRow(ROIConfigLayout)
     self.selectROIButton.connect('clicked(bool)',self.onDefineROI)
     self.createROIButton.connect('clicked(bool)',self.onCreateROI)
-    self.lengthSagitalReferenceLineEdit.connect('textEdited(QString)', self.onModifyMeasureLength)
+    self.lengthSagittalReferenceLineEdit.connect('textEdited(QString)', self.onModifyMeasureLength)
     self.lengthCoronalReferenceLineEdit.connect('textEdited(QString)', self.onModifyMeasureLength)
     
     
@@ -237,22 +237,22 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     
 
     #
-    # Mid-sagitalReference line
+    # Mid-sagittalReference line
     #
     planningLineLayout = qt.QHBoxLayout()
 
     #-- Curve length
-    lengthSagitalPlanningLineLabel = qt.QLabel('Sagital Length:  ')
-    planningLineLayout.addWidget(lengthSagitalPlanningLineLabel)
-    self.lengthSagitalPlanningLineEdit = qt.QLineEdit()
-    self.lengthSagitalPlanningLineEdit.text = '--'
-    self.lengthSagitalPlanningLineEdit.readOnly = True
-    self.lengthSagitalPlanningLineEdit.frame = True
-    self.lengthSagitalPlanningLineEdit.styleSheet = "QLineEdit { background:transparent; }"
-    self.lengthSagitalPlanningLineEdit.cursor = qt.QCursor(qt.Qt.IBeamCursor)
-    planningLineLayout.addWidget(self.lengthSagitalPlanningLineEdit)
-    lengthSagitalPlanningLineUnitLabel = qt.QLabel('mm  ')
-    planningLineLayout.addWidget(lengthSagitalPlanningLineUnitLabel)
+    lengthSagittalPlanningLineLabel = qt.QLabel('Sagittal Length:  ')
+    planningLineLayout.addWidget(lengthSagittalPlanningLineLabel)
+    self.lengthSagittalPlanningLineEdit = qt.QLineEdit()
+    self.lengthSagittalPlanningLineEdit.text = '--'
+    self.lengthSagittalPlanningLineEdit.readOnly = True
+    self.lengthSagittalPlanningLineEdit.frame = True
+    self.lengthSagittalPlanningLineEdit.styleSheet = "QLineEdit { background:transparent; }"
+    self.lengthSagittalPlanningLineEdit.cursor = qt.QCursor(qt.Qt.IBeamCursor)
+    planningLineLayout.addWidget(self.lengthSagittalPlanningLineEdit)
+    lengthSagittalPlanningLineUnitLabel = qt.QLabel('mm  ')
+    planningLineLayout.addWidget(lengthSagittalPlanningLineUnitLabel)
     
     lengthCoronalPlanningLineLabel = qt.QLabel('Coronal Length:  ')
     planningLineLayout.addWidget(lengthCoronalPlanningLineLabel)
@@ -274,22 +274,22 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.layout.addStretch(1)
 
     # Refresh Apply button state
-    self.onSelect()
+    self.onSelect(self.inputVolumeSelector.currentNode())
 
   def cleanup(self):
     pass
   
   def initialFieldsValue(self):
-    self.lengthSagitalPlanningLineEdit.text = '--'
+    self.lengthSagittalPlanningLineEdit.text = '--'
     self.lengthCoronalPlanningLineEdit.text = '--'
     self.lengthTrajectoryEdit.text = '--'
-    self.logic.clearSagitalPlanningLine()
+    self.logic.clearSagittalPlanningLine()
     self.logic.clearCoronalPlanningLine()
-    self.logic.clearSagitalReferenceLine()
+    self.logic.clearSagittalReferenceLine()
     self.logic.clearCoronalReferenceLine()
   
   def onAddedNode(self, addedNode):
-    if addedNode and (not addedNode.GetAttribute("vtkMRMLScalarVolumeNode.notShownEntity")):
+    if addedNode:
       self.inputVolumeSelector.setCurrentNode(addedNode)
       
   def onSelect(self, selectedNode=None):
@@ -305,8 +305,8 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
         self.logic.currentVolumeNode = slicer.mrmlScene.GetNodeByID(selectedNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_croppedVolume"))
       else:
         self.logic.currentVolumeNode = selectedNode  
-      self.logic.updateMeasureLength(float(self.lengthSagitalReferenceLineEdit.text), float(self.lengthCoronalReferenceLineEdit.text))
-      self.lengthSagitalReferenceLineEdit.text = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagitalLength")
+      self.logic.updateMeasureLength(float(self.lengthSagittalReferenceLineEdit.text), float(self.lengthCoronalReferenceLineEdit.text))
+      self.lengthSagittalReferenceLineEdit.text = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagittalLength")
       self.lengthCoronalReferenceLineEdit.text = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_coronalLength")
       self.logic.createEntryPoint()
       curveFiducialsID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_trajectory")
@@ -337,7 +337,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     
   def onCreatePlanningLine(self):
     self.logic.createPlanningLine()  
-    self.lengthSagitalPlanningLineEdit.text = '%.1f' % self.logic.getSagitalPlanningLineLength()
+    self.lengthSagittalPlanningLineEdit.text = '%.1f' % self.logic.getSagittalPlanningLineLength()
     self.lengthCoronalPlanningLineEdit.text = '%.1f' % self.logic.getCoronalPlanningLineLength()
     pass 
     
@@ -356,7 +356,9 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     outputModelNodeID = self.inputVolumeSelector.currentNode().GetAttribute("vtkMRMLScalarVolumeNode.rel_model") 
     if outputModelNodeID:
       outputModelNode = slicer.mrmlScene.GetNodeByID(outputModelNodeID)
-      self.logic.selectNasionPointNode(outputModelNode) 
+      self.inputVolumeSelector.disconnect("nodeAdded(vtkMRMLNode*)")
+      self.logic.selectNasionPointNode(outputModelNode) # when the model is not available, the model will be created, so nodeAdded signal should be disconnected
+      self.inputVolumeSelector.connect("nodeAdded(vtkMRMLNode*)", self.onAddedNode)
   
   def onDefineROI(self):
     self.logic.currentVolumeNode = self.logic.baseVolumeNode
@@ -364,14 +366,16 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.logic.defineROI()
   
   def onCreateROI(self):
+    self.inputVolumeSelector.disconnect("nodeAdded(vtkMRMLNode*)")
     self.logic.createROI()
+    self.inputVolumeSelector.connect("nodeAdded(vtkMRMLNode*)", self.onAddedNode)
     self.onSetSliceViewer()
       
   def onModifyMeasureLength(self):
-    sagitalReferenceLength = float(self.lengthSagitalReferenceLineEdit.text)
+    sagittalReferenceLength = float(self.lengthSagittalReferenceLineEdit.text)
     coronalReferenceLength = float(self.lengthCoronalReferenceLineEdit.text)
-    if self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagitalLength"):
-        self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_sagitalLength", '%.1f' % sagitalReferenceLength) 
+    if self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagittalLength"):
+        self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_sagittalLength", '%.1f' % sagittalReferenceLength) 
     if self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_coronalLength"):
         self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_coronalLength", '%.1f' % coronalReferenceLength)    
     
@@ -379,27 +383,27 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
   def onCreateEntryPoint(self):
     self.onModifyMeasureLength()
     self.logic.createEntryPoint()
-    #self.lengthSagitalReferenceLineEdit.text = '%.2f' % self.logic.getSagitalReferenceLineLength()
+    #self.lengthSagittalReferenceLineEdit.text = '%.2f' % self.logic.getSagittalReferenceLineLength()
     #self.lengthCoronalReferenceLineEdit.text = '%.2f' % self.logic.getCoronalReferenceLineLength()
     
 
-  # Event handlers for sagitalReference line
-  def onEditSagitalReferenceLine(self, switch):
+  # Event handlers for sagittalReference line
+  def onEditSagittalReferenceLine(self, switch):
 
     if switch == True:
       self.addTrajectoryButton.checked = False
-      self.logic.startEditSagitalReferenceLine()
+      self.logic.startEditSagittalReferenceLine()
     else:
-      self.logic.endEditSagitalReferenceLine()
+      self.logic.endEditSagittalReferenceLine()
 
-  def onClearSagitalReferenceLine(self):
-    self.logic.clearSagitalReferenceLine()
+  def onClearSagittalReferenceLine(self):
+    self.logic.clearSagittalReferenceLine()
 
-  def onSagitalReferenceLineModified(self, caller, event):
-    self.lengthSagitalReferenceLineEdit.text = '%.2f' % self.logic.getSagitalReferenceLineLength()
+  def onSagittalReferenceLineModified(self, caller, event):
+    self.lengthSagittalReferenceLineEdit.text = '%.2f' % self.logic.getSagittalReferenceLineLength()
 
-  def onMoveSliceSagitalReferenceLine(self):
-    self.logic.moveSliceSagitalReferenceLine()
+  def onMoveSliceSagittalReferenceLine(self):
+    self.logic.moveSliceSagittalReferenceLine()
 
   # Event handlers for coronalReference line
   def onEditCoronalReferenceLine(self, switch):
@@ -429,24 +433,24 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
   def onTrajectoryModified(self, caller, event):
     self.lengthTrajectoryEdit.text = '%.2f' % self.logic.getTrajectoryLength()
 
-  # Event handlers for sagitalPlanning line
-  def onEditSagitalPlanningLine(self, switch):
+  # Event handlers for sagittalPlanning line
+  def onEditSagittalPlanningLine(self, switch):
 
     if switch == True:
       self.addTrajectoryButton.checked = False
-      self.logic.startEditSagitalPlanningLine()
+      self.logic.startEditSagittalPlanningLine()
     else:
-      self.logic.endEditSagitalPlanningLine()
+      self.logic.endEditSagittalPlanningLine()
 
-  def onClearSagitalPlanningLine(self):
+  def onClearSagittalPlanningLine(self):
     
-    self.logic.clearSagitalPlanningLine()
+    self.logic.clearSagittalPlanningLine()
 
-  def onSagitalPlanningLineModified(self, caller, event):
-    self.lengthSagitalPlanningLineEdit.text = '%.2f' % self.logic.getSagitalPlanningLineLength()
+  def onSagittalPlanningLineModified(self, caller, event):
+    self.lengthSagittalPlanningLineEdit.text = '%.2f' % self.logic.getSagittalPlanningLineLength()
 
-  def onMoveSliceSagitalPlanningLine(self):
-    self.logic.moveSliceSagitalPlanningLine()
+  def onMoveSliceSagittalPlanningLine(self):
+    self.logic.moveSliceSagittalPlanningLine()
 
   # Event handlers for coronalPlanning line
   def onEditCoronalPlanningLine(self, switch):
@@ -493,7 +497,7 @@ class CurveManager:
 
     self.curveName = ""
     self.curveModelName = ""
-
+    self.step = 1;
     self.tagEventExternal = None
 
     self.sliceID = "vtkMRMLSliceNodeRed"
@@ -690,14 +694,14 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
   """
 
   def __init__(self):
-    self.sagitalReferenceCurveManager = CurveManager()
-    self.sagitalReferenceCurveManager.setName("SR1")
-    self.sagitalReferenceCurveManager.setSliceID("vtkMRMLSliceNodeYellow")
-    self.sagitalReferenceCurveManager.setDefaultSlicePositionToFirstPoint()
-    self.sagitalReferenceCurveManager.curveModel = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
-    self.sagitalReferenceCurveManager.curveModel.SetName(self.sagitalReferenceCurveManager.curveModelName)
-    slicer.mrmlScene.AddNode(self.sagitalReferenceCurveManager.curveModel)
-    self.sagitalReferenceCurveManager.setModelColor(1.0, 1.0, 0.5)
+    self.sagittalReferenceCurveManager = CurveManager()
+    self.sagittalReferenceCurveManager.setName("SR1")
+    self.sagittalReferenceCurveManager.setSliceID("vtkMRMLSliceNodeYellow")
+    self.sagittalReferenceCurveManager.setDefaultSlicePositionToFirstPoint()
+    self.sagittalReferenceCurveManager.curveModel = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
+    self.sagittalReferenceCurveManager.curveModel.SetName(self.sagittalReferenceCurveManager.curveModelName)
+    slicer.mrmlScene.AddNode(self.sagittalReferenceCurveManager.curveModel)
+    self.sagittalReferenceCurveManager.setModelColor(1.0, 1.0, 0.5)
     
     self.coronalReferenceCurveManager = CurveManager()
     self.coronalReferenceCurveManager.setName("CR1")
@@ -723,14 +727,14 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     slicer.mrmlScene.AddNode(self.coronalPlanningCurveManager.curveModel)
     self.coronalPlanningCurveManager.setModelColor(0.0, 1.0, 0.0)
 
-    self.sagitalPlanningCurveManager = CurveManager()
-    self.sagitalPlanningCurveManager.setName("SP1")
-    self.sagitalPlanningCurveManager.setSliceID("vtkMRMLSliceNodeYellow")
-    self.sagitalPlanningCurveManager.setDefaultSlicePositionToFirstPoint()
-    self.sagitalPlanningCurveManager.curveModel = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
-    self.sagitalPlanningCurveManager.curveModel.SetName(self.sagitalPlanningCurveManager.curveModelName)
-    slicer.mrmlScene.AddNode(self.sagitalPlanningCurveManager.curveModel)
-    self.sagitalPlanningCurveManager.setModelColor(1.0, 1.0, 0.0)
+    self.sagittalPlanningCurveManager = CurveManager()
+    self.sagittalPlanningCurveManager.setName("SP1")
+    self.sagittalPlanningCurveManager.setSliceID("vtkMRMLSliceNodeYellow")
+    self.sagittalPlanningCurveManager.setDefaultSlicePositionToFirstPoint()
+    self.sagittalPlanningCurveManager.curveModel = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
+    self.sagittalPlanningCurveManager.curveModel.SetName(self.sagittalPlanningCurveManager.curveModelName)
+    slicer.mrmlScene.AddNode(self.sagittalPlanningCurveManager.curveModel)
+    self.sagittalPlanningCurveManager.setModelColor(1.0, 1.0, 0.0)
     
     self.currentVolumeNode = None
     self.baseVolumeNode = None
@@ -750,32 +754,32 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       return False
     return True
 
-  def startEditSagitalReferenceLine(self):
+  def startEditSagittalReferenceLine(self):
 
-    self.sagitalReferenceCurveManager.startEditLine()
+    self.sagittalReferenceCurveManager.startEditLine()
     
-  def endEditSagitalReferenceLine(self):
+  def endEditSagittalReferenceLine(self):
 
-    self.sagitalReferenceCurveManager.endEditLine()
+    self.sagittalReferenceCurveManager.endEditLine()
 
-  def clearSagitalReferenceLine(self):
+  def clearSagittalReferenceLine(self):
     
-    self.sagitalReferenceCurveManager.clearLine()
+    self.sagittalReferenceCurveManager.clearLine()
 
-  def setSagitalReferenceLineModifiedEventHandler(self, handler):
+  def setSagittalReferenceLineModifiedEventHandler(self, handler):
 
-    self.sagitalReferenceCurveManager.setModifiedEventHandler(handler)
+    self.sagittalReferenceCurveManager.setModifiedEventHandler(handler)
 
-  def getSagitalReferenceLineLength(self):
-    return self.sagitalReferenceCurveManager.getLength()
+  def getSagittalReferenceLineLength(self):
+    return self.sagittalReferenceCurveManager.getLength()
 
-  def moveSliceSagitalReferenceLine(self):
-    self.sagitalReferenceCurveManager.moveSliceToLine()
+  def moveSliceSagittalReferenceLine(self):
+    self.sagittalReferenceCurveManager.moveSliceToLine()
 
   def startEditCoronalReferenceLine(self):
 
     pos = [0.0] * 3
-    self.sagitalReferenceCurveManager.getLastPoint(pos)
+    self.sagittalReferenceCurveManager.getLastPoint(pos)
     self.coronalReferenceCurveManager.startEditLine(pos)
     
   def endEditCoronalReferenceLine(self):
@@ -797,11 +801,11 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     self.coronalReferenceCurveManager.moveSliceToLine()
 
   def lockReferenceLine(self):
-    self.sagitalReferenceCurveManager.lockLine()
+    self.sagittalReferenceCurveManager.lockLine()
     self.coronalReferenceCurveManager.lockLine()
 
   def unlockReferenceLine(self):
-    self.sagitalReferenceCurveManager.unlockLine()
+    self.sagittalReferenceCurveManager.unlockLine()
     self.coronalReferenceCurveManager.unlockLine()
 
   def startEditTrajectory(self):
@@ -886,38 +890,38 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     self.coronalPlanningCurveManager.moveSliceToLine()
 
   def lockPlanningLine(self):
-    self.sagitalPlanningCurveManager.lockLine()
+    self.sagittalPlanningCurveManager.lockLine()
     self.coronalPlanningCurveManager.lockLine()
 
   def unlockPlanningLine(self):
-    self.sagitalPlanningCurveManager.unlockLine()
+    self.sagittalPlanningCurveManager.unlockLine()
     self.coronalPlanningCurveManager.unlockLine()
 
 
-  def startEditSagitalPlanningLine(self):
+  def startEditSagittalPlanningLine(self):
 
     pos = [0.0] * 3
 
     self.coronalPlanningCurveManager.getLastPoint(pos)
-    self.sagitalPlanningCurveManager.startEditLine(pos)
+    self.sagittalPlanningCurveManager.startEditLine(pos)
     
-  def endEditSagitalPlanningLine(self):
+  def endEditSagittalPlanningLine(self):
 
-    self.sagitalPlanningCurveManager.endEditLine()
+    self.sagittalPlanningCurveManager.endEditLine()
 
-  def clearSagitalPlanningLine(self):
+  def clearSagittalPlanningLine(self):
     
-    self.sagitalPlanningCurveManager.clearLine()
+    self.sagittalPlanningCurveManager.clearLine()
 
-  def setSagitalPlanningLineModifiedEventHandler(self, handler):
+  def setSagittalPlanningLineModifiedEventHandler(self, handler):
 
-    self.sagitalPlanningCurveManager.setModifiedEventHandler(handler)
+    self.sagittalPlanningCurveManager.setModifiedEventHandler(handler)
 
-  def getSagitalPlanningLineLength(self):
-    return self.sagitalPlanningCurveManager.getLength()
+  def getSagittalPlanningLineLength(self):
+    return self.sagittalPlanningCurveManager.getLength()
 
-  def moveSliceSagitalPlanningLine(self):
-    self.sagitalPlanningCurveManager.moveSliceToLine()
+  def moveSliceSagittalPlanningLine(self):
+    self.sagittalPlanningCurveManager.moveSliceToLine()
 
 
 
@@ -953,7 +957,6 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       imageCollection = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLScalarVolumeNode","holefilledImage")
       if imageCollection:
         holefilledImageNode = imageCollection.GetItemAsObject(0)
-        holefilledImageNode.SetAttribute("vtkMRMLScalarVolumeNode.notShownEntity","True")
         holefilledImageData = holefilledImageNode.GetImageData()
         
         cast = vtk.vtkImageCast()
@@ -962,7 +965,6 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         cast.Update()
     
         labelVolumeNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLLabelMapVolumeNode")
-        labelVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.notShownEntity","True")
         slicer.mrmlScene.AddNode(labelVolumeNode)
         labelVolumeNode.SetName("Threshold")
         labelVolumeNode.SetSpacing(holefilledImageData.GetSpacing())
@@ -1127,10 +1129,10 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
             attributeNode.GetDisplayNode().SetVisibility(0)
 
     
-  def updateMeasureLength(self, sagitalReferenceLength=None, coronalReferenceLength=None):
-    if not self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagitalLength"):
-      if sagitalReferenceLength:
-        self.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_sagitalLength", '%.1f' % sagitalReferenceLength)      
+  def updateMeasureLength(self, sagittalReferenceLength=None, coronalReferenceLength=None):
+    if not self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagittalLength"):
+      if sagittalReferenceLength:
+        self.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_sagittalLength", '%.1f' % sagittalReferenceLength)      
     if not self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_coronalLength"):    
       if coronalReferenceLength:
         self.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_coronalLength", '%.1f' % coronalReferenceLength)
@@ -1152,7 +1154,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
   def endPlacement(self, interactionNode, event):
     interactionNode.SetCurrentInteractionMode(slicer.vtkMRMLInteractionNode.ViewTransform)
     if interactionNode.GetAttribute("vtkMRMLInteractionNode.rel_marker") == "nasion":
-      self.createEntryPoint(self.baseVolumeNode)
+      self.createEntryPoint()
     pass
    
   def selectNasionPointNode(self, modelNode, initPoint = None):
@@ -1187,7 +1189,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     if self.baseVolumeNode:
       if not self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_croppedVolume"):
         croppedVolumeNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLScalarVolumeNode")
-        croppedVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.notShownEntity","True")
+        #croppedVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.notShownEntity","True")
         slicer.mrmlScene.AddNode(croppedVolumeNode)
         self.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_croppedVolume",croppedVolumeNode.GetID())
       croppedVolumeNodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_croppedVolume")
@@ -1246,6 +1248,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       
   def constructCurveReference(self, CurveManager,points, distance):
     step = int(0.5*distance/self.samplingFactor)
+    CurveManager.step = step
     ApproximityPos = distance * 0.85
     DestiationPos = distance
   
@@ -1299,7 +1302,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     CurveManager.cmLogic.setTubeRadius(0.5)  
     self.topPoint = points.GetPoint(jPos)
   
-  def constructCurvePlanning(self, CurveManager,points, axis):
+  def constructCurvePlanning(self, CurveManager,CurveManagerReference, points, axis):
     posNasion = numpy.array([0.0,0.0,0.0])
     nasionNode = slicer.mrmlScene.GetNodeByID(self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_nasion"))
     nasionNode.GetNthFiducialPosition(0,posNasion)
@@ -1314,52 +1317,76 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     iPos = 0
     iPosValid = iPos
     posModel = numpy.array(points.GetPoint(iPos))
-    step = 1
-    if axis == 0:
-      step = int(0.5*(posModel[2]-posNasion[2])/self.samplingFactor)
-    elif axis == 1:
-      step = int(0.5*(posModel[0]-posNasion[0])/self.samplingFactor)
-    if step<=0:
-      step = 1  
+    step = CurveManagerReference.step
     CurveManager.cmLogic.DestinationNode = CurveManager.curveModel
     CurveManager.curveFiducials.AddFiducial(posModel[0],posModel[1],posModel[2]) 
-    CurveManager.cmLogic.CurvePoly = vtk.vtkPolyData() ## For CurveMaker bug
-    CurveManager.cmLogic.enableAutomaticUpdate(1)
-    CurveManager.cmLogic.setInterpolationMethod(1)
-    CurveManager.cmLogic.setTubeRadius(1.0)
-    for iPos in range(step,points.GetNumberOfPoints(),step):
-      posModel = numpy.array(points.GetPoint(iPos))
-      posModelValid = numpy.array(points.GetPoint(iPosValid))
-      if  numpy.linalg.norm(posModel-posModelValid)> 50.0:
-        continue
-      if axis == 0 and posModel[2]<posNasion[2]:
-        break
-      if axis == 1 and posModel[0]<posNasion[0]:
-        break
-      iPosValid = iPos
-      CurveManager.curveFiducials.AddFiducial(posModel[0],posModel[1],posModel[2]) #adding fiducials takes too long, check the event triggered by this operation
-    jPos = iPosValid
-    jPosValid = jPos
-    for jPos in range(iPosValid, points.GetNumberOfPoints(), 1):
-      posModel = numpy.array(points.GetPoint(jPos))
-      posModelValid = numpy.array(points.GetPoint(jPosValid))
-      if  numpy.linalg.norm(posModel-posModelValid)> 50.0:
-        continue
-      if  axis == 0 and posModel[2]<posNasion[2]:
-        break
-      if  axis == 1 and posModel[0]<posNasion[0]:
-        break
-      jPosValid = jPos
-    posModel = numpy.array(points.GetPoint(jPosValid))  
-    CurveManager.curveFiducials.AddFiducial(posModel[0],posModel[1],posModel[2]) 
     
+    numOfRef = CurveManagerReference.curveFiducials.GetNumberOfFiducials()
+    
+    eps = 1e-2
+    if axis == 1:
+      lastRefPos = [0.0]*3
+      CurveManagerReference.curveFiducials.GetNthFiducialPosition(numOfRef-1, lastRefPos)  
+      if abs(lastRefPos[1]-points.GetPoint(0)[1])<eps:
+        for jPos in range(step, points.GetNumberOfPoints(), step):
+          if points.GetPoint(jPos)[0]>lastRefPos[0]:
+            CurveManager.curveFiducials.AddFiducial(points.GetPoint(jPos)[0],points.GetPoint(jPos)[1],points.GetPoint(jPos)[2])
+          else:
+            break
+        pos = [0.0]*3  
+        for iPos in range(1,numOfRef): 
+          CurveManagerReference.curveFiducials.GetNthFiducialPosition(numOfRef-iPos-1, pos)  
+          if pos[0]<points.GetPoint(0)[0]:
+            CurveManager.curveFiducials.AddFiducial(pos[0],pos[1],pos[2])
+        CurveManagerReference.curveFiducials.GetNthFiducialPosition(0, pos)    
+        self.topPoint = pos       
+      else:   
+        shift = step
+        for iPos in range(1,numOfRef): 
+          pos = [0.0]*3;
+          CurveManagerReference.curveFiducials.GetNthFiducialPosition(numOfRef-iPos-1, pos) 
+          if float(pos[0])<points.GetPoint(0)[0] and float(pos[1]-points.GetPoint(0)[1])<eps and float(pos[2]-points.GetPoint(0)[2])<eps:
+            CurveManager.curveFiducials.AddFiducial(pos[0],pos[1],pos[2]) 
+            shift = iPos
+            break
+        for iPos in range(shift,points.GetNumberOfPoints(),step):
+          posModel = numpy.array(points.GetPoint(iPos))
+          posModelValid = numpy.array(points.GetPoint(iPosValid))
+          if  numpy.linalg.norm(posModel-posModelValid)> 50.0:
+            continue
+          if abs(posModel[0]-posNasion[0])<eps or (posModel[0]<posNasion[0]):
+            break
+          iPosValid = iPos
+          CurveManager.curveFiducials.AddFiducial(posModel[0],posModel[1],posModel[2]) #adding fiducials takes too long, check the event triggered by this operation
+        jPos = iPosValid
+        jPosValid = jPos
+        for jPos in range(iPosValid, points.GetNumberOfPoints(), 1):
+          posModel = numpy.array(points.GetPoint(jPos))
+          posModelValid = numpy.array(points.GetPoint(jPosValid))
+          if  numpy.linalg.norm(posModel-posModelValid)> 50.0:
+            continue
+          jPosValid = jPos
+          if abs(posModel[0]-posNasion[0])<eps or (posModel[0]<posNasion[0]):
+            break        
+        self.topPoint = points.GetPoint(jPosValid)    
+        posModel = numpy.array(points.GetPoint(jPosValid))  
+        CurveManager.curveFiducials.AddFiducial(posModel[0],posModel[1],posModel[2]) 
+
+    if axis ==0:
+      for iPos in range(1,numOfRef): 
+        pos = [0.0]*3;
+        CurveManagerReference.curveFiducials.GetNthFiducialPosition(numOfRef-iPos-1, pos)  
+        if float(pos[2])<self.topPoint[2]:
+          CurveManager.curveFiducials.AddFiducial(pos[0],pos[1],pos[2]) 
+       
     CurveManager.cmLogic.SourceNode = CurveManager.curveFiducials
     CurveManager.cmLogic.updateCurve()
+    CurveManager.cmLogic.CurvePoly = vtk.vtkPolyData() ## For CurveMaker bug   
     CurveManager.cmLogic.SourceNode.SetAttribute('CurveMaker.CurveModel', CurveManager.cmLogic.DestinationNode.GetID())  
     CurveManager.cmLogic.enableAutomaticUpdate(1)
     CurveManager.cmLogic.setInterpolationMethod(1)
     CurveManager.cmLogic.setTubeRadius(0.5)  
-    self.topPoint = points.GetPoint(jPosValid)
+    
       
   def getIntersectPoints(self, polyData, plane, referencePoint, targetDistance, axis, intersectPoints):
     cutter = vtk.vtkCutter()
@@ -1403,7 +1430,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     ###All calculation is based on the RAS coordinates system 
     inputModelNode = None
     nasionNode = None
-    sagitalReferenceLength = None
+    sagittalReferenceLength = None
     coronalReferenceLength = None
     inputModelNodeID =  self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_model")
     if inputModelNodeID:
@@ -1411,11 +1438,11 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     nasionNodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_nasion")  
     if nasionNodeID:
       nasionNode = slicer.mrmlScene.GetNodeByID(nasionNodeID)  
-    if self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagitalLength"):
-      sagitalReferenceLength = float(self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagitalLength"))   
+    if self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagittalLength"):
+      sagittalReferenceLength = float(self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagittalLength"))   
     if self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_coronalLength")  :
       coronalReferenceLength = float(self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_coronalLength")  )  
-    if inputModelNode and (inputModelNode.GetAttribute("vtkMRMLModelNode.modelCreated") == "True") and (nasionNode.GetNumberOfMarkups()) and sagitalReferenceLength and coronalReferenceLength:
+    if inputModelNode and (inputModelNode.GetAttribute("vtkMRMLModelNode.modelCreated") == "True") and (nasionNode.GetNumberOfMarkups()) and sagittalReferenceLength and coronalReferenceLength:
       polyData = inputModelNode.GetPolyData()
       if polyData: 
         posNasion = numpy.array([0.0,0.0,0.0])
@@ -1424,11 +1451,11 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         plane.SetOrigin(posNasion[0],0,0)
         plane.SetNormal(1,0,0)
         sagittalPoints = vtk.vtkPoints()
-        self.getIntersectPoints(polyData, plane, posNasion, sagitalReferenceLength, 0, sagittalPoints)
+        self.getIntersectPoints(polyData, plane, posNasion, sagittalReferenceLength, 0, sagittalPoints)
               
         ## Sorting   
         self.sortPoints(sagittalPoints, posNasion)
-        self.constructCurveReference(self.sagitalReferenceCurveManager, sagittalPoints, sagitalReferenceLength)  
+        self.constructCurveReference(self.sagittalReferenceCurveManager, sagittalPoints, sagittalReferenceLength)  
             
         ##To do, calculate the curvature value points by point might be necessary to exclude the outliers   
         if self.topPoint:
@@ -1448,7 +1475,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     ###All calculation is based on the RAS coordinates system
     inputModelNode = None
     nasionNode = None
-    sagitalPlanningLength = None
+    sagittalPlanningLength = None
     coronalPlanningLength = None
     inputModelNodeID =  self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_model")
     if inputModelNodeID:
@@ -1472,19 +1499,19 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
           ## Sorting   
           self.sortPoints(coronalPoints, posTrajectory)   
           
-          self.constructCurvePlanning(self.coronalPlanningCurveManager, coronalPoints, 1)  
+          self.constructCurvePlanning(self.coronalPlanningCurveManager, self.coronalReferenceCurveManager, coronalPoints, 1)  
               
           ##To do, calculate the curvature value points by point might be necessary to exclude the outliers   
           if self.topPoint:
             posTractoryBack = self.topPoint
-            sagitalPoints = vtk.vtkPoints() 
+            sagittalPoints = vtk.vtkPoints() 
             plane.SetOrigin(posTractoryBack[0],0,0)
             plane.SetNormal(1,0,0)
-            self.getIntersectPointsPlanning(polyData, plane, posTractoryBack, 0, sagitalPoints) 
+            self.getIntersectPointsPlanning(polyData, plane, posTractoryBack, 0, sagittalPoints) 
                       
             ## Sorting      
-            self.sortPoints(sagitalPoints, posTractoryBack)  
-            self.constructCurvePlanning(self.sagitalPlanningCurveManager, sagitalPoints, 0)
+            self.sortPoints(sagittalPoints, posTractoryBack)  
+            self.constructCurvePlanning(self.sagittalPlanningCurveManager, self.sagittalReferenceCurveManager, sagittalPoints, 0)
       self.lockPlanningLine()     
     pass  
     
