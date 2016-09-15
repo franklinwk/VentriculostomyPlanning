@@ -844,16 +844,17 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         interactionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLInteractionNodeSingleton")
         if (selectionNode == None) or (interactionNode == None):
           return
-    
+        
         selectionNode.SetReferenceActivePlaceNodeClassName("vtkMRMLMarkupsFiducialNode");
         selectionNode.SetActivePlaceNodeID(trajectoryNode.GetID())
     
         interactionNode.SwitchToSinglePlaceMode ()
         interactionNode.SetCurrentInteractionMode(slicer.vtkMRMLInteractionNode.Place) 
-        trajectoryNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.updateTrajectoryPosition)
+        trajectoryNode.AddObserver(trajectoryNode.PointModifiedEvent, self.updateTrajectoryPosition)
         trajectoryNode.AddObserver(trajectoryNode.PointEndInteractionEvent, self.endTrajectoryInteraction)
         interactionNode.SetAttribute("vtkMRMLInteractionNode.rel_marker", "trajectory")
         interactionNode.AddObserver(interactionNode.EndPlacementEvent, self.endPlacement) 
+        
         pos = [0.0] * 3
         if trajectoryNode.GetNumberOfMarkups () > 0:
           pos = None
@@ -1191,10 +1192,11 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
           self.trajectoryProjectedMarker.SetNthFiducialLabel(0,"invalid")  
     self.updateSlicePosition(fiducicalMarkerNode)
   
-  def endTrajectoryInteraction(self, trajectoryNode, event):
+  def endTrajectoryInteraction(self, trajectoryNode, event=None):
     posFirst = [0.0,0.0,0.0]
     if not self.trajectoryProjectedMarker.GetNthFiducialLabel(0) == "invalid":
       self.trajectoryProjectedMarker.GetNthFiducialPosition(0,posFirst)
+      posFirst[1] = posFirst[1] + 0.005
       trajectoryNode.SetNthFiducialPositionFromArray(0,posFirst)
     self.trajectoryProjectedMarker.GetMarkupsDisplayNode().SetVisibility(0)
     pass
@@ -1240,15 +1242,21 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     pass
   
   def endPlacement(self, interactionNode, event):
+    ## when place a new trajectory point, the UpdatePosition is called, the projectedMarker will be visiable.
+    ## set the projected marker to invisiable here
     interactionNode.SetCurrentInteractionMode(slicer.vtkMRMLInteractionNode.ViewTransform)
     if interactionNode.GetAttribute("vtkMRMLInteractionNode.rel_marker") == "nasion":
       self.createEntryPoint()
+      self.nasionProjectedMarker.GetMarkupsDisplayNode().SetVisibility(0)
+    if interactionNode.GetAttribute("vtkMRMLInteractionNode.rel_marker") == "trajectory":
+      self.trajectoryProjectedMarker.GetMarkupsDisplayNode().SetVisibility(0)
     pass
   
   def endNasionInteraction(self, nasionNode, event):
     posFirst = [0.0,0.0,0.0]
     if not self.nasionProjectedMarker.GetNthFiducialLabel(0) == "invalid":
       self.nasionProjectedMarker.GetNthFiducialPosition(0,posFirst)
+      posFirst[1] = posFirst[1] + 0.005 # Plus 0.005 for the purpose of interaction, if the marker is directly at the skull model, interaction will be impossible
       nasionNode.SetNthFiducialPositionFromArray(0,posFirst)
     self.nasionProjectedMarker.GetMarkupsDisplayNode().SetVisibility(0)
     pass
@@ -1264,6 +1272,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         slicer.mrmlScene.AddNode(nasionNode)  
         self.nasionProjectedMarker.AddFiducial(0,0,0)
         self.nasionProjectedMarker.SetNthFiducialLabel(0, "")
+        dnode = self.nasionProjectedMarker.GetMarkupsDisplayNode()
         if dnode:
           rgbColor = [1.0, 0.0, 1.0]
           dnode.SetSelectedColor(rgbColor)
@@ -1280,7 +1289,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         interactionNode.SwitchToSinglePlaceMode ()
         interactionNode.SetCurrentInteractionMode(slicer.vtkMRMLInteractionNode.Place)
         interactionNode.AddObserver(interactionNode.EndPlacementEvent, self.endPlacement) 
-        nasionNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.updateNasionPosition)
+        nasionNode.AddObserver(nasionNode.PointModifiedEvent, self.updateNasionPosition)
         nasionNode.AddObserver(nasionNode.PointEndInteractionEvent, self.endNasionInteraction)
         
   def createROI(self):
@@ -1429,7 +1438,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     if axis == 1:
       lastRefPos = [0.0]*3
       CurveManagerReference.curveFiducials.GetNthFiducialPosition(numOfRef-1, lastRefPos)  
-      if abs(lastRefPos[1]-points.GetPoint(0)[1])<eps:
+      if abs(lastRefPos[1]-points.GetPoint(0)[1])<eps: #if the planning and reference entry points are identical 
         for jPos in range(step, points.GetNumberOfPoints(), step):
           if points.GetPoint(jPos)[0]>lastRefPos[0]:
             CurveManager.curveFiducials.AddFiducial(points.GetPoint(jPos)[0],points.GetPoint(jPos)[1],points.GetPoint(jPos)[2])
@@ -1480,6 +1489,22 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         CurveManagerReference.curveFiducials.GetNthFiducialPosition(numOfRef-iPos-1, pos)  
         if float(pos[2])<self.topPoint[2]:
           CurveManager.curveFiducials.AddFiducial(pos[0],pos[1],pos[2]) 
+    
+    for i in range(CurveManager.curveFiducials.GetNumberOfFiducials()/2):
+      pos = [0.0]*3  
+      CurveManager.curveFiducials.GetNthFiducialPosition(i,pos)
+      posReverse = [0.0]*3  
+      CurveManager.curveFiducials.GetNthFiducialPosition(CurveManager.curveFiducials.GetNumberOfFiducials()-i-1,posReverse)
+      CurveManager.curveFiducials.SetNthFiducialPositionFromArray(i,posReverse)
+      CurveManager.curveFiducials.SetNthFiducialPositionFromArray(CurveManager.curveFiducials.GetNumberOfFiducials()-i-1,pos)
+    """  
+    for i in range(CurveManager.curveFiducials.GetNumberOfFiducials()):
+      pos = [0.0]*3  
+      CurveManager.curveFiducials.GetNthFiducialPosition(i,pos)
+      print "Planning Pos: ", pos
+      CurveManagerReference.curveFiducials.GetNthFiducialPosition(i,pos)
+      print "Reference Pos: ", pos
+    """  
     CurveManager.cmLogic.SourceNode = CurveManager.curveFiducials
     CurveManager.cmLogic.updateCurve()
     CurveManager.cmLogic.CurvePoly = vtk.vtkPolyData() ## For CurveMaker bug   
