@@ -745,6 +745,12 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     self.samplingFactor = 1
     self.topPoint = []
     self.resetROI = False 
+    self.trajectoryProjectedMarker = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
+    self.trajectoryProjectedMarker.SetName("trajectoryProject")
+    slicer.mrmlScene.AddNode(self.trajectoryProjectedMarker)
+    self.nasionProjectedMarker = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
+    self.nasionProjectedMarker.SetName("nasionProject")
+    slicer.mrmlScene.AddNode(self.nasionProjectedMarker)
     
   def hasImageData(self,volumeNode):
     """This is an example logic method that
@@ -826,6 +832,14 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
           dnode.SetSelectedColor(rgbColor)
           dnode.SetVisibility(1)
         self.trajectoryManager.curveFiducials = trajectoryNode  
+        self.trajectoryProjectedMarker.RemoveAllMarkups()
+        self.trajectoryProjectedMarker.AddFiducial(0,0,0)
+        self.trajectoryProjectedMarker.SetNthFiducialLabel(0,"")
+        dnode = self.trajectoryProjectedMarker.GetMarkupsDisplayNode()
+        if dnode:
+          rgbColor = [1.0, 0.0, 0.0]
+          dnode.SetSelectedColor(rgbColor)
+          dnode.SetVisibility(1)
         selectionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSelectionNodeSingleton")
         interactionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLInteractionNodeSingleton")
         if (selectionNode == None) or (interactionNode == None):
@@ -836,7 +850,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     
         interactionNode.SwitchToSinglePlaceMode ()
         interactionNode.SetCurrentInteractionMode(slicer.vtkMRMLInteractionNode.Place) 
-        trajectoryNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.updatePosition)
+        trajectoryNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.updateTrajectoryPosition)
         interactionNode.SetAttribute("vtkMRMLInteractionNode.rel_marker", "trajectory")
         interactionNode.AddObserver(interactionNode.EndPlacementEvent, self.endPlacement) 
         pos = [0.0] * 3
@@ -1146,8 +1160,53 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     if not self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_coronalLength"):    
       if coronalReferenceLength:
         self.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_coronalLength", '%.1f' % coronalReferenceLength)
-         
-  def updatePosition(self, fiducicalMarkerNode, eventID):
+  
+  def updateTrajectoryPosition(self, fiducicalMarkerNode, eventID):
+    inputModelNodeID =  self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_model")
+    if inputModelNodeID:
+      inputModelNode = slicer.mrmlScene.GetNodeByID(inputModelNodeID) 
+      if (inputModelNode.GetAttribute("vtkMRMLModelNode.modelCreated") == "True"):
+        polyData = inputModelNode.GetPolyData()
+        posFirst = [0.0,0.0,0.0]
+        fiducicalMarkerNode.GetNthFiducialPosition(0,posFirst)
+        posSecond = [0.0,0.0,0.0]
+        fiducicalMarkerNode.GetNthFiducialPosition(1,posSecond)
+        direction = numpy.array(posFirst)- numpy.array(posSecond)
+        posFirst = posFirst + 1e6*direction
+        posSecond = posSecond -  1e6*direction
+        locator = vtk.vtkCellLocator()
+        locator.SetDataSet(polyData)
+        locator.BuildLocator()
+        t = vtk.mutable(0)
+        x = [0.0,0.0,0.0]
+        pcoords = [0.0,0.0,0.0]
+        subId = vtk.mutable(0)
+        locator.IntersectWithLine(posFirst, posSecond, 1e-2, t, x, pcoords, subId)
+        self.trajectoryProjectedMarker.SetNthFiducialPositionFromArray(0,x)
+    self.updateSlicePosition(fiducicalMarkerNode)
+  
+  def updateNasionPosition(self, fiducicalMarkerNode, eventID):
+    inputModelNodeID =  self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_model")
+    if inputModelNodeID:
+      inputModelNode = slicer.mrmlScene.GetNodeByID(inputModelNodeID) 
+      if (inputModelNode.GetAttribute("vtkMRMLModelNode.modelCreated") == "True"):
+        polyData = inputModelNode.GetPolyData()
+        posFirst = [0.0,0.0,0.0]
+        fiducicalMarkerNode.GetNthFiducialPosition(0,posFirst)
+        posSecond = [posFirst[0],posFirst[1]-1e6,posFirst[2]]
+        posFirst[1] = posFirst[1]+ 1e6 
+        locator = vtk.vtkCellLocator()
+        locator.SetDataSet(polyData)
+        locator.BuildLocator()
+        t = vtk.mutable(0)
+        x = [0.0,0.0,0.0]
+        pcoords = [0.0,0.0,0.0]
+        subId = vtk.mutable(0)
+        locator.IntersectWithLine(posFirst, posSecond, 1e-2, t, x, pcoords, subId)
+        self.nasionProjectedMarker.SetNthFiducialPositionFromArray(0,x)
+    self.updateSlicePosition(fiducicalMarkerNode)
+       
+  def updateSlicePosition(self, fiducicalMarkerNode):
     pos = [0.0]*4
     fiducicalMarkerNode.GetNthFiducialWorldCoordinates(0,pos)
     viewerRed = slicer.mrmlScene.GetNodeByID("vtkMRMLSliceNodeRed")
@@ -1176,6 +1235,8 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         dnode = nasionNode.GetMarkupsDisplayNode()
         nasionNode.RemoveAllMarkups()
         slicer.mrmlScene.AddNode(nasionNode)  
+        self.nasionProjectedMarker.AddFiducial(0,0,0)
+        self.nasionProjectedMarker.SetNthFiducialLabel(0, "")
         if dnode:
           rgbColor = [1.0, 0.0, 1.0]
           dnode.SetSelectedColor(rgbColor)
@@ -1192,7 +1253,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         interactionNode.SwitchToSinglePlaceMode ()
         interactionNode.SetCurrentInteractionMode(slicer.vtkMRMLInteractionNode.Place)
         interactionNode.AddObserver(interactionNode.EndPlacementEvent, self.endPlacement) 
-        nasionNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.updatePosition)
+        nasionNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.updateNasionPosition)
   
   def createROI(self):
     cropVolumeLogic = slicer.modules.cropvolume.logic()
@@ -1236,12 +1297,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       interactionNode.SetCurrentInteractionMode(slicer.vtkMRMLInteractionNode.Place) 
       slicer.modules.annotations.logic().SetActiveHierarchyNodeID(self.ROIListNode.GetID())
       self.resetROI = True
-      #ROINode = slicer.mrmlScene.GetNodeByID(self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_ROI"))
-      #selectionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSelectionNodeSingleton")
-      #selectionNode.SetActiveROIListID(self.ROIListNode.GetID())
-      #selectionNode.SetActivePlaceNodeID(ROINode.GetID())
-      #interactionNode.SwitchToSinglePlaceMode ()
-      #interactionNode.AddObserver(interactionNode.EndPlacementEvent, self.endROIPlacement) 
+
     pass
   
   def endROIPlacement(self,interactionNode, event):
@@ -1382,9 +1438,9 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
           posModelValid = numpy.array(points.GetPoint(jPosValid))
           if  numpy.linalg.norm(posModel-posModelValid)> 50.0:
             continue
-          jPosValid = jPos
           if abs(posModel[0]-posNasion[0])<eps or (posModel[0]<posNasion[0]):
-            break        
+            break     
+          jPosValid = jPos   
         self.topPoint = points.GetPoint(jPosValid)    
         posModel = numpy.array(points.GetPoint(jPosValid))  
         CurveManager.curveFiducials.AddFiducial(posModel[0],posModel[1],posModel[2]) 
@@ -1395,7 +1451,6 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         CurveManagerReference.curveFiducials.GetNthFiducialPosition(numOfRef-iPos-1, pos)  
         if float(pos[2])<self.topPoint[2]:
           CurveManager.curveFiducials.AddFiducial(pos[0],pos[1],pos[2]) 
-       
     CurveManager.cmLogic.SourceNode = CurveManager.curveFiducials
     CurveManager.cmLogic.updateCurve()
     CurveManager.cmLogic.CurvePoly = vtk.vtkPolyData() ## For CurveMaker bug   
