@@ -88,20 +88,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     referenceConfigLayout.addWidget(lengthCoronalReferenceLineUnitLabel)
     configurationFormLayout.addRow(referenceConfigLayout)
     
-    ROIConfigLayout = qt.QHBoxLayout()
-    self.selectROIButton = qt.QPushButton("ROI definition")
-    self.selectROIButton.toolTip = "Add two points in the 2D window"
-    self.selectROIButton.enabled = True
-    ROIConfigLayout.addWidget(self.selectROIButton)
-    
-    self.createROIButton = qt.QPushButton("Crop Volume")
-    self.createROIButton.toolTip = "Created cropped volume"
-    self.createROIButton.enabled = True
-    ROIConfigLayout.addWidget(self.createROIButton)
-    configurationFormLayout.addRow("ROI definition for cropping Volume:",None)
-    configurationFormLayout.addRow(ROIConfigLayout)
-    self.selectROIButton.connect('clicked(bool)',self.onDefineROI)
-    self.createROIButton.connect('clicked(bool)',self.onCreateROI)
+    #configurationFormLayout.addRow()
     self.lengthSagittalReferenceLineEdit.connect('textEdited(QString)', self.onModifyMeasureLength)
     self.lengthCoronalReferenceLineEdit.connect('textEdited(QString)', self.onModifyMeasureLength)
     
@@ -131,7 +118,8 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.inputVolumeSelector.setToolTip( "Pick the input to the algorithm." )
     #self.inputVolumeSelector.sortFilterProxyModel().setFilterRegExp("^(-originalVolume)$" )    
     volumeModelLayout.addWidget(self.inputVolumeSelector)
-    
+    self.inputVolumeSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
+    self.inputVolumeSelector.connect("nodeAdded(vtkMRMLNode*)", self.onAddedNode)
     #
     # output volume selector
     #
@@ -151,19 +139,34 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     #
     # Create Model Button
     #
-    self.createModelButton = qt.QPushButton("Create Model")
-    self.createModelButton.toolTip = "Create a surface model."
-    self.createModelButton.enabled = True
-    volumeModelLayout.addWidget(self.createModelButton)
-
-    self.createModelButton.connect('clicked(bool)', self.onCreateModel)
-    self.inputVolumeSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
-    self.inputVolumeSelector.connect("nodeAdded(vtkMRMLNode*)", self.onAddedNode)
-    referenceFormLayout.addRow("Input Volume: ", volumeModelLayout)
+    referenceFormLayout.addRow("Input Volume:", volumeModelLayout)
+    
+    ROIConfigLayout = qt.QHBoxLayout()
+    self.selectROIButton = qt.QPushButton("ROI definition")
+    self.selectROIButton.toolTip = "Add two points in the 2D window"
+    self.selectROIButton.enabled = True
+    ROIConfigLayout.addWidget(self.selectROIButton)
+    
+    self.createROIButton = qt.QPushButton("Crop Volume")
+    self.createROIButton.toolTip = "Created cropped volume"
+    self.createROIButton.enabled = True
+    ROIConfigLayout.addWidget(self.createROIButton)
+    self.selectROIButton.connect('clicked(bool)',self.onDefineROI)
+    self.createROIButton.connect('clicked(bool)',self.onCreateROI)
+    referenceFormLayout.addRow("ROI definition for cropping Volume:",None)
+    referenceFormLayout.addRow(ROIConfigLayout)
+    
     #
     # Create Entry point Button
     #
     automaticEntryHorizontalLayout = qt.QHBoxLayout()
+    
+    self.createModelButton = qt.QPushButton("Create Model")
+    self.createModelButton.toolTip = "Create a surface model."
+    self.createModelButton.enabled = True
+    self.createModelButton.connect('clicked(bool)', self.onCreateModel)    
+    
+    automaticEntryHorizontalLayout.addWidget(self.createModelButton)
     self.selectNasionButton = qt.QPushButton("Select Nasion")
     self.selectNasionButton.toolTip = "Add a point in the 3D window"
     self.selectNasionButton.enabled = True
@@ -187,6 +190,18 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     # Layout within the dummy collapsible button
     planningFormLayout = qt.QFormLayout(planningCollapsibleButton)
     
+    createVesselHorizontalLayout = qt.QHBoxLayout()
+    self.useGrayScaleMakerCheckBox = qt.QCheckBox()
+    self.useGrayScaleMakerCheckBox.checked = 0
+    self.useGrayScaleMakerCheckBox.setToolTip("If checked, the GrayScaleMaker module will be used for vessel calculation instead of the Hessian calculation")
+    #self.useGrayScaleMakerCheckBox.connect('toggled(bool)', self.onUseGrayScaleMaker)
+    createVesselHorizontalLayout.addWidget(self.useGrayScaleMakerCheckBox)
+    self.calculateVenousButton = qt.QPushButton("CalculateVenous")
+    self.calculateVenousButton.toolTip = "Calculate Venous"
+    self.calculateVenousButton.enabled = True
+    self.calculateVenousButton.connect('clicked(bool)', self.onCalculateVenous)
+    createVesselHorizontalLayout.addWidget(self.calculateVenousButton)
+    planningFormLayout.addRow("Create  the venous model:", createVesselHorizontalLayout)
     #
     # Trajectory
     #
@@ -342,14 +357,13 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     pass 
     
   def onCreateModel(self):
-    threshold = -500.0
     if self.inputVolumeSelector.currentNode():
       outputModelNodeID = self.inputVolumeSelector.currentNode().GetAttribute("vtkMRMLScalarVolumeNode.rel_model") 
       if outputModelNodeID:
         outputModelNode = slicer.mrmlScene.GetNodeByID(outputModelNodeID)
         outputModelNode.SetAttribute("vtkMRMLModelNode.modelCreated","False")
         self.inputVolumeSelector.disconnect("nodeAdded(vtkMRMLNode*)")
-        self.logic.createModel(outputModelNode, threshold)
+        self.logic.createModel(outputModelNode, self.logic.threshold)
         self.inputVolumeSelector.connect("nodeAdded(vtkMRMLNode*)", self.onAddedNode)
   
   def onSelectNasionPointNode(self):
@@ -422,7 +436,36 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     
   def onMoveSliceCoronalReferenceLine(self):
     self.logic.moveSliceCoronalReferenceLine()
-
+  
+  def onCalculateVenous(self):
+    self.inputVolumeSelector.disconnect("nodeAdded(vtkMRMLNode*)")
+    if self.logic.baseVolumeNode:
+      climodule = slicer.modules.hessianvesselnessfilter
+      croppedVolumeNode = self.logic.baseVolumeNode
+      croppedVolumeNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_croppedVolume")
+      if croppedVolumeNodeID:
+        croppedVolumeNode = slicer.mrmlScene.GetNodeByID(croppedVolumeNodeID)
+      vesselnessVolumeNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_vesselnessVolume")
+      if not vesselnessVolumeNodeID:
+        vesselnessVolumeNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLScalarVolumeNode")
+        slicer.mrmlScene.AddNode(vesselnessVolumeNode)
+        self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_vesselnessVolume",vesselnessVolumeNode.GetID())
+        vesselnessVolumeNodeID = vesselnessVolumeNode.GetID()
+      vesselnessVolumeNode = slicer.mrmlScene.GetNodeByID(vesselnessVolumeNodeID)  
+      vesselnessModelNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_vesselnessModel")
+      if not vesselnessModelNodeID:
+        vesselnessModelNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
+        slicer.mrmlScene.AddNode(vesselnessModelNode)
+        self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_vesselnessModel",vesselnessModelNode.GetID())
+        vesselnessModelNodeID = vesselnessModelNode.GetID()
+      vesselnessModelNode = slicer.mrmlScene.GetNodeByID(vesselnessModelNodeID)
+      if self.useGrayScaleMakerCheckBox.checked:
+        self.logic.calculateVenous(croppedVolumeNode, vesselnessModelNode, self.useGrayScaleMakerCheckBox.checked)
+      else:
+        self.logic.calculateVenous(croppedVolumeNode, vesselnessVolumeNode, self.useGrayScaleMakerCheckBox.checked)
+    self.inputVolumeSelector.connect("nodeAdded(vtkMRMLNode*)", self.onAddedNode)    
+    pass
+  
   # Event handlers for trajectory
   def onEditTrajectory(self):
     self.logic.startEditTrajectory()
@@ -745,6 +788,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     self.samplingFactor = 1
     self.topPoint = []
     self.resetROI = False 
+    self.threshold = -500.0
     self.trajectoryProjectedMarker = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
     self.trajectoryProjectedMarker.SetName("trajectoryProject")
     slicer.mrmlScene.AddNode(self.trajectoryProjectedMarker)
@@ -961,14 +1005,14 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       resampleFilter.SetOutputOrigin(numpy.array(originImage.GetOrigin()))
       resampledImage = resampleFilter.Execute(originImage)
       thresholdFilter = sitk.BinaryThresholdImageFilter()
-      thresholdImage = thresholdFilter.Execute(resampledImage,-500,10000,1,0)
+      thresholdImage = thresholdFilter.Execute(resampledImage,thresholdValue,10000,1,0)
       dilateFilter = sitk.BinaryDilateImageFilter()
-      dilateFilter.SetKernelRadius([12,12,6])
+      dilateFilter.SetKernelRadius([10,10,6])
       dilateFilter.SetBackgroundValue(0)
       dilateFilter.SetForegroundValue(1)
       dilatedImage = dilateFilter.Execute(thresholdImage)
       erodeFilter = sitk.BinaryErodeImageFilter()
-      erodeFilter.SetKernelRadius([12,12,6])
+      erodeFilter.SetKernelRadius([10,10,6])
       erodeFilter.SetBackgroundValue(0)
       erodeFilter.SetForegroundValue(1)
       erodedImage = erodeFilter.Execute(dilatedImage)
@@ -1088,6 +1132,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         outputModel = stripper.GetOutput()
         outputModelNode.SetAndObservePolyData(outputModel)
         outputModelNode.SetAttribute("vtkMRMLModelNode.modelCreated","True")
+        outputModelNode.GetDisplayNode().SetVisibility(1)
         layoutManager = slicer.app.layoutManager()
         threeDWidget = layoutManager.threeDWidget(0)
         threeDView = threeDWidget.threeDView()
@@ -1101,6 +1146,37 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       if imageCollection:
         thresholdImageNode = imageCollection.GetItemAsObject(0)
         slicer.mrmlScene.RemoveNode(thresholdImageNode)  
+  
+  def calculateVenous(self, inputVolumeNode, vesselnessNode, useGrayScaleMaker):
+    if useGrayScaleMaker:      
+      parameters = {}
+      parameters["InputVolume"] = inputVolumeNode.GetID()
+      parameters["OutputGeometry"] = vesselnessNode.GetID()
+      grayMaker = slicer.modules.grayscalemodelmaker
+      cliNode = slicer.cli.run(grayMaker, None, parameters, wait_for_completion=True)
+    else:   
+      convolutionFilter = vtk.vtkImageSeparableConvolution()
+      zKernel = vtk.vtkFloatArray()
+      zKernel.SetNumberOfTuples(5);
+      zKernel.SetNumberOfComponents(1);
+      zKernel.SetValue(0,1);
+      zKernel.SetValue(1,1);
+      zKernel.SetValue(2,1);
+      zKernel.SetValue(3,1);
+      zKernel.SetValue(4,1);
+      convolutionFilter.SetZKernel(zKernel)
+      convolutionFilter.SetInputData(inputVolumeNode.GetImageData())
+      convolutionFilter.Update()
+      convolutedImage = convolutionFilter.GetOutput()
+      convolutedVolumeNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLScalarVolumeNode")
+      ijkToRAS = vtk.vtkMatrix4x4()
+      inputVolumeNode.GetIJKToRASMatrix(ijkToRAS)
+      convolutedVolumeNode.SetIJKToRASMatrix(ijkToRAS) 
+      convolutedVolumeNode.SetAndObserveImageData(convolutionFilter.GetOutput())
+      slicer.mrmlScene.AddNode(convolutedVolumeNode)
+      vesselnessFilter = slicer.modules.hessianvesselnessfilter
+      parameters = {"inputVolume": convolutedVolumeNode.GetID(), "outputVolume": vesselnessNode.GetID(), "alpha1": -40, "alpha2":-100, "sigma":0.8}
+      cliNode = slicer.cli.run(vesselnessFilter, None, parameters, wait_for_completion=True)
         
   def enableAttribute(self, attribute):
     enabledAttributeID = self.baseVolumeNode.GetAttribute(attribute)
@@ -1118,10 +1194,6 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         slicer.mrmlScene.AddNode(nasionNode)
         self.baseVolumeNode.SetAttribute(attribute, nasionNode.GetID())  
       elif attribute == "vtkMRMLScalarVolumeNode.rel_ROI":
-        #ROINode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLAnnotationROINode")
-        #ROINode.SetName("ROI"+self.baseVolumeNode.GetID()[-1:])
-        #ROINode.HideFromEditorsOff()
-        #slicer.mrmlScene.AddNode(ROINode)
         self.baseVolumeNode.SetAttribute(attribute, "")     
       elif attribute == "vtkMRMLScalarVolumeNode.rel_trajectory":
         trajectoryNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
@@ -1264,7 +1336,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
   def selectNasionPointNode(self, modelNode, initPoint = None):
     if self.baseVolumeNode:
       if modelNode.GetAttribute("vtkMRMLModelNode.modelCreated") == "False":
-        self.createModel(modelNode,-500)
+        self.createModel(modelNode,self.threshold)
       if self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_nasion"):
         nasionNode = slicer.mrmlScene.GetNodeByID(self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_nasion"))
         dnode = nasionNode.GetMarkupsDisplayNode()
