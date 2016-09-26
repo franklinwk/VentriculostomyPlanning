@@ -111,7 +111,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.inputVolumeSelector.selectNodeUponCreation = True
     self.inputVolumeSelector.addEnabled = False
     self.inputVolumeSelector.removeEnabled = False
-    self.inputVolumeSelector.noneEnabled = False
+    self.inputVolumeSelector.noneEnabled = True
     self.inputVolumeSelector.showHidden = False
     self.inputVolumeSelector.showChildNodeTypes = False
     self.inputVolumeSelector.setMRMLScene( slicer.mrmlScene )
@@ -203,7 +203,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.vesselnessCalcButton.toolTip = "Use Vesselness calculation "
     self.vesselnessCalcButton.enabled = True
     self.vesselnessCalcButton.connect('clicked(bool)', self.onVenousVesselnessCalc)
-    createVesselHorizontalLayout.addWidget(self.vesselnessCalcButton)
+    #createVesselHorizontalLayout.addWidget(self.vesselnessCalcButton)
     VenousFormLayout.addRow("Create venous model: ",None)
     VenousFormLayout.addRow(createVesselHorizontalLayout)
     
@@ -252,7 +252,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.lockTrajectoryCheckBox.checked = 0
     self.lockTrajectoryCheckBox.setToolTip("If checked, the trajectory will be locked.")
     createPlanningLineHorizontalLayout.addWidget(self.lockTrajectoryCheckBox)
-    self.createPlanningLineButton = qt.QPushButton("Create planning Line")
+    self.createPlanningLineButton = qt.QPushButton("Create Planning Line")
     self.createPlanningLineButton.toolTip = "Create the planning line."
     self.createPlanningLineButton.enabled = True
     createPlanningLineHorizontalLayout.addWidget(self.createPlanningLineButton)
@@ -296,6 +296,33 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     lengthCoronalPlanningLineUnitLabel = qt.QLabel('mm  ')
     planningLineLayout.addWidget(lengthCoronalPlanningLineUnitLabel)
     planningFormLayout.addRow(planningLineLayout)
+    
+    planningAnglesLayout = qt.QHBoxLayout()
+    #-- Curve length
+    pitchAngleLabel = qt.QLabel('Pitch Angle:  ') 
+    planningAnglesLayout.addWidget(pitchAngleLabel)
+    self.pitchAngleEdit = qt.QLineEdit()
+    self.pitchAngleEdit.text = '--'
+    self.pitchAngleEdit.readOnly = True
+    self.pitchAngleEdit.frame = True
+    self.pitchAngleEdit.styleSheet = "QLineEdit { background:transparent; }"
+    self.pitchAngleEdit.cursor = qt.QCursor(qt.Qt.IBeamCursor)
+    planningAnglesLayout.addWidget(self.pitchAngleEdit)
+    pitchAngleUnitLabel = qt.QLabel('degree  ')
+    planningAnglesLayout.addWidget(pitchAngleUnitLabel)
+    
+    yawAngleLabel = qt.QLabel('Yaw Angle:  ') 
+    planningAnglesLayout.addWidget(yawAngleLabel)
+    self.yawAngleEdit = qt.QLineEdit()
+    self.yawAngleEdit.text = '--'
+    self.yawAngleEdit.readOnly = True
+    self.yawAngleEdit.frame = True
+    self.yawAngleEdit.styleSheet = "QLineEdit { background:transparent; }"
+    self.yawAngleEdit.cursor = qt.QCursor(qt.Qt.IBeamCursor)
+    planningAnglesLayout.addWidget(self.yawAngleEdit)
+    yawAngleUnitLabel = qt.QLabel('degree  ')
+    planningAnglesLayout.addWidget(yawAngleUnitLabel)
+    planningFormLayout.addRow(planningAnglesLayout)
     
     #end of GUI section
     #####################################
@@ -345,6 +372,10 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       self.logic.trajectoryManager.startEditLine()
       self.onCreatePlanningLine()
       self.onSetSliceViewer()
+      
+      layoutManager = slicer.app.layoutManager()
+      threeDView = layoutManager.threeDWidget(0).threeDView()
+      threeDView.lookFromViewAxis(ctkAxesWidget.Anterior)
           
     pass
   
@@ -370,6 +401,9 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.logic.createPlanningLine()  
     self.lengthSagittalPlanningLineEdit.text = '%.1f' % self.logic.getSagittalPlanningLineLength()
     self.lengthCoronalPlanningLineEdit.text = '%.1f' % self.logic.getCoronalPlanningLineLength()
+    self.logic.calcPitchYawAngles()  
+    self.pitchAngleEdit.text = '%.1f' % self.logic.pitchAngle
+    self.yawAngleEdit.text = '%.1f' % self.logic.yawAngle
     pass 
     
   def onCreateModel(self):
@@ -464,6 +498,12 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       if not grayScaleModelNodeID:
         grayScaleModelNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
         slicer.mrmlScene.AddNode(grayScaleModelNode)
+        modelDisplayNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelDisplayNode")
+        ModelColor = [0.5, 0.0, 0.0]
+        modelDisplayNode.SetColor(ModelColor)
+        modelDisplayNode.SetOpacity(0.5)
+        slicer.mrmlScene.AddNode(modelDisplayNode)
+        grayScaleModelNode.SetAndObserveDisplayNodeID(modelDisplayNode.GetID())
         self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_grayScaleModel",grayScaleModelNode.GetID())
         grayScaleModelNodeID = grayScaleModelNode.GetID()
       grayScaleModelNode = slicer.mrmlScene.GetNodeByID(grayScaleModelNodeID)
@@ -568,6 +608,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     ModuleWizard will subsitute correct default moduleName.
     """
     globals()[moduleName] = slicer.util.reloadScriptedModule(moduleName)
+    slicer.mrmlScene.Clear(0)
 
 
 class CurveManager:
@@ -829,6 +870,8 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     self.topPoint = []
     self.resetROI = False 
     self.threshold = -500.0
+    self.yawAngle = 0
+    self.pitchAngle = 0
     self.activeTrajectoryMarkup = 0
     self.trajectoryProjectedMarker = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
     self.trajectoryProjectedMarker.SetName("trajectoryProject")
@@ -918,13 +961,12 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
           dnode.SetVisibility(1)
         self.trajectoryManager.curveFiducials = trajectoryNode  
         self.trajectoryProjectedMarker.RemoveAllMarkups()
-        self.trajectoryProjectedMarker.AddFiducial(0,0,0)
-        self.trajectoryProjectedMarker.SetNthFiducialLabel(0,"")
         dnode = self.trajectoryProjectedMarker.GetMarkupsDisplayNode()
         if dnode:
           rgbColor = [1.0, 0.0, 1.0]
           dnode.SetSelectedColor(rgbColor)
           dnode.SetVisibility(0)
+          dnode.SetGlyphScale(2.5)
         selectionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSelectionNodeSingleton")
         interactionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLInteractionNodeSingleton")
         if (selectionNode == None) or (interactionNode == None):
@@ -1178,8 +1220,8 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         layoutManager = slicer.app.layoutManager()
         threeDWidget = layoutManager.threeDWidget(0)
         threeDView = threeDWidget.threeDView()
-        threeDView.lookFromViewAxis(ctkAxesWidget.Anterior)
         threeDView.resetFocalPoint()
+        threeDView.lookFromViewAxis(ctkAxesWidget.Anterior)
       imageCollection = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLScalarVolumeNode","holefilledImage")
       if imageCollection:
         holefilledImageNode = imageCollection.GetItemAsObject(0)
@@ -1279,9 +1321,12 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
   
   def updateTrajectoryPosition(self, fiducicalMarkerNode, eventID):
     inputModelNodeID =  self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_model")
+    inputVesselModelNodeID =  self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_grayScaleModel")
     if inputModelNodeID:
       inputModelNode = slicer.mrmlScene.GetNodeByID(inputModelNodeID) 
       if (inputModelNode.GetAttribute("vtkMRMLModelNode.modelCreated") == "True"):
+        self.trajectoryProjectedMarker.RemoveAllMarkups()
+        self.trajectoryProjectedMarker.AddFiducial(0,0,0)
         self.trajectoryProjectedMarker.GetMarkupsDisplayNode().SetVisibility(1)
         polyData = inputModelNode.GetPolyData()
         posFirst = [0.0,0.0,0.0]
@@ -1289,8 +1334,6 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         posSecond = [0.0,0.0,0.0]
         fiducicalMarkerNode.GetNthFiducialPosition(1,posSecond)
         direction = numpy.array(posFirst)- numpy.array(posSecond)
-        posFirst = posFirst + 1e6*direction
-        posSecond = posSecond -  1e6*direction
         locator = vtk.vtkCellLocator()
         locator.SetDataSet(polyData)
         locator.BuildLocator()
@@ -1298,12 +1341,37 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         x = [0.0,0.0,0.0]
         pcoords = [0.0,0.0,0.0]
         subId = vtk.mutable(0)
-        hasIntersection = locator.IntersectWithLine(posFirst, posSecond, 1e-2, t, x, pcoords, subId)
+        hasIntersection = locator.IntersectWithLine( posFirst + 1e6*direction, posSecond -  1e6*direction, 1e-2, t, x, pcoords, subId)
         if hasIntersection>0:
           self.trajectoryProjectedMarker.SetNthFiducialPositionFromArray(0,x)
           self.trajectoryProjectedMarker.SetNthFiducialLabel(0,"")  
         else:
           self.trajectoryProjectedMarker.SetNthFiducialLabel(0,"invalid")  
+        if inputVesselModelNodeID:
+          inputVesselModelNode = slicer.mrmlScene.GetNodeByID(inputVesselModelNodeID)   
+          obbTree = vtk.vtkOBBTree()
+          obbTree.SetDataSet(inputVesselModelNode.GetPolyData())  
+          obbTree.BuildLocator()
+          pointsVTKintersection = vtk.vtkPoints()
+          hasIntersection = obbTree.IntersectWithLine(posFirst, posSecond, pointsVTKintersection, None)  
+          if hasIntersection>0: 
+            pointsVTKIntersectionData = pointsVTKintersection.GetData()
+            noPointsVTKIntersection = pointsVTKIntersectionData.GetNumberOfTuples()
+            validPosIndex = 1
+            for idx in range(noPointsVTKIntersection):
+              posTuple = pointsVTKIntersectionData.GetTuple3(idx)
+              if ((posTuple[0]-posFirst[0])*(posSecond[0]-posFirst[0])>0) and abs(posTuple[0]-posFirst[0])<abs(posSecond[0]-posFirst[0]): 
+                # check if the intersection if within the posFist and posSecond
+                self.trajectoryProjectedMarker.AddFiducial(0,0,0)
+                self.trajectoryProjectedMarker.SetNthFiducialPositionFromArray(validPosIndex,posTuple)
+                self.trajectoryProjectedMarker.SetNthFiducialLabel(validPosIndex,"")  
+                self.trajectoryProjectedMarker.SetNthFiducialVisibility(validPosIndex,True)
+                validPosIndex = validPosIndex + 1
+          else:
+            numOfFiducial = self.trajectoryProjectedMarker.GetNumberOfFiducials()
+            for idx in range(1, numOfFiducial):
+              self.trajectoryProjectedMarker.SetNthFiducialLabel(idx,"invalid")  
+          
     self.updateSlicePosition(fiducicalMarkerNode,self.activeTrajectoryMarkup)
   
   def endTrajectoryInteraction(self, trajectoryNode, event=None):
@@ -1312,7 +1380,8 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       self.trajectoryProjectedMarker.GetNthFiducialPosition(0,posFirst)
       posFirst[1] = posFirst[1] + 0.005
       trajectoryNode.SetNthFiducialPositionFromArray(0,posFirst)
-    self.trajectoryProjectedMarker.GetMarkupsDisplayNode().SetVisibility(0)
+      
+    self.trajectoryProjectedMarker.SetNthFiducialVisibility(0,False)
     pass
   
   def updateNasionPosition(self, fiducicalMarkerNode, eventID):
@@ -1758,7 +1827,23 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       self.lockPlanningLine()     
     pass  
     
-
+  def calcPitchYawAngles(self):
+    firstPos = numpy.array([0.0,0.0,0.0])
+    self.trajectoryManager.getFirstPoint(firstPos)
+    lastPos = numpy.array([0.0,0.0,0.0])
+    self.trajectoryManager.getLastPoint(lastPos)
+    self.pitchAngle = numpy.arctan2(firstPos[2]-lastPos[2], firstPos[1]-lastPos[1])*180.0/numpy.pi
+    self.yawAngle = numpy.arctan2(firstPos[0]-lastPos[0], firstPos[1]-lastPos[1])*180.0/numpy.pi
+    layoutManager = slicer.app.layoutManager()
+    threeDView = layoutManager.threeDWidget(0).threeDView()
+    threeDView.lookFromViewAxis(ctkAxesWidget.Posterior)
+    threeDView.pitchDirection = threeDView.PitchUp
+    threeDView.yawDirection = threeDView.YawRight
+    threeDView.setPitchRollYawIncrement(self.pitchAngle)
+    threeDView.pitch()
+    threeDView.setPitchRollYawIncrement(self.yawAngle)
+    threeDView.yaw()
+    pass
   
 class VentriculostomyPlanningTest(ScriptedLoadableModuleTest):
   """
