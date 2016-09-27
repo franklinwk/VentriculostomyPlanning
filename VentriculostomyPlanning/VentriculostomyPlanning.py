@@ -607,10 +607,9 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     """Generic reload method for any scripted module.
     ModuleWizard will subsitute correct default moduleName.
     """
-    globals()[moduleName] = slicer.util.reloadScriptedModule(moduleName)
     slicer.mrmlScene.Clear(0)
-
-
+    globals()[moduleName] = slicer.util.reloadScriptedModule(moduleName)
+    
 class CurveManager:
   
   def __init__(self):
@@ -1319,9 +1318,8 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     self.activeTrajectoryMarkup = callData
     pass
   
-  def updateTrajectoryPosition(self, fiducicalMarkerNode, eventID):
+  def updateTrajectoryPosition(self, fiducicalMarkerNode, eventID = None):
     inputModelNodeID =  self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_model")
-    inputVesselModelNodeID =  self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_grayScaleModel")
     if inputModelNodeID:
       inputModelNode = slicer.mrmlScene.GetNodeByID(inputModelNodeID) 
       if (inputModelNode.GetAttribute("vtkMRMLModelNode.modelCreated") == "True"):
@@ -1333,45 +1331,27 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         fiducicalMarkerNode.GetNthFiducialPosition(0,posFirst)
         posSecond = [0.0,0.0,0.0]
         fiducicalMarkerNode.GetNthFiducialPosition(1,posSecond)
-        direction = numpy.array(posFirst)- numpy.array(posSecond)
-        locator = vtk.vtkCellLocator()
-        locator.SetDataSet(polyData)
-        locator.BuildLocator()
-        t = vtk.mutable(0)
-        x = [0.0,0.0,0.0]
-        pcoords = [0.0,0.0,0.0]
-        subId = vtk.mutable(0)
-        hasIntersection = locator.IntersectWithLine( posFirst + 1e6*direction, posSecond -  1e6*direction, 1e-2, t, x, pcoords, subId)
-        if hasIntersection>0:
-          self.trajectoryProjectedMarker.SetNthFiducialPositionFromArray(0,x)
-          self.trajectoryProjectedMarker.SetNthFiducialLabel(0,"")  
-        else:
-          self.trajectoryProjectedMarker.SetNthFiducialLabel(0,"invalid")  
-        if inputVesselModelNodeID:
-          inputVesselModelNode = slicer.mrmlScene.GetNodeByID(inputVesselModelNodeID)   
-          obbTree = vtk.vtkOBBTree()
-          obbTree.SetDataSet(inputVesselModelNode.GetPolyData())  
-          obbTree.BuildLocator()
-          pointsVTKintersection = vtk.vtkPoints()
-          hasIntersection = obbTree.IntersectWithLine(posFirst, posSecond, pointsVTKintersection, None)  
-          if hasIntersection>0: 
-            pointsVTKIntersectionData = pointsVTKintersection.GetData()
-            noPointsVTKIntersection = pointsVTKIntersectionData.GetNumberOfTuples()
-            validPosIndex = 1
-            for idx in range(noPointsVTKIntersection):
-              posTuple = pointsVTKIntersectionData.GetTuple3(idx)
-              if ((posTuple[0]-posFirst[0])*(posSecond[0]-posFirst[0])>0) and abs(posTuple[0]-posFirst[0])<abs(posSecond[0]-posFirst[0]): 
-                # check if the intersection if within the posFist and posSecond
-                self.trajectoryProjectedMarker.AddFiducial(0,0,0)
-                self.trajectoryProjectedMarker.SetNthFiducialPositionFromArray(validPosIndex,posTuple)
-                self.trajectoryProjectedMarker.SetNthFiducialLabel(validPosIndex,"")  
-                self.trajectoryProjectedMarker.SetNthFiducialVisibility(validPosIndex,True)
-                validPosIndex = validPosIndex + 1
+        if self.activeTrajectoryMarkup == 0:
+          direction = numpy.array(posFirst)- numpy.array(posSecond)
+          locator = vtk.vtkCellLocator()
+          locator.SetDataSet(polyData)
+          locator.BuildLocator()
+          t = vtk.mutable(0)
+          x = [0.0,0.0,0.0]
+          pcoords = [0.0,0.0,0.0]
+          subId = vtk.mutable(0)
+          hasIntersection = locator.IntersectWithLine( posFirst + 1e6*direction, posSecond -  1e6*direction, 1e-2, t, x, pcoords, subId)
+          if hasIntersection>0:
+            self.trajectoryProjectedMarker.SetNthFiducialPositionFromArray(0,x)
+            self.trajectoryProjectedMarker.SetNthFiducialLabel(0,"")  
           else:
-            numOfFiducial = self.trajectoryProjectedMarker.GetNumberOfFiducials()
-            for idx in range(1, numOfFiducial):
-              self.trajectoryProjectedMarker.SetNthFiducialLabel(idx,"invalid")  
-          
+            self.trajectoryProjectedMarker.SetNthFiducialLabel(0,"invalid")  
+        else:
+          self.trajectoryProjectedMarker.SetNthFiducialPositionFromArray(0,posFirst)
+          self.trajectoryProjectedMarker.SetNthFiducialLabel(0,"")    
+          self.trajectoryProjectedMarker.SetNthFiducialVisibility(0,False)
+    
+                
     self.updateSlicePosition(fiducicalMarkerNode,self.activeTrajectoryMarkup)
   
   def endTrajectoryInteraction(self, trajectoryNode, event=None):
@@ -1379,9 +1359,39 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     if not self.trajectoryProjectedMarker.GetNthFiducialLabel(0) == "invalid":
       self.trajectoryProjectedMarker.GetNthFiducialPosition(0,posFirst)
       posFirst[1] = posFirst[1] + 0.005
-      trajectoryNode.SetNthFiducialPositionFromArray(0,posFirst)
-      
+      trajectoryNode.SetNthFiducialPositionFromArray(0,posFirst)  
     self.trajectoryProjectedMarker.SetNthFiducialVisibility(0,False)
+    
+    # update the intersection of trajectory with venous
+    posFirst = [0.0,0.0,0.0]
+    trajectoryNode.GetNthFiducialPosition(0,posFirst)
+    posSecond = [0.0,0.0,0.0]
+    trajectoryNode.GetNthFiducialPosition(1,posSecond)
+    inputVesselModelNodeID =  self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_grayScaleModel")
+    if inputVesselModelNodeID:
+      inputVesselModelNode = slicer.mrmlScene.GetNodeByID(inputVesselModelNodeID)   
+      obbTree = vtk.vtkOBBTree()
+      obbTree.SetDataSet(inputVesselModelNode.GetPolyData())  
+      obbTree.BuildLocator()
+      pointsVTKintersection = vtk.vtkPoints()
+      hasIntersection = obbTree.IntersectWithLine(posFirst, posSecond, pointsVTKintersection, None)  
+      if hasIntersection>0: 
+        pointsVTKIntersectionData = pointsVTKintersection.GetData()
+        noPointsVTKIntersection = pointsVTKIntersectionData.GetNumberOfTuples()
+        validPosIndex = 1
+        for idx in range(noPointsVTKIntersection):
+          posTuple = pointsVTKIntersectionData.GetTuple3(idx)
+          if ((posTuple[0]-posFirst[0])*(posSecond[0]-posFirst[0])>0) and abs(posTuple[0]-posFirst[0])<abs(posSecond[0]-posFirst[0]): 
+            # check if the intersection if within the posFist and posSecond
+            self.trajectoryProjectedMarker.AddFiducial(0,0,0)
+            self.trajectoryProjectedMarker.SetNthFiducialPositionFromArray(validPosIndex,posTuple)
+            self.trajectoryProjectedMarker.SetNthFiducialLabel(validPosIndex,"")  
+            self.trajectoryProjectedMarker.SetNthFiducialVisibility(validPosIndex,True)
+            validPosIndex = validPosIndex + 1
+      else:
+        numOfFiducial = self.trajectoryProjectedMarker.GetNumberOfFiducials()
+        for idx in range(1, numOfFiducial):
+          self.trajectoryProjectedMarker.SetNthFiducialLabel(idx,"invalid")  
     pass
   
   def updateNasionPosition(self, fiducicalMarkerNode, eventID):
@@ -1432,7 +1442,11 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       self.createEntryPoint()
       self.nasionProjectedMarker.GetMarkupsDisplayNode().SetVisibility(0)
     if interactionNode.GetAttribute("vtkMRMLInteractionNode.rel_marker") == "trajectory":
-      self.trajectoryProjectedMarker.GetMarkupsDisplayNode().SetVisibility(0)
+      self.trajectoryProjectedMarker.GetMarkupsDisplayNode().SetVisibility(0)    
+      ## Trigger the venous intersection computation
+      trajectoryNode = slicer.mrmlScene.GetNodeByID(self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_trajectory"))
+      self.updateTrajectoryPosition(trajectoryNode)
+      self.endTrajectoryInteraction(trajectoryNode)                                              
     pass
   
   def endNasionInteraction(self, nasionNode, event):
