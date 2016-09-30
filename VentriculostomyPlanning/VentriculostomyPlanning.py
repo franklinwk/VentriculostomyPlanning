@@ -403,7 +403,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.lengthCoronalPlanningLineEdit.text = '%.1f' % self.logic.getCoronalPlanningLineLength()
     self.logic.calcPitchYawAngles()  
     self.pitchAngleEdit.text = '%.1f' % self.logic.pitchAngle
-    self.yawAngleEdit.text = '%.1f' % self.logic.yawAngle
+    self.yawAngleEdit.text = '%.1f' % (-self.logic.yawAngle)
     pass 
     
   def onCreateModel(self):
@@ -1353,6 +1353,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     
                 
     self.updateSlicePosition(fiducicalMarkerNode,self.activeTrajectoryMarkup)
+    #self.calcPitchYawAngles()
   
   def endTrajectoryInteraction(self, trajectoryNode, event=None):
     posFirst = [0.0,0.0,0.0]
@@ -1847,7 +1848,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     lastPos = numpy.array([0.0,0.0,0.0])
     self.trajectoryManager.getLastPoint(lastPos)
     self.pitchAngle = numpy.arctan2(firstPos[2]-lastPos[2], firstPos[1]-lastPos[1])*180.0/numpy.pi
-    self.yawAngle = numpy.arctan2(firstPos[0]-lastPos[0], firstPos[1]-lastPos[1])*180.0/numpy.pi
+    self.yawAngle = -numpy.arctan2(firstPos[0]-lastPos[0], firstPos[1]-lastPos[1])*180.0/numpy.pi
     layoutManager = slicer.app.layoutManager()
     threeDView = layoutManager.threeDWidget(0).threeDView()
     threeDView.lookFromViewAxis(ctkAxesWidget.Posterior)
@@ -1855,12 +1856,13 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     threeDView.yawDirection = threeDView.YawRight
     threeDView.setPitchRollYawIncrement(self.pitchAngle)
     threeDView.pitch()
-    threeDView.setPitchRollYawIncrement(self.yawAngle)
+    threeDView.setPitchRollYawIncrement(abs(self.yawAngle))
     threeDView.yaw()
     self.updateSliceView()
     pass
 
   def updateSliceView(self):
+    ## due to the RAS and vtk space difference, the X axis is flipped, So the standard rotation matrix is multiplied by -1 in the X axis
     trajectoryNodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_trajectory")
     if trajectoryNodeID:
       trajectoryNode = slicer.mrmlScene.GetNodeByID(trajectoryNodeID)
@@ -1874,30 +1876,40 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         matrixRedNew.SetElement(0, 3, pos[0])
         matrixRedNew.SetElement(1, 3, pos[1])
         matrixRedNew.SetElement(2, 3, pos[2])
+        matrixRedNew.SetElement(0, 0, -1)   # The X axis is flipped
         matrixRedNew.SetElement(1, 1, numpy.cos(self.pitchAngle / 180.0 * numpy.pi))
         matrixRedNew.SetElement(1, 2, -numpy.sin(self.pitchAngle / 180.0 * numpy.pi))
         matrixRedNew.SetElement(2, 1, numpy.sin(self.pitchAngle / 180.0 * numpy.pi))
         matrixRedNew.SetElement(2, 2, numpy.cos(self.pitchAngle / 180.0 * numpy.pi))
         matrixRedOri.DeepCopy(matrixRedNew)
         redSliceNode.UpdateMatrices()
-        greenSliceNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSliceNodeGreen")
-        matrixGreenOri = greenSliceNode.GetSliceToRAS()
-        matrixGreenNew = vtk.vtkMatrix4x4()
+
+
+        matrixMultiplier = vtk.vtkMatrix4x4()
+        yellowSliceNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSliceNodeYellow")
+        matrixYellowOri = yellowSliceNode.GetSliceToRAS()
         matrixYaw = vtk.vtkMatrix4x4()
         matrixYaw.Identity()
         matrixYaw.SetElement(0, 3, pos[0])
         matrixYaw.SetElement(1, 3, pos[1])
         matrixYaw.SetElement(2, 3, pos[2])
-        matrixYaw.SetElement(0, 0, numpy.cos((90-self.yawAngle) / 180.0 * numpy.pi))
-        matrixYaw.SetElement(0, 1, -numpy.sin((90-self.yawAngle) / 180.0 * numpy.pi))
-        matrixYaw.SetElement(1, 0, numpy.sin((90-self.yawAngle) / 180.0 * numpy.pi))
-        matrixYaw.SetElement(1, 1, numpy.cos((90-self.yawAngle) / 180.0 * numpy.pi))
-        matrixGreenOri.SetElement(0, 3, 0.0)
-        matrixGreenOri.SetElement(1, 3, 0.0)
-        matrixGreenOri.SetElement(2, 3, 0.0)
-        matrixMultiplier = vtk.vtkMatrix4x4()
-        matrixMultiplier.Multiply4x4(matrixYaw, matrixGreenOri, matrixGreenNew)
-        matrixGreenOri.DeepCopy(matrixGreenNew)
+        matrixYaw.SetElement(0, 0, -1)  # The X axis is flipped
+        matrixYaw.SetElement(0, 0, numpy.cos(self.yawAngle / 180.0 * numpy.pi)) # definition of
+        matrixYaw.SetElement(0, 1, -numpy.sin(self.yawAngle / 180.0 * numpy.pi))
+        matrixYaw.SetElement(1, 0, numpy.sin(self.yawAngle / 180.0 * numpy.pi))
+        matrixYaw.SetElement(1, 1, numpy.cos(self.yawAngle / 180.0 * numpy.pi))
+        matrixYellowNew = vtk.vtkMatrix4x4()
+        matrixYellowNew.Zero()
+        matrixYellowNew.SetElement(0, 2, 1)
+        matrixYellowNew.SetElement(1, 0, -1)
+        matrixYellowNew.SetElement(2, 1, 1)
+        matrixYellowNew.SetElement(3, 3, 1)
+        matrixMultiplier.Multiply4x4(matrixYaw, matrixYellowNew, matrixYellowOri)
+        yellowSliceNode.UpdateMatrices()
+
+        greenSliceNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSliceNodeGreen")
+        matrixGreenOri = greenSliceNode.GetSliceToRAS()
+        matrixGreenOri.DeepCopy(matrixYellowOri)
         greenSliceNode.UpdateMatrices()
 
     pass
