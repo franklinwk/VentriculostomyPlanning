@@ -1857,8 +1857,51 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     threeDView.pitch()
     threeDView.setPitchRollYawIncrement(self.yawAngle)
     threeDView.yaw()
+    self.updateSliceView()
     pass
-  
+
+  def updateSliceView(self):
+    trajectoryNodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_trajectory")
+    if trajectoryNodeID:
+      trajectoryNode = slicer.mrmlScene.GetNodeByID(trajectoryNodeID)
+      if trajectoryNode.GetNumberOfFiducials() > 1:
+        pos = [0.0] * 3
+        trajectoryNode.GetNthFiducialPosition(1, pos)
+        redSliceNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSliceNodeRed")
+        matrixRedOri = redSliceNode.GetSliceToRAS()
+        matrixRedNew = vtk.vtkMatrix4x4()
+        matrixRedNew.Identity()
+        matrixRedNew.SetElement(0, 3, pos[0])
+        matrixRedNew.SetElement(1, 3, pos[1])
+        matrixRedNew.SetElement(2, 3, pos[2])
+        matrixRedNew.SetElement(1, 1, numpy.cos(self.pitchAngle / 180.0 * numpy.pi))
+        matrixRedNew.SetElement(1, 2, -numpy.sin(self.pitchAngle / 180.0 * numpy.pi))
+        matrixRedNew.SetElement(2, 1, numpy.sin(self.pitchAngle / 180.0 * numpy.pi))
+        matrixRedNew.SetElement(2, 2, numpy.cos(self.pitchAngle / 180.0 * numpy.pi))
+        matrixRedOri.DeepCopy(matrixRedNew)
+        redSliceNode.UpdateMatrices()
+        greenSliceNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSliceNodeGreen")
+        matrixGreenOri = greenSliceNode.GetSliceToRAS()
+        matrixGreenNew = vtk.vtkMatrix4x4()
+        matrixYaw = vtk.vtkMatrix4x4()
+        matrixYaw.Identity()
+        matrixYaw.SetElement(0, 3, pos[0])
+        matrixYaw.SetElement(1, 3, pos[1])
+        matrixYaw.SetElement(2, 3, pos[2])
+        matrixYaw.SetElement(0, 0, numpy.cos((90-self.yawAngle) / 180.0 * numpy.pi))
+        matrixYaw.SetElement(0, 1, -numpy.sin((90-self.yawAngle) / 180.0 * numpy.pi))
+        matrixYaw.SetElement(1, 0, numpy.sin((90-self.yawAngle) / 180.0 * numpy.pi))
+        matrixYaw.SetElement(1, 1, numpy.cos((90-self.yawAngle) / 180.0 * numpy.pi))
+        matrixGreenOri.SetElement(0, 3, 0.0)
+        matrixGreenOri.SetElement(1, 3, 0.0)
+        matrixGreenOri.SetElement(2, 3, 0.0)
+        matrixMultiplier = vtk.vtkMatrix4x4()
+        matrixMultiplier.Multiply4x4(matrixYaw, matrixGreenOri, matrixGreenNew)
+        matrixGreenOri.DeepCopy(matrixGreenNew)
+        greenSliceNode.UpdateMatrices()
+
+    pass
+
 class VentriculostomyPlanningTest(ScriptedLoadableModuleTest):
   """
   This is the test case for your scripted module.
