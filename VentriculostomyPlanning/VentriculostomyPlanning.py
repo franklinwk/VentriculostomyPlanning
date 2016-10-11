@@ -9,6 +9,7 @@ import CurveMaker
 import numpy
 import SimpleITK as sitk
 import sitkUtils
+import SlicerCaseManager
 
 #
 # VentriculostomyPlanning
@@ -23,7 +24,7 @@ class VentriculostomyPlanning(ScriptedLoadableModule):
     ScriptedLoadableModule.__init__(self, parent)
     self.parent.title = "VentriculostomyPlanning" # TODO make this more human readable by adding spaces
     self.parent.categories = ["IGT"]
-    self.parent.dependencies = []
+    self.parent.dependencies = ["SlicerCaseManager"]
     self.parent.contributors = ["Junichi Tokuda (BWH)", "Longquan Chen(BWH)"] # replace with "Firstname Lastname (Organization)"
     self.parent.helpText = """
     This is an example of scripted loadable module bundled in an extension.
@@ -102,6 +103,16 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     # Layout within the dummy collapsible button
     referenceFormLayout = qt.QFormLayout(referenceCollapsibleButton)
     
+    
+    CaseManagerConfigLayout = qt.QVBoxLayout()
+    slicerCaseWidgetParent = slicer.qMRMLWidget()
+    slicerCaseWidgetParent.setLayout(qt.QVBoxLayout())
+    slicerCaseWidgetParent.setMRMLScene(slicer.mrmlScene)
+    self.slicerCaseWidget = SlicerCaseManager.SlicerCaseManagerWidget(slicerCaseWidgetParent)
+    self.slicerCaseWidget.setup()
+    CaseManagerConfigLayout.addWidget(self.slicerCaseWidget.mainGUIGroupBox)
+
+    referenceFormLayout.addRow(CaseManagerConfigLayout)
     #
     # input volume selector
     #
@@ -358,12 +369,13 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     green_widget = slicer.app.layoutManager().sliceWidget("Green")
     green_logic = green_widget.sliceLogic()
     green_cn = green_logic.GetSliceCompositeNode()
-    red_cn.SetBackgroundVolumeID(self.logic.currentVolumeNode.GetID()) 
-    red_widget.fitSliceToBackground()
-    yellow_cn.SetBackgroundVolumeID(self.logic.currentVolumeNode.GetID())  
-    yellow_widget.fitSliceToBackground()
-    green_cn.SetBackgroundVolumeID(self.logic.currentVolumeNode.GetID())   
-    green_widget.fitSliceToBackground()
+    if self.logic.currentVolumeNode:
+      red_cn.SetBackgroundVolumeID(self.logic.currentVolumeNode.GetID()) 
+      red_widget.fitSliceToBackground()
+      yellow_cn.SetBackgroundVolumeID(self.logic.currentVolumeNode.GetID())  
+      yellow_widget.fitSliceToBackground()
+      green_cn.SetBackgroundVolumeID(self.logic.currentVolumeNode.GetID())   
+      green_widget.fitSliceToBackground()
     pass
     
   def onCreatePlanningLine(self):
@@ -1726,7 +1738,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     nasionNodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_nasion")  
     if nasionNodeID:
       nasionNode = slicer.mrmlScene.GetNodeByID(nasionNodeID)   
-    if (inputModelNode.GetAttribute("vtkMRMLModelNode.modelCreated") == "True") and (nasionNode.GetNumberOfMarkups()):
+    if inputModelNode and (inputModelNode.GetAttribute("vtkMRMLModelNode.modelCreated") == "True") and (nasionNode.GetNumberOfMarkups()):
       polyData = inputModelNode.GetPolyData()
       if polyData: 
         posNasion = numpy.array([0.0,0.0,0.0])
