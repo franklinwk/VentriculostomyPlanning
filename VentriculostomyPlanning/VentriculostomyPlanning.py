@@ -110,7 +110,9 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     slicerCaseWidgetParent.setMRMLScene(slicer.mrmlScene)
     self.slicerCaseWidget = SlicerCaseManager.SlicerCaseManagerWidget(slicerCaseWidgetParent)
     self.slicerCaseWidget.setup()
-    CaseManagerConfigLayout.addWidget(self.slicerCaseWidget.mainGUIGroupBox)
+    #CaseManagerConfigLayout.addWidget(self.slicerCaseWidget.collapsibleDirectoryConfigurationArea)
+    #CaseManagerConfigLayout.addWidget(self.slicerCaseWidget.mainGUIGroupBox)
+
 
     referenceFormLayout.addRow(CaseManagerConfigLayout)
     #
@@ -234,10 +236,10 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     trajectoryLayout = qt.QHBoxLayout()
 
     #-- Add Point
-    self.addTrajectoryButton = qt.QPushButton("Add Trajectory")
-    self.addTrajectoryButton.toolTip = "Add Trajectory"
-    self.addTrajectoryButton.enabled = True
-    trajectoryLayout.addWidget(self.addTrajectoryButton)
+    self.addCannulaPointButton = qt.QPushButton("Add Cannula Points")
+    self.addCannulaPointButton.toolTip = "Add Cannula Points"
+    self.addCannulaPointButton.enabled = True
+    trajectoryLayout.addWidget(self.addCannulaPointButton)
 
     #-- Curve length
     self.lengthTrajectoryEdit = qt.QLineEdit()
@@ -267,11 +269,17 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.createPlanningLineButton.toolTip = "Create the planning line."
     self.createPlanningLineButton.enabled = True
     createPlanningLineHorizontalLayout.addWidget(self.createPlanningLineButton)
+    self.setReverseViewButton = qt.QPushButton("Set Reverse View")
+    self.setReverseViewButton.toolTip = "Change the perspective view in 3D viewer."
+    self.setReverseViewButton.enabled = True
+    createPlanningLineHorizontalLayout.addWidget(self.setReverseViewButton)
     self.createPlanningLineButton.connect('clicked(bool)', self.onCreatePlanningLine)
+    self.setReverseViewButton.connect('clicked(bool)', self.onSetReverseView)
+    self.isReverseView = False
     planningFormLayout.addRow("Lock:", createPlanningLineHorizontalLayout)
 
      # Needle trajectory
-    self.addTrajectoryButton.connect('clicked(bool)', self.onEditTrajectory)
+    self.addCannulaPointButton.connect('clicked(bool)', self.onEditCannula)
     self.clearTrajectoryButton.connect('clicked(bool)', self.onClearTrajectory)
     self.logic.setTrajectoryModifiedEventHandler(self.onTrajectoryModified)
     self.lockTrajectoryCheckBox.connect('toggled(bool)', self.onLock)
@@ -413,10 +421,32 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.logic.createPlanningLine()  
     self.lengthSagittalPlanningLineEdit.text = '%.1f' % self.logic.getSagittalPlanningLineLength()
     self.lengthCoronalPlanningLineEdit.text = '%.1f' % self.logic.getCoronalPlanningLineLength()
-    self.logic.calcPitchYawAngles()  
-    self.pitchAngleEdit.text = '%.1f' % self.logic.pitchAngle
-    self.yawAngleEdit.text = '%.1f' % (-self.logic.yawAngle)
-    pass 
+    if self.logic.baseVolumeNode:
+      trajectoryNode = slicer.mrmlScene.GetNodeByID(self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_trajectory"))
+      trajectoryNode.AddObserver(trajectoryNode.PointStartInteractionEvent, self.onResetPlanningOutput)
+    pass
+
+  @vtk.calldata_type(vtk.VTK_INT)
+  def onResetPlanningOutput(self, node, eventID, callData):
+    self.lengthSagittalPlanningLineEdit.text = '--'
+    self.lengthCoronalPlanningLineEdit.text = '--'
+    self.pitchAngleEdit.text = '--'
+    self.yawAngleEdit.text = '--'
+
+  def onSetReverseView(self):
+    if self.isReverseView == False:
+      self.logic.calcPitchYawAngles()
+      self.pitchAngleEdit.text = '%.1f' % self.logic.pitchAngle
+      self.yawAngleEdit.text = '%.1f' % (-self.logic.yawAngle)
+      self.setReverseViewButton.setText("Reset View")
+      self.isReverseView = True
+    else:
+      layoutManager = slicer.app.layoutManager()
+      threeDView = layoutManager.threeDWidget(0).threeDView()
+      threeDView.lookFromViewAxis(ctkAxesWidget.Anterior)
+      self.setReverseViewButton.setText("Set Reverse View")
+      self.isReverseView = False
+    pass
     
   def onCreateModel(self):
     if self.inputVolumeSelector.currentNode():
@@ -467,7 +497,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
   def onEditSagittalReferenceLine(self, switch):
 
     if switch == True:
-      self.addTrajectoryButton.checked = False
+      self.addCannulaPointButton.checked = False
       self.logic.startEditSagittalReferenceLine()
     else:
       self.logic.endEditSagittalReferenceLine()
@@ -485,7 +515,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
   def onEditCoronalReferenceLine(self, switch):
 
     if switch == True:
-      self.addTrajectoryButton.checked = False
+      self.addCannulaPointButton.checked = False
       self.logic.startEditCoronalReferenceLine()
     else:
       self.logic.endEditCoronalReferenceLine()
@@ -558,8 +588,8 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     pass
   
   # Event handlers for trajectory
-  def onEditTrajectory(self):
-    self.logic.startEditTrajectory()
+  def onEditCannula(self):
+    self.logic.startEditCannula()
     
   def onClearTrajectory(self):
     self.logic.clearTrajectory()
@@ -571,7 +601,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
   def onEditSagittalPlanningLine(self, switch):
 
     if switch == True:
-      self.addTrajectoryButton.checked = False
+      self.addCannulaPointButton.checked = False
       self.logic.startEditSagittalPlanningLine()
     else:
       self.logic.endEditSagittalPlanningLine()
@@ -590,7 +620,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
   def onEditCoronalPlanningLine(self, switch):
 
     if switch == True:
-      self.addTrajectoryButton.checked = False
+      self.addCannulaPointButton.checked = False
       self.logic.startEditCoronalPlanningLine()
     else:
       self.logic.endEditCoronalPlanningLine()
@@ -607,11 +637,11 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
 
   def onLock(self):
     if self.lockTrajectoryCheckBox.checked == 1:
-      self.addTrajectoryButton.enabled = False
+      self.addCannulaPointButton.enabled = False
       self.clearTrajectoryButton.enabled = False
       self.logic.lockTrajectoryLine()
     else:
-      self.addTrajectoryButton.enabled = True
+      self.addCannulaPointButton.enabled = True
       self.clearTrajectoryButton.enabled = True
       self.logic.unlockTrajectoryLine()
 
@@ -625,6 +655,12 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
 class CurveManager:
   
   def __init__(self):
+    try:
+      import CurveMaker
+    except ImportError:
+      return slicer.util.warningDisplay(
+            "Error: Could not find extension CurveMaker. Open Slicer Extension Manager and install "
+       "CurveMaker.", "Missing Extension")
     self.cmLogic = CurveMaker.CurveMakerLogic()
     self.curveFiducials = None
     self.curveModel = None
@@ -958,7 +994,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     self.sagittalReferenceCurveManager.unlockLine()
     self.coronalReferenceCurveManager.unlockLine()
 
-  def startEditTrajectory(self):
+  def startEditCannula(self):
     if self.baseVolumeNode:
       nasionID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_nasion")
       nasionNode = slicer.mrmlScene.GetNodeByID(nasionID)
@@ -1878,7 +1914,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     trajectoryNodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_trajectory")
     if trajectoryNodeID:
       trajectoryNode = slicer.mrmlScene.GetNodeByID(trajectoryNodeID)
-      if trajectoryNode.GetNumberOfFiducials() > 1:
+      if trajectoryNode and (trajectoryNode.GetNumberOfFiducials() > 1):
         pos = [0.0] * 3
         trajectoryNode.GetNthFiducialPosition(1, pos)
         redSliceNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSliceNodeRed")
