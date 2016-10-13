@@ -52,6 +52,17 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.logic = VentriculostomyPlanningLogic()
     self.dicomWidget = DICOMWidget()
     self.dicomWidget.parent.close()
+
+    self.cameraPos = [0.0]*3
+    self.camera = None
+    layoutManager = slicer.app.layoutManager()
+    threeDView = layoutManager.threeDWidget(0).threeDView()
+    displayManagers = vtk.vtkCollection()
+    threeDView.getDisplayableManagers(displayManagers)
+    for index in range(displayManagers.GetNumberOfItems()):
+      if displayManagers.GetItemAsObject(index).GetClassName() == 'vtkMRMLCameraDisplayableManager':
+        self.camera = displayManagers.GetItemAsObject(index).GetCameraNode().GetCamera()
+        self.cameraPos = self.camera.GetPosition()
     # Instantiate and connect widgets ...
     #
     # Lines Area
@@ -259,6 +270,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.createPlanningLineButton.enabled = True
     self.mainGUIGroupBoxLayout.addWidget(self.createPlanningLineButton)
     self.setReverseViewButton = qt.QPushButton("Set Reverse 3D View")
+    self.setReverseViewButton.setMinimumWidth(150)
     self.setReverseViewButton.toolTip = "Change the perspective view in 3D viewer."
     self.setReverseViewButton.enabled = True
     createPlanningLineHorizontalLayout.addWidget(self.setReverseViewButton)
@@ -396,6 +408,11 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
   def onSelect(self, selectedNode=None):
     if selectedNode:        
       self.initialFieldsValue()
+      noSubtractVolumeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_NoSubtractVolume")
+      if not noSubtractVolumeID:
+        slicer.util.warningDisplay("This case doesn't have the non-subtracted image, please load the data into slicer", windowTitle="")
+      else:
+        self.logic.noSubtractVolume = slicer.mrmlScene.GetNodeByID(noSubtractVolumeID)
       self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_model")
       self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_nasion")
       self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_trajectory")
@@ -421,7 +438,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       threeDView.lookFromViewAxis(ctkAxesWidget.Anterior)
           
     pass
-  
+
   def onSetSliceViewer(self):
     red_widget = slicer.app.layoutManager().sliceWidget("Red")
     red_logic = red_widget.sliceLogic()
@@ -451,12 +468,12 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     pass
     
   def onCreatePlanningLine(self):
-    self.logic.createPlanningLine()
-    self.logic.calcPitchYawAngles()
-    self.lengthSagittalPlanningLineEdit.text = '%.1f' % self.logic.getSagittalPlanningLineLength()
-    self.lengthCoronalPlanningLineEdit.text = '%.1f' % self.logic.getCoronalPlanningLineLength()
-    self.pitchAngleEdit.text = '%.1f' % self.logic.pitchAngle
-    self.yawAngleEdit.text = '%.1f' % (-self.logic.yawAngle)
+    if self.logic.createPlanningLine():
+      self.logic.calcPitchYawAngles()
+      self.lengthSagittalPlanningLineEdit.text = '%.1f' % self.logic.getSagittalPlanningLineLength()
+      self.lengthCoronalPlanningLineEdit.text = '%.1f' % self.logic.getCoronalPlanningLineLength()
+      self.pitchAngleEdit.text = '%.1f' % self.logic.pitchAngle
+      self.yawAngleEdit.text = '%.1f' % (-self.logic.yawAngle)
     if self.logic.baseVolumeNode:
       trajectoryNode = slicer.mrmlScene.GetNodeByID(self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_trajectory"))
       trajectoryNode.AddObserver(trajectoryNode.PointStartInteractionEvent, self.onResetPlanningOutput)
@@ -471,24 +488,31 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.yawAngleEdit.text = '--'
 
   def onSetReverseView(self):
-    if self.isReverseView == False:
+    if self.logic.baseVolumeNode:
       layoutManager = slicer.app.layoutManager()
       threeDView = layoutManager.threeDWidget(0).threeDView()
-      threeDView.lookFromViewAxis(ctkAxesWidget.Posterior)
-      threeDView.pitchDirection = threeDView.PitchUp
-      threeDView.yawDirection = threeDView.YawRight
-      threeDView.setPitchRollYawIncrement(self.logic.pitchAngle)
-      threeDView.pitch()
-      threeDView.setPitchRollYawIncrement(abs(self.logic.yawAngle))
-      threeDView.yaw()
-      self.setReverseViewButton.setText("Reset View")
-      self.isReverseView = True
-    else:
-      layoutManager = slicer.app.layoutManager()
-      threeDView = layoutManager.threeDWidget(0).threeDView()
-      threeDView.lookFromViewAxis(ctkAxesWidget.Anterior)
-      self.setReverseViewButton.setText("Set Reverse View")
-      self.isReverseView = False
+      if self.isReverseView == False:
+        self.cameraPos = self.camera.GetPosition()
+        threeDView.lookFromViewAxis(ctkAxesWidget.Posterior)
+        threeDView.pitchDirection = threeDView.PitchUp
+        threeDView.yawDirection = threeDView.YawRight
+        threeDView.setPitchRollYawIncrement(self.logic.pitchAngle)
+        threeDView.pitch()
+        threeDView.setPitchRollYawIncrement(abs(self.logic.yawAngle))
+        threeDView.yaw()
+        trajectoryNode = slicer.mrmlScene.GetNodeByID(self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_trajectory"))
+        if trajectoryNode and trajectoryNode.GetNumberOfFiducials()>=2:
+          posSecond = [0.0]*3
+          trajectoryNode.GetNthFiducialPosition(1, posSecond)
+          threeDView.setFocalPoint(posSecond[0],posSecond[1],posSecond[2])
+        self.setReverseViewButton.setText("  Reset View     ")
+        self.isReverseView = True
+      else:
+        self.camera.SetPosition(self.cameraPos)
+        threeDView.zoomIn()# to refresh the 3D viewer, when the view position is inside the skull model, the model is not rendered,
+        threeDView.zoomOut()# Zoom in and out will refresh the viewer
+        self.setReverseViewButton.setText("Set Reverse View")
+        self.isReverseView = False
     pass
 
   def onChangeSliceViewImage(self, sliderValue):
@@ -512,15 +536,19 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       if outputModelNodeID:
         outputModelNode = slicer.mrmlScene.GetNodeByID(outputModelNodeID)
         outputModelNode.SetAttribute("vtkMRMLModelNode.modelCreated","False")
-        self.inputVolumeSelector.disconnect("nodeAdded(vtkMRMLNode*)")
         self.logic.createModel(outputModelNode, self.logic.threshold)
   
   def onSelectNasionPointNode(self):
-    outputModelNodeID = self.inputVolumeSelector.currentNode().GetAttribute("vtkMRMLScalarVolumeNode.rel_model") 
-    if outputModelNodeID:
-      outputModelNode = slicer.mrmlScene.GetNodeByID(outputModelNodeID)
-      self.inputVolumeSelector.disconnect("nodeAdded(vtkMRMLNode*)")
-      self.logic.selectNasionPointNode(outputModelNode) # when the model is not available, the model will be created, so nodeAdded signal should be disconnected
+    if not self.inputVolumeSelector.currentNode():
+      slicer.util.warningDisplay("No case is selceted, please select the case in the combox", windowTitle="")
+    else:
+      outputModelNodeID = self.inputVolumeSelector.currentNode().GetAttribute("vtkMRMLScalarVolumeNode.rel_model")
+      if outputModelNodeID:
+        outputModelNode = slicer.mrmlScene.GetNodeByID(outputModelNodeID)
+        if (not outputModelNode) or outputModelNode.GetAttribute("vtkMRMLModelNode.modelCreated") == "False":
+            self.logic.createModel(outputModelNode, self.logic.threshold)
+        self.logic.selectNasionPointNode(outputModelNode) # when the model is not available, the model will be created, so nodeAdded signal should be disconnected
+        self.onSetSliceViewer()
   
   def onDefineROI(self):
     self.logic.currentVolumeNode = self.logic.baseVolumeNode
@@ -528,7 +556,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.logic.defineROI()
   
   def onCreateROI(self):
-    self.inputVolumeSelector.disconnect("nodeAdded(vtkMRMLNode*)")
     self.logic.createROI()
     self.onSetSliceViewer()
       
@@ -585,7 +612,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.logic.moveSliceCoronalReferenceLine()
   
   def onVenousGrayScaleCalc(self):
-    self.inputVolumeSelector.disconnect("nodeAdded(vtkMRMLNode*)")
     if self.logic.baseVolumeNode:
       croppedVolumeNode = self.logic.baseVolumeNode
       croppedVolumeNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_croppedVolume")
@@ -611,7 +637,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     pass
   
   def onVenousVesselnessCalc(self):
-    self.inputVolumeSelector.disconnect("nodeAdded(vtkMRMLNode*)")
     if self.logic.baseVolumeNode:
       croppedVolumeNode = self.logic.baseVolumeNode
       croppedVolumeNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_croppedVolume")
@@ -643,6 +668,11 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
   # Event handlers for trajectory
   def onEditCannula(self):
     self.imageSlider.setValue(100.0)
+    self.lengthTrajectoryEdit.text = '--'
+    self.lengthSagittalPlanningLineEdit.text = '--'
+    self.lengthCoronalPlanningLineEdit.text = '--'
+    self.pitchAngleEdit.text = '--'
+    self.yawAngleEdit.text = '--'
     self.logic.startEditCannula()
     
   def onClearTrajectory(self):
@@ -1377,12 +1407,13 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     else:
       if attribute == "vtkMRMLScalarVolumeNode.rel_nasion":
         nasionNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
-        nasionNode.SetName("nasion"+self.baseVolumeNode.GetID()[-1:])
+        nasionNode.SetName("nasion")
         slicer.mrmlScene.AddNode(nasionNode)
-        self.baseVolumeNode.SetAttribute(attribute, nasionNode.GetID())      
+        nasionNode.SetLocked(True)
+        self.baseVolumeNode.SetAttribute(attribute, nasionNode.GetID())
       elif attribute == "vtkMRMLScalarVolumeNode.rel_trajectory":
         trajectoryNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
-        trajectoryNode.SetName("trajectory"+self.baseVolumeNode.GetID()[-1:])
+        trajectoryNode.SetName("trajectory")
         slicer.mrmlScene.AddNode(trajectoryNode)
         self.baseVolumeNode.SetAttribute(attribute, trajectoryNode.GetID())  
       elif attribute == "vtkMRMLScalarVolumeNode.rel_model":  
@@ -1565,13 +1596,12 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
    
   def selectNasionPointNode(self, modelNode, initPoint = None):
     if self.baseVolumeNode:
-      if modelNode.GetAttribute("vtkMRMLModelNode.modelCreated") == "False":
-        self.createModel(modelNode,self.threshold)
       if self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_nasion"):
         nasionNode = slicer.mrmlScene.GetNodeByID(self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_nasion"))
         dnode = nasionNode.GetMarkupsDisplayNode()
         nasionNode.RemoveAllMarkups()
-        slicer.mrmlScene.AddNode(nasionNode)  
+        slicer.mrmlScene.AddNode(nasionNode)
+        nasionNode.SetLocked(True)
         self.nasionProjectedMarker.AddFiducial(0,0,0)
         self.nasionProjectedMarker.SetNthFiducialLabel(0, "")
         dnode = self.nasionProjectedMarker.GetMarkupsDisplayNode()
@@ -1751,7 +1781,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
             break
         pos = [0.0]*3  
         for iPos in range(1,numOfRef): 
-          CurveManagerReference.curveFiducials.GetNthFiducialPosition(numOfRef-iPos-1, pos)  
+          CurveManagerReference.curveFiducials.GetNthFiducialPosition(numOfRef-iPos-1, pos)
           if pos[0]<points.GetPoint(0)[0]:
             CurveManager.curveFiducials.AddFiducial(pos[0],pos[1],pos[2])
         CurveManagerReference.curveFiducials.GetNthFiducialPosition(0, pos)    
@@ -1851,9 +1881,9 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       distanceModelNasion = numpy.linalg.norm(posModel-referencePoint)
       valid = False
       if axis == 0:
-        valid = posModel[2]<=referencePoint[2]
+        valid = (posModel[2]<=referencePoint[2] or abs(posModel[2]-referencePoint[2])<1e-3 )
       elif axis == 1:
-        valid = posModel[0]<=referencePoint[0]
+        valid = (posModel[0]<=referencePoint[0] or abs(posModel[0]-referencePoint[0])<1e-3 )
       if valid:        
           intersectPoints.InsertNextPoint(posModel)        
   
@@ -1943,8 +1973,9 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
             ## Sorting      
             self.sortPoints(sagittalPoints, posTractoryBack)  
             self.constructCurvePlanning(self.sagittalPlanningCurveManager, self.sagittalReferenceCurveManager, sagittalPoints, 0)
-      self.lockPlanningLine()     
-    pass  
+            self.lockPlanningLine()
+            return True
+    return False
     
   def calcPitchYawAngles(self):
     firstPos = numpy.array([0.0,0.0,0.0])
