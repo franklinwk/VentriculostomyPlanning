@@ -5,7 +5,6 @@ from slicer.ScriptedLoadableModule import *
 from ctk import ctkAxesWidget
 import logging
 import tempfile
-import CurveMaker
 import numpy
 import SimpleITK as sitk
 import sitkUtils
@@ -26,7 +25,7 @@ class VentriculostomyPlanning(ScriptedLoadableModule):
     ScriptedLoadableModule.__init__(self, parent)
     self.parent.title = "VentriculostomyPlanning" # TODO make this more human readable by adding spaces
     self.parent.categories = ["IGT"]
-    self.parent.dependencies = ["SlicerCaseManager"]
+    #self.parent.dependencies = ["SlicerCaseManager"]
     self.parent.contributors = ["Junichi Tokuda (BWH)", "Longquan Chen(BWH)"] # replace with "Firstname Lastname (Organization)"
     self.parent.helpText = """
     This is an example of scripted loadable module bundled in an extension.
@@ -142,6 +141,14 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.mainGUIGroupBoxLayout = qt.QGridLayout()
     self.mainGUIGroupBox.setLayout(self.mainGUIGroupBoxLayout)
     self.layout.addWidget(self.mainGUIGroupBox)
+
+
+    self.infoVolumeBox = qt.QGroupBox()
+    inputVolumeLayout = qt.QHBoxLayout()
+    self.infoVolumeBox.setLayout(inputVolumeLayout)
+    self.layout.addWidget(self.infoVolumeBox)
+    inputVolumeLabel = qt.QLabel('Select Case: ')
+    inputVolumeLayout.addWidget(inputVolumeLabel)
     self.inputVolumeSelector = slicer.qMRMLNodeComboBox()
     self.inputVolumeSelector.nodeTypes = ["vtkMRMLScalarVolumeNode"]
     self.inputVolumeSelector.selectNodeUponCreation = True
@@ -152,14 +159,16 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.inputVolumeSelector.showChildNodeTypes = False
     self.inputVolumeSelector.setMRMLScene( slicer.mrmlScene )
     self.inputVolumeSelector.setToolTip( "Pick the input to the algorithm." )
-    self.inputVolumeSelector.sortFilterProxyModel().setFilterRegExp("^(VenousSubtraction)")
+    self.inputVolumeSelector.sortFilterProxyModel().setFilterRegExp("(Venous)")
     #self.inputVolumeSelector.sortFilterProxyModel().setFilterRegExp("^((?!NotShownEntity31415).)*$" )
     self.inputVolumeSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
+    inputVolumeLayout.addWidget(self.inputVolumeSelector)
 
     #
     # Create Model Button
     #
-    self.mainGUIGroupBoxLayout.addWidget(self.inputVolumeSelector,1,0)
+    #self.mainGUIGroupBoxLayout.addWidget(self.inputVolumeSelector,1,0)
+    self.mainGUIGroupBoxLayout.addWidget(self.infoVolumeBox)
     
     ROIConfigLayout = qt.QHBoxLayout()
     self.selectROIButton = qt.QPushButton("ROI definition")
@@ -359,14 +368,14 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.viewGroupBoxLayout.addWidget(self.viewSubGroupBox)
     #self.viewSubGroupBox.setStyleSheet("border:3")
 
-    subtractImageLabel = qt.QLabel('Subtraction Image')
-    self.viewSubGroupBoxLayout.addWidget(subtractImageLabel)
+    venousVolumeLabel = qt.QLabel('Venous Image')
+    self.viewSubGroupBoxLayout.addWidget(venousVolumeLabel)
     self.imageSlider = qt.QSlider(qt.Qt.Horizontal)
     self.imageSlider.setMinimum(0)
     self.imageSlider.setMaximum(100)
     self.viewSubGroupBoxLayout.addWidget(self.imageSlider)
-    noSubtractionImageLabel = qt.QLabel('No Subtraction Image')
-    self.viewSubGroupBoxLayout.addWidget(noSubtractionImageLabel)
+    ventricleVolumeLabel = qt.QLabel('Ventricle Image')
+    self.viewSubGroupBoxLayout.addWidget(ventricleVolumeLabel)
     self.viewSubGroupBoxLayout.addWidget(self.setReverseViewButton,0,3)
 
     self.imageSlider.connect('valueChanged(int)', self.onChangeSliceViewImage)
@@ -396,23 +405,24 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
 
   def onAddedNode(self, addedNode):
     if addedNode:
-      if len(addedNode.GetName())>=17 and addedNode.GetName()[0:17] == "VenousSubtraction":
+      volumeName = addedNode.GetName().split(': ')[-1].strip(' ')
+      if len(volumeName)>=6 and volumeName[0:6] == "Venous":
         self.logic.baseVolumeNode = addedNode
-      elif len(addedNode.GetName()) >= 6 and len(addedNode.GetName()) <=10 and addedNode.GetName()[0:6] == "Venous":
-        self.logic.noSubtractVolume = addedNode
-      if self.logic.baseVolumeNode and self.logic.noSubtractVolume:
-        self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_NoSubtractVolume", self.logic.noSubtractVolume.GetID())
+      elif len(volumeName) >= 9 and len(volumeName) <=12 and volumeName[0:9] == "Ventricle":
+        self.logic.ventricleVolume = addedNode
+      if self.logic.baseVolumeNode and self.logic.ventricleVolume:
+        self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_ventricleVolume", self.logic.ventricleVolume.GetID())
         #self.inputVolumeSelector.setCurrentNode(self.logic.baseVolumeNode)
         # the setForegroundVolume will not work, because the slicerapp triggers the SetBackgroundVolume after the volume is loaded
 
   def onSelect(self, selectedNode=None):
     if selectedNode:        
       self.initialFieldsValue()
-      noSubtractVolumeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_NoSubtractVolume")
-      if not noSubtractVolumeID:
-        slicer.util.warningDisplay("This case doesn't have the non-subtracted image, please load the data into slicer", windowTitle="")
+      ventricleVolumeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_ventricleVolume")
+      if not ventricleVolumeID:
+        slicer.util.warningDisplay("This case doesn't have the venous image, please load the data into slicer", windowTitle="")
       else:
-        self.logic.noSubtractVolume = slicer.mrmlScene.GetNodeByID(noSubtractVolumeID)
+        self.logic.ventricleVolume = slicer.mrmlScene.GetNodeByID(ventricleVolumeID)
       self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_model")
       self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_nasion")
       self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_trajectory")
@@ -460,10 +470,10 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       yellow_widget.fitSliceToBackground()
       green_widget.fitSliceToBackground()
 
-    if self.logic.noSubtractVolume:
-      red_cn.SetForegroundVolumeID(self.logic.noSubtractVolume.GetID())
-      yellow_cn.SetForegroundVolumeID(self.logic.noSubtractVolume.GetID())
-      green_cn.SetForegroundVolumeID(self.logic.noSubtractVolume.GetID())
+    if self.logic.ventricleVolume:
+      red_cn.SetForegroundVolumeID(self.logic.ventricleVolume.GetID())
+      yellow_cn.SetForegroundVolumeID(self.logic.ventricleVolume.GetID())
+      green_cn.SetForegroundVolumeID(self.logic.ventricleVolume.GetID())
 
     pass
     
@@ -996,7 +1006,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     slicer.mrmlScene.AddNode(self.ROIListNode)
     self.currentVolumeNode = None
     self.baseVolumeNode = None
-    self.noSubtractVolume = None
+    self.ventricleVolume = None
     self.cliNode = None
     self.samplingFactor = 1
     self.topPoint = []
