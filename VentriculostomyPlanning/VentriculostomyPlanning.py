@@ -140,8 +140,8 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.mainGUIGroupBox = qt.QGroupBox()
     self.mainGUIGroupBoxLayout = qt.QGridLayout()
     self.mainGUIGroupBox.setLayout(self.mainGUIGroupBoxLayout)
-    self.layout.addWidget(self.mainGUIGroupBox)
-
+    buttonWidth = 80
+    buttonHeight = 80
 
     self.infoVolumeBox = qt.QGroupBox()
     inputVolumeLayout = qt.QHBoxLayout()
@@ -164,12 +164,13 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     #self.inputVolumeSelector.sortFilterProxyModel().setFilterRegExp("^((?!NotShownEntity31415).)*$" )
     self.inputVolumeSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
     inputVolumeLayout.addWidget(self.inputVolumeSelector)
-
+    self.layout.addWidget(self.infoVolumeBox)
+    self.layout.addWidget(self.mainGUIGroupBox)
     #
     # Create Model Button
     #
     #self.mainGUIGroupBoxLayout.addWidget(self.inputVolumeSelector,1,0)
-    self.mainGUIGroupBoxLayout.addWidget(self.infoVolumeBox)
+
     
     ROIConfigLayout = qt.QHBoxLayout()
     self.selectROIButton = qt.QPushButton("ROI definition")
@@ -200,30 +201,38 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     loadCaseLayout = qt.QHBoxLayout()
     loadCaseLayout.setAlignment(qt.Qt.AlignLeft)
     self.loadCaseBox.setLayout(loadCaseLayout)
-    self.layout.addWidget(self.loadCaseBox)
-    self.LoadCaseButton = qt.QPushButton("Load Case")
+    self.LoadCaseButton = qt.QPushButton("")
     self.LoadCaseButton.toolTip = "Load a dicom dataset"
     self.LoadCaseButton.enabled = True
     loadCaseLabel = qt.QLabel('Load Dicom: ')
     loadCaseLabel.setPixmap(qt.QPixmap(os.path.join(scriptDirectory, "load.png")).scaledToHeight(self.LoadCaseButton.height/20.0))
     loadCaseLayout.addWidget(loadCaseLabel)
     loadCaseLayout.addWidget(self.LoadCaseButton)
-    self.mainGUIGroupBoxLayout.addWidget(self.loadCaseBox, 2, 0)
+    #self.LoadCaseButton.setFixedHeight(50)
+    self.LoadCaseButton.setMaximumHeight(buttonHeight)
+    self.LoadCaseButton.setMaximumWidth(buttonWidth)
+    self.LoadCaseButton.setIcon(qt.QIcon(qt.QPixmap(os.path.join(scriptDirectory, "load.png"))))
+    self.LoadCaseButton.setIconSize(qt.QSize(self.LoadCaseButton.size))
+    self.mainGUIGroupBoxLayout.addWidget(self.LoadCaseButton, 2, 0)
 
     self.selectNasionBox = qt.QGroupBox()
     selectNasionLayout = qt.QHBoxLayout()
     selectNasionLayout.setAlignment(qt.Qt.AlignLeft)
     self.selectNasionBox.setLayout(selectNasionLayout)
-    self.layout.addWidget(self.selectNasionBox)
-    self.selectNasionButton = qt.QPushButton("Select Nasion")
+    self.selectNasionButton = qt.QPushButton("")
     self.selectNasionButton.toolTip = "Add a point in the 3D window"
     self.selectNasionButton.enabled = True
-    selectNasionLabel = qt.QLabel('Select Nasion: ')
+    selectNasionLabel = qt.QLabel('')
     selectNasionLabel.setPixmap(qt.QPixmap(os.path.join(scriptDirectory, "nasion.png")).scaledToHeight(
       self.selectNasionButton.height / 20.0))
     selectNasionLayout.addWidget(selectNasionLabel)
     selectNasionLayout.addWidget(self.selectNasionButton)
-    self.mainGUIGroupBoxLayout.addWidget(self.selectNasionBox,3,0)
+    self.selectNasionButton.setMaximumHeight(buttonHeight)
+    self.selectNasionButton.setMaximumWidth(buttonWidth)
+    self.selectNasionButton.setIcon(qt.QIcon(qt.QPixmap(os.path.join(scriptDirectory, "nasion.png"))))
+    self.selectNasionButton.setIconSize(qt.QSize(self.selectNasionButton.size))
+    self.mainGUIGroupBoxLayout.addWidget(self.selectNasionButton, 2, 1)
+
     self.createEntryPointButton = qt.QPushButton("Create Entry Point")
     self.createEntryPointButton.toolTip = "Create the initial entry point."
     self.createEntryPointButton.toolTip = "Create the initial entry point."
@@ -246,8 +255,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     detectVesselLayout = qt.QHBoxLayout()
     detectVesselLayout.setAlignment(qt.Qt.AlignLeft)
     self.detectVesselBox.setLayout(detectVesselLayout)
-    self.layout.addWidget(self.detectVesselBox)
-    self.grayScaleMakerButton = qt.QPushButton("Detect Vessels")
+    self.grayScaleMakerButton = qt.QPushButton("")
     self.grayScaleMakerButton.enabled = True
     self.grayScaleMakerButton.toolTip = "Use the GrayScaleMaker module for vessel calculation "
     detectVesselLabel = qt.QLabel('Detect Vessel: ')
@@ -255,7 +263,11 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       self.grayScaleMakerButton.height / 20.0))
     detectVesselLayout.addWidget(detectVesselLabel)
     detectVesselLayout.addWidget(self.grayScaleMakerButton)
-    self.mainGUIGroupBoxLayout.addWidget(self.detectVesselBox, 4, 0)
+    self.grayScaleMakerButton.setMaximumHeight(buttonHeight)
+    self.grayScaleMakerButton.setMaximumWidth(buttonWidth)
+    self.grayScaleMakerButton.setIcon(qt.QIcon(qt.QPixmap(os.path.join(scriptDirectory, "vessel.png"))))
+    self.grayScaleMakerButton.setIconSize(qt.QSize(self.grayScaleMakerButton.size))
+    self.mainGUIGroupBoxLayout.addWidget(self.grayScaleMakerButton, 2, 2)
 
 
     self.grayScaleMakerButton.connect('clicked(bool)', self.onVenousGrayScaleCalc)
@@ -275,16 +287,19 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     addCannulaLayout = qt.QHBoxLayout()
     addCannulaLayout.setAlignment(qt.Qt.AlignLeft)
     self.addCannulaBox.setLayout(addCannulaLayout)
-    self.layout.addWidget(self.addCannulaBox)
-    self.addCannulaPointButton = qt.QPushButton("Add Cannula Target")
-    self.addCannulaPointButton.toolTip = "Add Cannula Target"
+    self.addCannulaPointButton = qt.QPushButton("")
+    self.addCannulaPointButton.toolTip = ""
     self.addCannulaPointButton.enabled = True
     addCannulaLabel = qt.QLabel('Add Cannula: ')
     addCannulaLabel.setPixmap(qt.QPixmap(os.path.join(scriptDirectory, "cannula.png")).scaledToHeight(
       self.addCannulaPointButton.height / 20.0))
     addCannulaLayout.addWidget(addCannulaLabel)
     addCannulaLayout.addWidget(self.addCannulaPointButton)
-    self.mainGUIGroupBoxLayout.addWidget(self.addCannulaBox, 5, 0)
+    self.addCannulaPointButton.setMaximumHeight(buttonHeight)
+    self.addCannulaPointButton.setMaximumWidth(buttonWidth)
+    self.addCannulaPointButton.setIcon(qt.QIcon(qt.QPixmap(os.path.join(scriptDirectory, "cannula.png"))))
+    self.addCannulaPointButton.setIconSize(qt.QSize(self.addCannulaPointButton.size))
+    self.mainGUIGroupBoxLayout.addWidget(self.addCannulaPointButton, 2, 3)
 
     #-- Curve length
     self.infoGroupBox = qt.QGroupBox()
@@ -322,16 +337,20 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     confirmLayout = qt.QHBoxLayout()
     confirmLayout.setAlignment(qt.Qt.AlignLeft)
     self.confirmBox.setLayout(confirmLayout)
-    self.layout.addWidget(self.confirmBox)
-    self.createPlanningLineButton = qt.QPushButton("Confirm Target")
+    self.createPlanningLineButton = qt.QPushButton("")
     self.createPlanningLineButton.toolTip = "Confirm the target and generate the planning line."
     self.createPlanningLineButton.enabled = True
-    confirmLabel = qt.QLabel('Add Cannula: ')
+    confirmLabel = qt.QLabel('confirm: ')
     confirmLabel.setPixmap(qt.QPixmap(os.path.join(scriptDirectory, "confirm.png")).scaledToHeight(
       self.createPlanningLineButton.height / 20.0))
     confirmLayout.addWidget(confirmLabel)
     confirmLayout.addWidget(self.createPlanningLineButton)
-    self.mainGUIGroupBoxLayout.addWidget(self.confirmBox, 6, 0)
+
+    self.createPlanningLineButton.setMaximumHeight(buttonHeight)
+    self.createPlanningLineButton.setMaximumWidth(buttonWidth)
+    self.createPlanningLineButton.setIcon(qt.QIcon(qt.QPixmap(os.path.join(scriptDirectory, "confirm.png"))))
+    self.createPlanningLineButton.setIconSize(qt.QSize(self.createPlanningLineButton.size))
+    self.mainGUIGroupBoxLayout.addWidget(self.createPlanningLineButton, 2, 4)
 
     self.setReverseViewButton = qt.QPushButton("Set Reverse 3D View")
     self.setReverseViewButton.setMinimumWidth(150)
