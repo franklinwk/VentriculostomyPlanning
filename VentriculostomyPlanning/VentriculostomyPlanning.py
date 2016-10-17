@@ -103,15 +103,13 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     lengthCoronalReferenceLineUnitLabel = qt.QLabel('mm  ')
     referenceConfigLayout.addWidget(lengthCoronalReferenceLineUnitLabel)
     configurationFormLayout.addRow(referenceConfigLayout)
-    #configurationFormLayout.addRow()
+
     self.lengthSagittalReferenceLineEdit.connect('textEdited(QString)', self.onModifyMeasureLength)
     self.lengthCoronalReferenceLineEdit.connect('textEdited(QString)', self.onModifyMeasureLength)
-
     self.allVolumeSelector = slicer.qMRMLNodeComboBox()
     self.allVolumeSelector.nodeTypes = ["vtkMRMLScalarVolumeNode"]
     self.allVolumeSelector.setMRMLScene(slicer.mrmlScene)
     self.allVolumeSelector.connect("nodeAdded(vtkMRMLNode*)", self.onAddedNode)
-    referenceConfigLayout.addWidget(self.allVolumeSelector)
     # PatientModel Area
     #
     #referenceCollapsibleButton = ctk.ctkCollapsibleButton()
@@ -198,14 +196,10 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     scriptDirectory = os.path.join(os.path.dirname(os.path.realpath(__file__)),"Resources", "icons")
 
     self.loadCaseBox = qt.QGroupBox()
-    loadCaseLayout = qt.QHBoxLayout()
-    loadCaseLayout.setAlignment(qt.Qt.AlignLeft)
     self.loadCaseBox.setLayout(loadCaseLayout)
     self.LoadCaseButton = qt.QPushButton("")
     self.LoadCaseButton.toolTip = "Load a dicom dataset"
     self.LoadCaseButton.enabled = True
-    loadCaseLabel = qt.QLabel('Load Dicom: ')
-    loadCaseLabel.setPixmap(qt.QPixmap(os.path.join(scriptDirectory, "load.png")).scaledToHeight(self.LoadCaseButton.height/20.0))
     loadCaseLayout.addWidget(loadCaseLabel)
     loadCaseLayout.addWidget(self.LoadCaseButton)
     #self.LoadCaseButton.setFixedHeight(50)
@@ -213,25 +207,18 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.LoadCaseButton.setMaximumWidth(buttonWidth)
     self.LoadCaseButton.setIcon(qt.QIcon(qt.QPixmap(os.path.join(scriptDirectory, "load.png"))))
     self.LoadCaseButton.setIconSize(qt.QSize(self.LoadCaseButton.size))
-    self.mainGUIGroupBoxLayout.addWidget(self.LoadCaseButton, 2, 0)
 
     self.selectNasionBox = qt.QGroupBox()
-    selectNasionLayout = qt.QHBoxLayout()
-    selectNasionLayout.setAlignment(qt.Qt.AlignLeft)
     self.selectNasionBox.setLayout(selectNasionLayout)
     self.selectNasionButton = qt.QPushButton("")
     self.selectNasionButton.toolTip = "Add a point in the 3D window"
     self.selectNasionButton.enabled = True
-    selectNasionLabel = qt.QLabel('')
-    selectNasionLabel.setPixmap(qt.QPixmap(os.path.join(scriptDirectory, "nasion.png")).scaledToHeight(
-      self.selectNasionButton.height / 20.0))
     selectNasionLayout.addWidget(selectNasionLabel)
     selectNasionLayout.addWidget(self.selectNasionButton)
     self.selectNasionButton.setMaximumHeight(buttonHeight)
     self.selectNasionButton.setMaximumWidth(buttonWidth)
     self.selectNasionButton.setIcon(qt.QIcon(qt.QPixmap(os.path.join(scriptDirectory, "nasion.png"))))
     self.selectNasionButton.setIconSize(qt.QSize(self.selectNasionButton.size))
-    self.mainGUIGroupBoxLayout.addWidget(self.selectNasionButton, 2, 1)
 
     self.createEntryPointButton = qt.QPushButton("Create Entry Point")
     self.createEntryPointButton.toolTip = "Create the initial entry point."
@@ -252,22 +239,16 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.venousCalcStatus = qt.QLabel('VenousCalcStatus')
 
     self.detectVesselBox = qt.QGroupBox()
-    detectVesselLayout = qt.QHBoxLayout()
-    detectVesselLayout.setAlignment(qt.Qt.AlignLeft)
     self.detectVesselBox.setLayout(detectVesselLayout)
     self.grayScaleMakerButton = qt.QPushButton("")
     self.grayScaleMakerButton.enabled = True
     self.grayScaleMakerButton.toolTip = "Use the GrayScaleMaker module for vessel calculation "
-    detectVesselLabel = qt.QLabel('Detect Vessel: ')
-    detectVesselLabel.setPixmap(qt.QPixmap(os.path.join(scriptDirectory, "vessel.png")).scaledToHeight(
-      self.grayScaleMakerButton.height / 20.0))
     detectVesselLayout.addWidget(detectVesselLabel)
     detectVesselLayout.addWidget(self.grayScaleMakerButton)
     self.grayScaleMakerButton.setMaximumHeight(buttonHeight)
     self.grayScaleMakerButton.setMaximumWidth(buttonWidth)
     self.grayScaleMakerButton.setIcon(qt.QIcon(qt.QPixmap(os.path.join(scriptDirectory, "vessel.png"))))
     self.grayScaleMakerButton.setIconSize(qt.QSize(self.grayScaleMakerButton.size))
-    self.mainGUIGroupBoxLayout.addWidget(self.grayScaleMakerButton, 2, 2)
 
 
     self.grayScaleMakerButton.connect('clicked(bool)', self.onVenousGrayScaleCalc)
@@ -284,22 +265,16 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
 
     #-- Add Point
     self.addCannulaBox = qt.QGroupBox()
-    addCannulaLayout = qt.QHBoxLayout()
-    addCannulaLayout.setAlignment(qt.Qt.AlignLeft)
     self.addCannulaBox.setLayout(addCannulaLayout)
     self.addCannulaPointButton = qt.QPushButton("")
     self.addCannulaPointButton.toolTip = ""
     self.addCannulaPointButton.enabled = True
-    addCannulaLabel = qt.QLabel('Add Cannula: ')
-    addCannulaLabel.setPixmap(qt.QPixmap(os.path.join(scriptDirectory, "cannula.png")).scaledToHeight(
-      self.addCannulaPointButton.height / 20.0))
     addCannulaLayout.addWidget(addCannulaLabel)
     addCannulaLayout.addWidget(self.addCannulaPointButton)
     self.addCannulaPointButton.setMaximumHeight(buttonHeight)
     self.addCannulaPointButton.setMaximumWidth(buttonWidth)
     self.addCannulaPointButton.setIcon(qt.QIcon(qt.QPixmap(os.path.join(scriptDirectory, "cannula.png"))))
     self.addCannulaPointButton.setIconSize(qt.QSize(self.addCannulaPointButton.size))
-    self.mainGUIGroupBoxLayout.addWidget(self.addCannulaPointButton, 2, 3)
 
     #-- Curve length
     self.infoGroupBox = qt.QGroupBox()
@@ -334,15 +309,10 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     createPlanningLineHorizontalLayout.addWidget(self.lockTrajectoryCheckBox)
 
     self.confirmBox = qt.QGroupBox()
-    confirmLayout = qt.QHBoxLayout()
-    confirmLayout.setAlignment(qt.Qt.AlignLeft)
     self.confirmBox.setLayout(confirmLayout)
     self.createPlanningLineButton = qt.QPushButton("")
     self.createPlanningLineButton.toolTip = "Confirm the target and generate the planning line."
     self.createPlanningLineButton.enabled = True
-    confirmLabel = qt.QLabel('confirm: ')
-    confirmLabel.setPixmap(qt.QPixmap(os.path.join(scriptDirectory, "confirm.png")).scaledToHeight(
-      self.createPlanningLineButton.height / 20.0))
     confirmLayout.addWidget(confirmLabel)
     confirmLayout.addWidget(self.createPlanningLineButton)
 
@@ -350,7 +320,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.createPlanningLineButton.setMaximumWidth(buttonWidth)
     self.createPlanningLineButton.setIcon(qt.QIcon(qt.QPixmap(os.path.join(scriptDirectory, "confirm.png"))))
     self.createPlanningLineButton.setIconSize(qt.QSize(self.createPlanningLineButton.size))
-    self.mainGUIGroupBoxLayout.addWidget(self.createPlanningLineButton, 2, 4)
 
     self.setReverseViewButton = qt.QPushButton("Set Reverse 3D View")
     self.setReverseViewButton.setMinimumWidth(150)
@@ -479,10 +448,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
 
   def onAddedNode(self, addedNode):
     if addedNode:
-      volumeName = addedNode.GetName().split(': ')[-1].strip(' ')
-      if len(volumeName)>=6 and volumeName[0:6] == "Venous":
         self.logic.baseVolumeNode = addedNode
-      elif len(volumeName) >= 9 and len(volumeName) <=12 and volumeName[0:9] == "Ventricle":
         self.logic.ventricleVolume = addedNode
       if self.logic.baseVolumeNode and self.logic.ventricleVolume:
         self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_ventricleVolume", self.logic.ventricleVolume.GetID())
@@ -550,7 +516,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       green_cn.SetForegroundVolumeID(self.logic.ventricleVolume.GetID())
 
     pass
-    
   def onCreatePlanningLine(self):
     if self.logic.createPlanningLine():
       self.logic.calcPitchYawAngles()
@@ -1859,23 +1824,19 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       CurveManagerReference.curveFiducials.GetNthFiducialPosition(numOfRef-1, lastRefPos)  
       if abs(lastRefPos[1]-points.GetPoint(0)[1])<eps: #if the planning and reference entry points are identical 
         for jPos in range(step, points.GetNumberOfPoints(), step):
-          if points.GetPoint(jPos)[0]>lastRefPos[0]:
             CurveManager.curveFiducials.AddFiducial(points.GetPoint(jPos)[0],points.GetPoint(jPos)[1],points.GetPoint(jPos)[2])
           else:
             break
         pos = [0.0]*3  
         for iPos in range(1,numOfRef): 
           CurveManagerReference.curveFiducials.GetNthFiducialPosition(numOfRef-iPos-1, pos)
-          if pos[0]<points.GetPoint(0)[0]:
             CurveManager.curveFiducials.AddFiducial(pos[0],pos[1],pos[2])
         CurveManagerReference.curveFiducials.GetNthFiducialPosition(0, pos)    
         self.topPoint = pos       
       else:   
         shift = step
         for iPos in range(1,numOfRef): 
-          pos = [0.0]*3;
           CurveManagerReference.curveFiducials.GetNthFiducialPosition(numOfRef-iPos-1, pos) 
-          if float(pos[0])<points.GetPoint(0)[0] and float(pos[1]-points.GetPoint(0)[1])<eps and float(pos[2]-points.GetPoint(0)[2])<eps:
             CurveManager.curveFiducials.AddFiducial(pos[0],pos[1],pos[2]) 
             shift = iPos
             break
@@ -1884,7 +1845,6 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
           posModelValid = numpy.array(points.GetPoint(iPosValid))
           if  numpy.linalg.norm(posModel-posModelValid)> 50.0:
             continue
-          if abs(posModel[0]-posNasion[0])<eps or (posModel[0]<posNasion[0]):
             break
           iPosValid = iPos
           CurveManager.curveFiducials.AddFiducial(posModel[0],posModel[1],posModel[2]) #adding fiducials takes too long, check the event triggered by this operation
@@ -1895,8 +1855,6 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
           posModelValid = numpy.array(points.GetPoint(jPosValid))
           if  numpy.linalg.norm(posModel-posModelValid)> 50.0:
             continue
-          if abs(posModel[0]-posNasion[0])<eps or (posModel[0]<posNasion[0]):
-            break     
           jPosValid = jPos   
         self.topPoint = points.GetPoint(jPosValid)    
         posModel = numpy.array(points.GetPoint(jPosValid))  
@@ -1948,7 +1906,6 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       if axis == 0:
         valid = posModel[2]>=referencePoint[2]
       elif axis == 1:
-        valid = posModel[0]>=referencePoint[0]
       if (distanceModelNasion < targetDistance) and valid:        
           intersectPoints.InsertNextPoint(posModel)
           
@@ -1967,7 +1924,6 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       if axis == 0:
         valid = (posModel[2]<=referencePoint[2] or abs(posModel[2]-referencePoint[2])<1e-3 )
       elif axis == 1:
-        valid = (posModel[0]<=referencePoint[0] or abs(posModel[0]-referencePoint[0])<1e-3 )
       if valid:        
           intersectPoints.InsertNextPoint(posModel)        
   
@@ -2042,7 +1998,6 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
           self.getIntersectPointsPlanning(polyData, plane, posTrajectory, 1 , coronalPoints)
                 
           ## Sorting   
-          self.sortPoints(coronalPoints, posTrajectory)   
           
           self.constructCurvePlanning(self.coronalPlanningCurveManager, self.coronalReferenceCurveManager, coronalPoints, 1)  
               
