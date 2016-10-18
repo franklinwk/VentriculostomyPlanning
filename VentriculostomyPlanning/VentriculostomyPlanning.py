@@ -1,4 +1,4 @@
-import os
+import os, inspect
 import unittest
 import vtk, qt, ctk, slicer
 from slicer.ScriptedLoadableModule import *
@@ -16,6 +16,192 @@ from DICOM import DICOMWidget
 # VentriculostomyPlanning
 #
 
+class WindowLevelEffectsButton(qt.QPushButton):
+  """
+  The code here is regenerated from SlicerProstateUtil.buttons, from Andrey Fedorov,
+  This button might be in
+  Will be removed or rewritten later.
+  """
+  FILE_NAME = 'icon-WindowLevelEffect.png'
+
+  @property
+  def sliceWidgets(self):
+    return self._sliceWidgets
+
+  @sliceWidgets.setter
+  def sliceWidgets(self, value):
+    self._sliceWidgets = value
+    self.setup()
+
+  def __init__(self, title="", sliceWidgets=None, parent=None, **kwargs):
+    super(WindowLevelEffectsButton, self).__init__(title, parent, **kwargs)
+    self.checkable = True
+    self.toolTip = "Change W/L with respect to FG and BG opacity"
+    self.wlEffects = {}
+    self.sliceWidgets = sliceWidgets
+    self._connectSignals()
+    iconPath = os.path.join(os.path.dirname(inspect.getfile(self.__class__)), 'Resources/Icons', self.FILE_NAME)
+    pixmap = qt.QPixmap(iconPath)
+    self.setIcon(qt.QIcon(pixmap))
+
+  def refreshForAllAvailableSliceWidgets(self):
+    self.sliceWidgets = None
+
+  def _connectSignals(self):
+    self.destroyed.connect(self.onAboutToBeDestroyed)
+    self.toggled.connect(self.onToggled)
+
+  def onAboutToBeDestroyed(self, obj):
+    obj.destroyed.disconnect(self.onAboutToBeDestroyed)
+
+  def setup(self):
+    lm = slicer.app.layoutManager()
+    if not self.sliceWidgets:
+      self._sliceWidgets = []
+      sliceLogics = lm.mrmlSliceLogics()
+      for n in range(sliceLogics.GetNumberOfItems()):
+        sliceLogic = sliceLogics.GetItemAsObject(n)
+        self._sliceWidgets.append(lm.sliceWidget(sliceLogic.GetName()))
+    for sliceWidget in self._sliceWidgets :
+      self.addSliceWidget(sliceWidget)
+
+  def cleanupSliceWidgets(self):
+    for sliceWidget in self.wlEffects.keys():
+      if sliceWidget not in self._sliceWidgets:
+        self.removeSliceWidget(sliceWidget)
+
+  def addSliceWidget(self, sliceWidget):
+    if not self.wlEffects.has_key(sliceWidget):
+      self.wlEffects[sliceWidget] = WindowLevelEffect(sliceWidget)
+
+  def removeSliceWidget(self, sliceWidget):
+    if self.wlEffects.has_key(sliceWidget):
+      self.wlEffects[sliceWidget].disable()
+      del self.wlEffects[sliceWidget]
+
+  def onToggled(self, toggled):
+    if toggled:
+      self._enableWindowLevelEffects()
+    else:
+      self._disableWindowLevelEffects()
+
+  def _enableWindowLevelEffects(self):
+    for wlEffect in self.wlEffects.values():
+      wlEffect.enable()
+
+  def _disableWindowLevelEffects(self):
+    for wlEffect in self.wlEffects.values():
+      wlEffect.disable()
+
+
+class WindowLevelEffect(object):
+  """
+    The code here is regenerated from SlicerProstateUtil.buttons, from Andrey Fedorov
+    Will be removed or rewritten later.
+    """
+  EVENTS = [vtk.vtkCommand.LeftButtonPressEvent,
+            vtk.vtkCommand.LeftButtonReleaseEvent,
+            vtk.vtkCommand.MouseMoveEvent]
+
+  def __init__(self, sliceWidget):
+    self.actionState = None
+    iconPath = os.path.join(os.path.dirname(inspect.getfile(self.__class__)), 'Resources/Icons/icon-WindowLevelEffect.png' )
+    pixmap = qt.QPixmap(iconPath)
+    self.cursor = qt.QCursor(qt.QIcon(pixmap).pixmap(32, 32), 0, 0)
+    self.sliceWidget = sliceWidget
+    self.sliceLogic = sliceWidget.sliceLogic()
+    self.compositeNode = sliceWidget.mrmlSliceCompositeNode()
+    self.sliceView = self.sliceWidget.sliceView()
+    self.interactor = self.sliceView.interactorStyle().GetInteractor()
+
+    self.actionState = None
+
+    self.interactorObserverTags = []
+
+    self.bgStartWindowLevel = [0,0]
+    self.fgStartWindowLevel = [0,0]
+
+  def enable(self):
+    for e in self.EVENTS:
+      tag = self.interactor.AddObserver(e, self.processEvent, 1.0)
+      self.interactorObserverTags.append(tag)
+
+  def disable(self):
+    for tag in self.interactorObserverTags:
+      self.interactor.RemoveObserver(tag)
+    self.interactorObserverTags = []
+
+  def processEvent(self, caller=None, event=None):
+    """
+    handle events from the render window interactor
+    """
+    bgLayer = self.sliceLogic.GetBackgroundLayer()
+    fgLayer = self.sliceLogic.GetForegroundLayer()
+
+    bgNode = bgLayer.GetVolumeNode()
+    fgNode = fgLayer.GetVolumeNode()
+
+    changeFg = 1 if fgNode and self.compositeNode.GetForegroundOpacity() > 0.5 else 0
+    changeBg = not changeFg
+
+    if event == "LeftButtonPressEvent":
+      self.actionState = "dragging"
+      self.sliceWidget.setCursor(self.cursor)
+
+      xy = self.interactor.GetEventPosition()
+      self.startXYPosition = xy
+      self.currentXYPosition = xy
+
+      if bgNode:
+        bgDisplay = bgNode.GetDisplayNode()
+        self.bgStartWindowLevel = [bgDisplay.GetWindow(), bgDisplay.GetLevel()]
+      if fgNode:
+        fgDisplay = fgNode.GetDisplayNode()
+        self.fgStartWindowLevel = [fgDisplay.GetWindow(), fgDisplay.GetLevel()]
+      self.abortEvent(event)
+
+    elif event == "MouseMoveEvent":
+      if self.actionState == "dragging":
+        if bgNode and changeBg:
+          self.updateNodeWL(bgNode, self.bgStartWindowLevel, self.startXYPosition)
+        if fgNode and changeFg:
+          self.updateNodeWL(fgNode, self.fgStartWindowLevel, self.startXYPosition)
+        self.abortEvent(event)
+
+    elif event == "LeftButtonReleaseEvent":
+      self.sliceWidget.unsetCursor()
+      self.actionState = ""
+      self.abortEvent(event)
+
+  def updateNodeWL(self, node, startWindowLevel, startXY):
+
+    currentXY = self.interactor.GetEventPosition()
+
+    vDisplay = node.GetDisplayNode()
+    vImage = node.GetImageData()
+    vRange = vImage.GetScalarRange()
+
+    deltaX = currentXY[0] - startXY[0]
+    deltaY = currentXY[1] - startXY[1]
+    gain = (vRange[1] - vRange[0]) / 500.
+    newWindow = startWindowLevel[0] + (gain * deltaX)
+    newLevel = startWindowLevel[1] + (gain * deltaY)
+
+    vDisplay.SetAutoWindowLevel(0)
+    vDisplay.SetWindowLevel(newWindow, newLevel)
+    vDisplay.Modified()
+
+  def abortEvent(self, event):
+    """Set the AbortFlag on the vtkCommand associated
+    with the event - causes other things listening to the
+    interactor not to receive the events"""
+    # TODO: make interactorObserverTags a map to we can
+    # explicitly abort just the event we handled - it will
+    # be slightly more efficient
+    for tag in self.interactorObserverTags:
+      cmd = self.interactor.GetCommand(tag)
+      cmd.SetAbortFlag(1)
+
 class VentriculostomyPlanning(ScriptedLoadableModule):
   """Uses ScriptedLoadableModule base class, available at:
   https://github.com/Slicer/Slicer/blob/master/Base/Python/slicer/ScriptedLoadableModule.py
@@ -25,7 +211,7 @@ class VentriculostomyPlanning(ScriptedLoadableModule):
     ScriptedLoadableModule.__init__(self, parent)
     self.parent.title = "VentriculostomyPlanning" # TODO make this more human readable by adding spaces
     self.parent.categories = ["IGT"]
-    #self.parent.dependencies = ["SlicerCaseManager"]
+    #self.parent.dependencies = [""]
     self.parent.contributors = ["Junichi Tokuda (BWH)", "Longquan Chen(BWH)"] # replace with "Firstname Lastname (Organization)"
     self.parent.helpText = """
     This is an example of scripted loadable module bundled in an extension.
@@ -467,8 +653,10 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.imageSlider.setMaximum(100)
     self.viewSubGroupBoxLayout.addWidget(self.imageSlider)
     ventricleVolumeLabel = qt.QLabel('Ventricle Image')
+    self.setWindowLevelButton = WindowLevelEffectsButton()
     self.viewSubGroupBoxLayout.addWidget(ventricleVolumeLabel)
-    self.viewSubGroupBoxLayout.addWidget(self.setReverseViewButton,0,3)
+    self.viewSubGroupBoxLayout.addWidget(self.setWindowLevelButton, 0, 3)
+    self.viewSubGroupBoxLayout.addWidget(self.setReverseViewButton,0,4)
 
     self.imageSlider.connect('valueChanged(int)', self.onChangeSliceViewImage)
 
