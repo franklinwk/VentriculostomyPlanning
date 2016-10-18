@@ -507,6 +507,8 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
         #self.inputVolumeSelector.setCurrentNode(self.logic.baseVolumeNode)
         # the setForegroundVolume will not work, because the slicerapp triggers the SetBackgroundVolume after the volume is loaded
 
+
+
   def onSelect(self, selectedNode=None):
     if selectedNode:        
       self.initialFieldsValue()
@@ -520,6 +522,10 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_nasion")
       self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_trajectory")
       self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_trajectoryModel")
+      self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_saggitalReferenceModel")
+      self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_coronalReferenceModel")
+      self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_saggitalPlanningModel")
+      self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_coronalPlanningModel")
       self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_grayScaleModel")
       self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_vesselnessVolume")
       #Set the cropped image for processing
@@ -531,15 +537,26 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       self.lengthSagittalReferenceLineEdit.text = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagittalLength")
       self.lengthCoronalReferenceLineEdit.text = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_coronalLength")
 
+      ReferenceModelID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_saggitalReferenceModel")
+      self.logic.sagittalReferenceCurveManager.curveModel = slicer.mrmlScene.GetNodeByID(ReferenceModelID)
+      ReferenceModelID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_coronalReferenceModel")
+      self.logic.coronalReferenceCurveManager.curveModel = slicer.mrmlScene.GetNodeByID(ReferenceModelID)
+      ReferenceModelID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_saggitalPlanningModel")
+      self.logic.sagittalPlanningCurveManager.curveModel = slicer.mrmlScene.GetNodeByID(ReferenceModelID)
+      ReferenceModelID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_coronalPlanningModel")
+      self.logic.coronalPlanningCurveManager.curveModel = slicer.mrmlScene.GetNodeByID(ReferenceModelID)
       self.logic.sagittalReferenceCurveManager.startEditLine()
       self.logic.coronalReferenceCurveManager.startEditLine()
       self.logic.sagittalPlanningCurveManager.startEditLine()
       self.logic.coronalPlanningCurveManager.startEditLine()
       self.logic.createEntryPoint()
       trajectoryModelID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_trajectoryModel")
-      self.logic.trajectoryManager.curveModel = slicer.mrmlScene.GetNodeByID(trajectoryModelID)
       trajectoryFiducialsID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_trajectory")
+      self.logic.trajectoryManager.curveModel = slicer.mrmlScene.GetNodeByID(trajectoryModelID)
       self.logic.trajectoryManager.curveFiducials = slicer.mrmlScene.GetNodeByID(trajectoryFiducialsID)
+      self.logic.trajectoryManager.curveFiducials.AddObserver(slicer.vtkMRMLMarkupsNode().PointStartInteractionEvent, self.logic.updateSelectedMarker)
+      self.logic.trajectoryManager.curveFiducials.AddObserver(slicer.vtkMRMLMarkupsNode().PointModifiedEvent, self.logic.updateTrajectoryPosition)
+      self.logic.trajectoryManager.curveFiducials.AddObserver(slicer.vtkMRMLMarkupsNode().PointEndInteractionEvent, self.logic.endTrajectoryInteraction)
       self.logic.trajectoryManager.startEditLine()
       self.onCreatePlanningLine()
       self.onSetSliceViewer()
@@ -694,9 +711,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
   def onCreateEntryPoint(self):
     self.onModifyMeasureLength()
     self.logic.createEntryPoint()
-    #self.lengthSagittalReferenceLineEdit.text = '%.2f' % self.logic.getSagittalReferenceLineLength()
-    #self.lengthCoronalReferenceLineEdit.text = '%.2f' % self.logic.getCoronalReferenceLineLength()
-    
 
   # Event handlers for sagittalReference line
   def onEditSagittalReferenceLine(self, switch):
@@ -875,7 +889,7 @@ class CurveManager:
 
     self.curveName = ""
     self.curveModelName = ""
-    self.step = 1;
+    self.step = 1
     self.tagEventExternal = None
     self.externalHandler = None
 
@@ -1217,7 +1231,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       nasionNode = slicer.mrmlScene.GetNodeByID(nasionID)
       if nasionNode.GetNumberOfFiducials()>0:
         trajectoryNode = slicer.mrmlScene.GetNodeByID(self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_trajectory"))
-        slicer.mrmlScene.AddNode(trajectoryNode)
+        #slicer.mrmlScene.AddNode(trajectoryNode)
         dnode = trajectoryNode.GetMarkupsDisplayNode()
         if dnode:
           rgbColor = [0.0, 1.0, 1.0]
@@ -1561,8 +1575,29 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         self.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_model", modelNode.GetID())
       elif attribute == "vtkMRMLScalarVolumeNode.rel_trajectoryModel":
         modelNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
+        modelNode.SetName("trajectoryModel")
         slicer.mrmlScene.AddNode(modelNode)
         self.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_trajectoryModel", modelNode.GetID())
+      elif attribute == "vtkMRMLScalarVolumeNode.rel_saggitalReferenceModel":
+        modelNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
+        modelNode.SetName("saggitalReferenceModel")
+        slicer.mrmlScene.AddNode(modelNode)
+        self.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_saggitalReferenceModel", modelNode.GetID())
+      elif attribute == "vtkMRMLScalarVolumeNode.rel_coronalReferenceModel":
+        modelNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
+        modelNode.SetName("coronalReferenceModel")
+        slicer.mrmlScene.AddNode(modelNode)
+        self.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_coronalReferenceModel", modelNode.GetID())
+      elif attribute == "vtkMRMLScalarVolumeNode.rel_saggitalPlanningModel":
+        modelNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
+        modelNode.SetName("saggitalPlanningModel")
+        slicer.mrmlScene.AddNode(modelNode)
+        self.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_saggitalPlanningModel", modelNode.GetID())
+      elif attribute == "vtkMRMLScalarVolumeNode.rel_coronalPlanningModel":
+        modelNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
+        modelNode.SetName("coronalPlanningModel")
+        slicer.mrmlScene.AddNode(modelNode)
+        self.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_coronalPlanningModel", modelNode.GetID())
       enabledAttributeID = self.baseVolumeNode.GetAttribute(attribute)  
         # to do update the logic regarding the current attribute // self.nasionPointNode = nasionNode
     volumeCollection = slicer.mrmlScene.GetNodesByClass("vtkMRMLScalarVolumeNode") 
@@ -1737,7 +1772,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         nasionNode = slicer.mrmlScene.GetNodeByID(self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_nasion"))
         dnode = nasionNode.GetMarkupsDisplayNode()
         nasionNode.RemoveAllMarkups()
-        slicer.mrmlScene.AddNode(nasionNode)
+        #slicer.mrmlScene.AddNode(nasionNode)
         nasionNode.SetLocked(True)
         self.nasionProjectedMarker.AddFiducial(0,0,0)
         self.nasionProjectedMarker.SetNthFiducialLabel(0, "")
