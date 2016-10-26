@@ -10,6 +10,8 @@ import SimpleITK as sitk
 import sitkUtils
 import DICOM
 from DICOM import DICOMWidget
+import PercutaneousApproachAnalysis
+from PercutaneousApproachAnalysis import *
 #import SlicerCaseManager
 
 #
@@ -290,8 +292,24 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     referenceConfigLayout.addWidget(lengthCoronalReferenceLineUnitLabel)
     configurationFormLayout.addRow(referenceConfigLayout)
 
+    anglePathPlanningLabel = qt.QLabel('Angle:  ')
+    referenceConfigLayout.addWidget(anglePathPlanningLabel)
+    self.anglePathPlanningEdit = qt.QLineEdit()
+    self.anglePathPlanningEdit.text = '30.0'
+    self.anglePathPlanningEdit.readOnly = False
+    self.anglePathPlanningEdit.frame = True
+    self.anglePathPlanningEdit.styleSheet = "QLineEdit { background:transparent; }"
+    self.anglePathPlanningEdit.cursor = qt.QCursor(qt.Qt.IBeamCursor)
+    referenceConfigLayout.addWidget(self.anglePathPlanningEdit)
+    anglePathPlanningUnitLabel = qt.QLabel('degree  ')
+    referenceConfigLayout.addWidget(anglePathPlanningUnitLabel)
+    configurationFormLayout.addRow(referenceConfigLayout)
+
+
     self.lengthSagittalReferenceLineEdit.connect('textEdited(QString)', self.onModifyMeasureLength)
     self.lengthCoronalReferenceLineEdit.connect('textEdited(QString)', self.onModifyMeasureLength)
+    self.anglePathPlanningEdit.connect('textEdited(QString)', self.onModifyPathPlanningAngle)
+
     self.allVolumeSelector = slicer.qMRMLNodeComboBox()
     self.allVolumeSelector.nodeTypes = ["vtkMRMLScalarVolumeNode"]
     self.allVolumeSelector.setMRMLScene(slicer.mrmlScene)
@@ -487,6 +505,24 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.addCannulaBox.setStyleSheet('QGroupBox{border:0;}')
     self.mainGUIGroupBoxLayout.addWidget(self.addCannulaBox,2,3)
 
+    self.generatePathBox = qt.QGroupBox()
+    generatePathLayout = qt.QVBoxLayout()
+    generatePathLayout.setAlignment(qt.Qt.AlignCenter)
+    self.generatePathBox.setLayout(generatePathLayout)
+    self.generatePathButton = qt.QPushButton("")
+    self.generatePathButton.toolTip = ""
+    self.generatePathButton.enabled = True
+    generatePathLabel = qt.QLabel('Generate Path')
+    generatePathLayout.addWidget(generatePathLabel)
+    generatePathLayout.addWidget(self.generatePathButton)
+    self.generatePathButton.setMaximumHeight(buttonHeight)
+    self.generatePathButton.setMaximumWidth(buttonWidth)
+    self.generatePathButton.setToolTip("Generate cannula paths")
+    self.generatePathButton.setIcon(qt.QIcon(qt.QPixmap(os.path.join(self.scriptDirectory, "cannula.png"))))
+    self.generatePathButton.setIconSize(qt.QSize(self.generatePathButton.size))
+    self.generatePathBox.setStyleSheet('QGroupBox{border:0;}')
+    self.mainGUIGroupBoxLayout.addWidget(self.generatePathBox, 2, 4)
+
     #-- Curve length
     self.infoGroupBox = qt.QGroupBox()
     self.infoGroupBoxLayout = qt.QVBoxLayout()
@@ -535,7 +571,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.createPlanningLineButton.setIcon(qt.QIcon(qt.QPixmap(os.path.join(self.scriptDirectory, "confirm.png"))))
     self.createPlanningLineButton.setIconSize(qt.QSize(self.createPlanningLineButton.size))
     self.confirmBox.setStyleSheet('QGroupBox{border:0;}')
-    self.mainGUIGroupBoxLayout.addWidget(self.confirmBox, 2, 4)
+    self.mainGUIGroupBoxLayout.addWidget(self.confirmBox, 2, 5)
 
     self.saveBox = qt.QGroupBox()
     saveLayout = qt.QVBoxLayout()
@@ -554,7 +590,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.saveDataButton.setIcon(qt.QIcon(qt.QPixmap(os.path.join(self.scriptDirectory, "save.png"))))
     self.saveDataButton.setIconSize(qt.QSize(self.createPlanningLineButton.size))
     self.saveBox.setStyleSheet('QGroupBox{border:0;}')
-    self.mainGUIGroupBoxLayout.addWidget(self.saveBox, 2, 5)
+    self.mainGUIGroupBoxLayout.addWidget(self.saveBox, 2, 6)
 
     self.setReverseViewButton = qt.QPushButton("Set Reverse 3D View")
     self.setReverseViewButton.setMinimumWidth(150)
@@ -567,6 +603,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
 
      # Needle trajectory
     self.addCannulaPointButton.connect('clicked(bool)', self.onEditCannula)
+    self.generatePathButton.connect('clicked(bool)', self.onGeneratePath)
     self.clearTrajectoryButton.connect('clicked(bool)', self.onClearTrajectory)
     self.logic.setTrajectoryModifiedEventHandler(self.onTrajectoryModified)
     self.lockTrajectoryCheckBox.connect('toggled(bool)', self.onLock)
@@ -729,8 +766,10 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       else:
         self.logic.currentVolumeNode = selectedNode  
       self.logic.updateMeasureLength(float(self.lengthSagittalReferenceLineEdit.text), float(self.lengthCoronalReferenceLineEdit.text))
+      self.logic.updatePathPlanningAngle(float(self.anglePathPlanningEdit.text))
       self.lengthSagittalReferenceLineEdit.text = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagittalLength")
       self.lengthCoronalReferenceLineEdit.text = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_coronalLength")
+      self.anglePathPlanningEdit.text = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_planningAngle")
 
       ReferenceModelID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_saggitalReferenceModel")
       self.logic.sagittalReferenceCurveManager._curveModel = slicer.mrmlScene.GetNodeByID(ReferenceModelID)
@@ -910,10 +949,16 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
         self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_sagittalLength", '%.1f' % sagittalReferenceLength) 
     if self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_coronalLength"):
         self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_coronalLength", '%.1f' % coronalReferenceLength)    
-    
-  
+
+  def onModifyPathPlanningAngle(self):
+    angle = float(self.anglePathPlanningEdit.text)
+    if self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_planningAngle"):
+      self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_planningAngle", '%.1f' % angle)
+
+
   def onCreateEntryPoint(self):
     self.onModifyMeasureLength()
+    self.onModifyPathPlanningAngle()
     self.logic.createEntryPoint()
 
   # Event handlers for sagittalReference line
@@ -1015,6 +1060,9 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.pitchAngleEdit.text = '--'
     self.yawAngleEdit.text = '--'
     self.logic.startEditCannula()
+
+  def onGeneratePath(self):
+    self.logic.generatePath()
     
   def onClearTrajectory(self):
     self.logic.clearTrajectory()
@@ -1032,7 +1080,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       self.logic.endEditSagittalPlanningLine()
 
   def onClearSagittalPlanningLine(self):
-    
     self.logic.clearSagittalPlanningLine()
 
   def onSagittalPlanningLineModified(self, caller, event):
@@ -1320,7 +1367,15 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     self.sagittalPlanningCurveManager.setSliceID("vtkMRMLSliceNodeYellow")
     self.sagittalPlanningCurveManager.setDefaultSlicePositionToFirstPoint()
     self.sagittalPlanningCurveManager.setModelColor(1.0, 1.0, 0.0)
-    
+
+    ##Path Planning variables
+    self.PercutaneousApproachAnalysisLogic = PercutaneousApproachAnalysisLogic()
+    self.targetPointNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
+    self.allLines = vtk.vtkPolyData()
+    self.singleLine = vtk.vtkPolyData()
+    self.extendedLine = vtk.vtkPolyData()
+    ##
+
     self.ROIListNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLAnnotationHierarchyNode")
     self.ROIListNode.SetName("ROIListForAllCases")
     self.ROIListNode.HideFromEditorsOff()
@@ -1463,6 +1518,70 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
   
   def endEditTrajectory(self):
     self.trajectoryManager.endEditLine()
+
+  def generatePath(self):
+    posTarget = [0.0]*3
+    self.trajectoryManager.getLastPoint(posTarget)
+    self.targetPointNode.RemoveAllMarkups()
+    self.targetPointNode.AddFiducial(posTarget[0],posTarget[1],posTarget[2])
+    posEntry = [0.0]*3
+    self.trajectoryManager.getFirstPoint(posEntry)
+    grayScaleModelNodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_grayScaleModel")
+    grayScaleModelNode = slicer.mrmlScene.GetNodeByID(grayScaleModelNodeID)
+    skullModelNodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_model")
+    skullModelNode = slicer.mrmlScene.GetNodeByID(skullModelNodeID)
+    angleForModelCut = float(self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_planningAngle"))
+
+    coneSource = vtk.vtkConeSource()
+    coneHeight = self.trajectoryManager.getLength()* 1.2 # times 1.2 to make sure the skull is inside the cone base
+    coneBasePoint = numpy.array(posTarget) + (numpy.array(posEntry)-numpy.array(posTarget))*1.2
+    coneCenterPoint = (numpy.array(posTarget) + coneBasePoint)/2
+    coneDirection = numpy.array(posTarget) - numpy.array(posEntry)
+    coneSource.SetCenter(coneCenterPoint[0],coneCenterPoint[1],coneCenterPoint[2])
+    coneSource.SetHeight(coneHeight)
+    coneSource.SetAngle(angleForModelCut)
+    coneSource.CappingOn()
+    coneSource.SetResolution(100)
+    coneSource.SetDirection(coneDirection[0],coneDirection[1],coneDirection[2])
+    coneSource.Update()
+
+    booleanOper = vtk.vtkBooleanOperationPolyDataFilter()
+    booleanOper.SetOperationToDifference()
+    booleanOper.SetInputData(0, coneSource.GetOutput())
+    booleanOper.SetInputData(1, skullModelNode.GetPolyData())
+    booleanOper.Update()
+    croppedSkinModel = booleanOper.GetOutput()
+
+    sphereSource = vtk.vtkSphereSource()
+    sphereSource.SetCenter(posEntry[0],posEntry[1],posEntry[2])
+    sphereSource.SetThetaResolution(100)
+    sphereSource.SetPhiResolution(100)
+    sphereSource.SetRadius(50)
+    sphereSource.Update()
+    tempModel = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
+    tempModel.SetAndObservePolyData(coneSource.GetOutput())
+    slicer.mrmlScene.AddNode(tempModel)
+    if coneSource.GetOutput().GetNumberOfPoints():
+      self.pathReceived, self.nPathReceived, self.apReceived, self.minimumPoint, self.minimumDistance, self.maximumPoint, self.maximumDistance = self.PercutaneousApproachAnalysisLogic.makePaths(
+        self.targetPointNode, None, 0, grayScaleModelNode, tempModel)
+      # display all paths model
+      yellow = [1, 1, 0]
+      red =[1, 0, 0]
+      self.modelReceived, pReceived, self.allPaths, self.allPathPoints = NeedlePathModel().make(self.pathReceived,
+                                                                                                self.nPathReceived,
+                                                                                                1, yellow,
+                                                                                                "candidatePaths",
+                                                                                                self.allLines)
+
+      # make and display single path candidate
+      self.onePath, self.onePathDistance = self.PercutaneousApproachAnalysisLogic.makeSinglePath(self.apReceived, self.pathSliderValue)
+      self.singlePathModel, self.singleP, self.singlePath, self.singlePathPoints = NeedlePathModel().make(self.onePath, 2,
+                                                                                                          0,
+                                                                                                        red,
+                                                                                                          "selectedPath",
+                                                                                                          self.singleLine)
+      # make and display virtual path candidate
+
 
   def clearTrajectory(self):
     self.trajectoryManager.clearLine()
@@ -1810,7 +1929,11 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     if not self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_coronalLength"):    
       if coronalReferenceLength:
         self.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_coronalLength", '%.1f' % coronalReferenceLength)
-  
+
+  def updatePathPlanningAngle(self, angle):
+    if not self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_planningAngle"):
+        self.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_planningAngle", '%.1f' % angle)
+
   @vtk.calldata_type(vtk.VTK_INT)
   def updateSelectedMarker(self,node, eventID, callData):
     self.activeTrajectoryMarkup = callData
