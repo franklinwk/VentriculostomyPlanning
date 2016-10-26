@@ -524,7 +524,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.generatePathButton.setMaximumHeight(buttonHeight)
     self.generatePathButton.setMaximumWidth(buttonWidth)
     self.generatePathButton.setToolTip("Generate cannula paths")
-    self.generatePathButton.setIcon(qt.QIcon(qt.QPixmap(os.path.join(self.scriptDirectory, "cannula.png"))))
+    self.generatePathButton.setIcon(qt.QIcon(qt.QPixmap(os.path.join(self.scriptDirectory, "pathPlanning.png"))))
     self.generatePathButton.setIconSize(qt.QSize(self.generatePathButton.size))
     self.generatePathBox.setStyleSheet('QGroupBox{border:0;}')
     self.mainGUIGroupBoxLayout.addWidget(self.generatePathBox, 2, 4)
@@ -1526,12 +1526,12 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     self.trajectoryManager.endEditLine()
 
   def generatePath(self):
-    posTarget = [0.0]*3
+    posTarget = numpy.array([0.0] * 3)
     self.trajectoryManager.getLastPoint(posTarget)
-    self.targetPointNode.RemoveAllMarkups()
-    self.targetPointNode.AddFiducial(posTarget[0],posTarget[1],posTarget[2])
     posEntry = numpy.array([0.0]*3)
     self.trajectoryManager.getFirstPoint(posEntry)
+    self.targetPointNode.RemoveAllMarkups()
+    self.targetPointNode.AddFiducial(posTarget[0], posTarget[1], posTarget[2])
     grayScaleModelNodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_grayScaleModel")
     grayScaleModelNode = slicer.mrmlScene.GetNodeByID(grayScaleModelNodeID)
     skullModelNodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_model")
@@ -1548,8 +1548,8 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     matrix = transform.GetMatrix()
     synthesizedData = vtk.vtkPolyData()
     points = vtk.vtkPoints()
-    phiResolution = 3*numpy.pi/180.0
-    radiusResolution = 1.0
+    phiResolution = 5*numpy.pi/180.0
+    radiusResolution = 1.5
     points.InsertNextPoint(posEntry)
     for radius in numpy.arange(radiusResolution, 30, radiusResolution):
       for angle in numpy.arange(phiResolution, numpy.pi, phiResolution):
@@ -1563,9 +1563,32 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     synthesizedData.SetPoints(points)
     tempModel = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
     tempModel.SetAndObservePolyData(synthesizedData)
-    if synthesizedData.GetNumberOfPoints():
+    distanceMapNode = None
+    if not self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_distanceVolume"):
+      distanceMapFilter = sitk.ApproximateSignedDistanceMapImageFilter()
+      originImage = sitk.Cast(sitkUtils.PullFromSlicer(self.currentVolumeNode.GetID()), sitk.sitkInt16)
+      threshold = 100
+      distanceMap = distanceMapFilter.Execute(originImage, threshold - 10, threshold )
+      sitkUtils.PushToSlicer(distanceMap, "distanceMap", 0, True)
+      imageCollection = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLScalarVolumeNode", "distanceMap")
+      if imageCollection:
+        distanceMapNode = imageCollection.GetItemAsObject(0)
+        self.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_distanceVolume", distanceMapNode.GetID())
+    else:
+      distanceMapNodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_distanceVolume")
+      distanceMapNode = slicer.mrmlScene.GetNodeByID(distanceMapNodeID)
+    if synthesizedData.GetNumberOfPoints() and distanceMapNode:
+      grayScaleModelWithMarginNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
+      slicer.mrmlScene.AddNode(grayScaleModelWithMarginNode)
+      parameters = {}
+      parameters["InputVolume"] = distanceMapNode.GetID()
+      parameters["OutputGeometry"] = grayScaleModelWithMarginNode.GetID()
+      parameters["Threshold"] = -10.0
+      grayMaker = slicer.modules.grayscalemodelmaker
+      self.cliNode = slicer.cli.run(grayMaker, None, parameters, wait_for_completion=True)
+
       self.pathReceived, self.nPathReceived, self.apReceived, self.minimumPoint, self.minimumDistance, self.maximumPoint, self.maximumDistance = self.PercutaneousApproachAnalysisLogic.makePaths(
-        self.targetPointNode, None, 0, grayScaleModelNode, tempModel)
+        self.targetPointNode, None, 0, grayScaleModelWithMarginNode, tempModel)
       # display all paths model
       yellow = [1, 1, 0]
       red =[1, 0, 0]
@@ -1574,7 +1597,40 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
                                                                                                 1, yellow,
                                                                                                 "candidatePaths",
                                                                                                 self.allLines)
+      obbTree = vtk.vtkOBBTree()
+      obbTree.SetDataSet(grayScaleModelWithMarginNode.GetPolyData())
+      obbTree.BuildLocator()
+      pointsVTKintersection = vtk.vtkPoints()
+      hasIntersection = obbTree.IntersectWithLine(posEntry, posTarget, pointsVTKintersection, None)
+      if hasIntersection > 0:
+        if slicer.util.confirmYesNoDisplay("The cannula is within the safty margin of the venous, use location optimization?",
+                                           windowTitle=""):
+          self.relocateCannula(self.pathReceived)
 
+    slicer.mrmlScene.RemoveNode(grayScaleModelWithMarginNode)
+      #slicer.mrmlScene.RemoveNode(distanceMapNode)
+
+  def relocateCannula(self, pathReceived):
+    if pathReceived:
+      posTarget = numpy.array([0.0] * 3)
+      self.trajectoryManager.getLastPoint(posTarget)
+      posEntry = numpy.array([0.0] * 3)
+      self.trajectoryManager.getFirstPoint(posEntry)
+      direction1Norm = (posEntry - posTarget)/numpy.linalg.norm(posTarget - posEntry)
+      angleMin =numpy.pi
+      optimizedEntry = []
+      for pointIndex in range(1, len(pathReceived),2):
+        direction2 = numpy.array(pathReceived[pointIndex]) - numpy.array(pathReceived[pointIndex-1])
+        direction2Norm = direction2/numpy.linalg.norm(direction2)
+        angle = math.acos(numpy.dot(direction1Norm, direction2Norm))
+        if angle < angleMin:
+          angleMin = angle
+          optimizedEntry = pathReceived[pointIndex]
+      if optimizedEntry.any():
+        self.trajectoryManager.curveFiducials.SetNthFiducialPositionFromArray(0,optimizedEntry)
+        self.updateTrajectoryPosition(self.trajectoryManager.curveFiducials)
+        self.endTrajectoryInteraction(self.trajectoryManager.curveFiducials)
+    pass
 
   def clearTrajectory(self):
     self.trajectoryManager.clearLine()
