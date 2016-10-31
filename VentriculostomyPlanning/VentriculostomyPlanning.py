@@ -258,7 +258,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     configurationCollapsibleButton = ctk.ctkCollapsibleButton()
     configurationCollapsibleButton.text = "Configuration"
     self.layout.addWidget(configurationCollapsibleButton)
-    configurationCollapsibleButton.setVisible(True)
+    configurationCollapsibleButton.setVisible(False)
     # Layout within the dummy collapsible button
     configurationFormLayout = qt.QFormLayout(configurationCollapsibleButton)
     #
@@ -291,7 +291,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     referenceConfigLayout.addWidget(self.lengthCoronalReferenceLineEdit)
     lengthCoronalReferenceLineUnitLabel = qt.QLabel('mm  ')
     referenceConfigLayout.addWidget(lengthCoronalReferenceLineUnitLabel)
-    configurationFormLayout.addRow(referenceConfigLayout)
 
     radiusPathPlanningLabel = qt.QLabel('Radius:  ')
     referenceConfigLayout.addWidget(radiusPathPlanningLabel)
@@ -314,7 +313,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.reloadButton.connect('clicked()', self.onReload)
     self.lengthSagittalReferenceLineEdit.connect('textEdited(QString)', self.onModifyMeasureLength)
     self.lengthCoronalReferenceLineEdit.connect('textEdited(QString)', self.onModifyMeasureLength)
-    self.radiusPathPlanningEdit.connect('textEdited(QString)', self.onModifyPathPlanningAngle)
+    self.radiusPathPlanningEdit.connect('textEdited(QString)', self.onModifyPathPlanningRadius)
 
     self.allVolumeSelector = slicer.qMRMLNodeComboBox()
     self.allVolumeSelector.nodeTypes = ["vtkMRMLScalarVolumeNode"]
@@ -350,8 +349,8 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.mainGUIGroupBoxLayout = qt.QGridLayout()
     self.mainGUIGroupBox.setLayout(self.mainGUIGroupBoxLayout)
 
-    buttonWidth = 70
-    buttonHeight = 70
+    buttonWidth = 40
+    buttonHeight = 40
 
     self.infoVolumeBox = qt.QGroupBox()
     inputVolumeLayout = qt.QHBoxLayout()
@@ -417,7 +416,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.LoadCaseButton.toolTip = "Load a dicom dataset"
     self.LoadCaseButton.enabled = True
     loadCaseLabel = qt.QLabel('Load Dicom')
-    loadCaseLayout.addWidget(loadCaseLabel)
+    #loadCaseLayout.addWidget(loadCaseLabel)
     loadCaseLayout.addWidget(self.LoadCaseButton)
     #self.LoadCaseButton.setFixedHeight(50)
     self.LoadCaseButton.setMaximumHeight(buttonHeight)
@@ -435,7 +434,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.selectNasionButton.toolTip = "Add a point in the 3D window"
     self.selectNasionButton.enabled = True
     selectNasionLabel = qt.QLabel('Select Nasion')
-    selectNasionLayout.addWidget(selectNasionLabel)
+    #selectNasionLayout.addWidget(selectNasionLabel)
     selectNasionLayout.addWidget(self.selectNasionButton)
     self.selectNasionButton.setMaximumHeight(buttonHeight)
     self.selectNasionButton.setMaximumWidth(buttonWidth)
@@ -470,7 +469,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.grayScaleMakerButton.enabled = True
     self.grayScaleMakerButton.toolTip = "Use the GrayScaleMaker module for vessel calculation "
     detectVesselLabel = qt.QLabel('Detect Vessel')
-    detectVesselLayout.addWidget(detectVesselLabel)
+    #detectVesselLayout.addWidget(detectVesselLabel)
     detectVesselLayout.addWidget(self.grayScaleMakerButton)
     self.grayScaleMakerButton.setMaximumHeight(buttonHeight)
     self.grayScaleMakerButton.setMaximumWidth(buttonWidth)
@@ -501,7 +500,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.addCannulaPointButton.toolTip = ""
     self.addCannulaPointButton.enabled = True
     addCannulaLabel = qt.QLabel('Add Cannula')
-    addCannulaLayout.addWidget(addCannulaLabel)
+    #addCannulaLayout.addWidget(addCannulaLabel)
     addCannulaLayout.addWidget(self.addCannulaPointButton)
     self.addCannulaPointButton.setMaximumHeight(buttonHeight)
     self.addCannulaPointButton.setMaximumWidth(buttonWidth)
@@ -519,7 +518,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.generatePathButton.toolTip = ""
     self.generatePathButton.enabled = True
     generatePathLabel = qt.QLabel('Generate Path')
-    generatePathLayout.addWidget(generatePathLabel)
+    #generatePathLayout.addWidget(generatePathLabel)
     generatePathLayout.addWidget(self.generatePathButton)
     self.generatePathButton.setMaximumHeight(buttonHeight)
     self.generatePathButton.setMaximumWidth(buttonWidth)
@@ -536,10 +535,11 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.layout.addWidget(self.infoGroupBox)
 
     cannulaLengthInfoLayout = qt.QHBoxLayout()
-    lengthTrajectoryLabel = qt.QLabel('Cannula Length: ')
+    lengthTrajectoryLabel = qt.QLabel('Cannula Length:')
     cannulaLengthInfoLayout.addWidget(lengthTrajectoryLabel)
     self.lengthTrajectoryEdit = qt.QLineEdit()
     self.lengthTrajectoryEdit.text = '--'
+    self.lengthTrajectoryEdit.setMaxLength(5)
     self.lengthTrajectoryEdit.readOnly = True
     self.lengthTrajectoryEdit.frame = True
     self.lengthTrajectoryEdit.styleSheet = "QLineEdit { background:transparent; }"
@@ -569,7 +569,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.createPlanningLineButton.toolTip = "Confirm the target and generate the planning line."
     self.createPlanningLineButton.enabled = True
     confirmLabel = qt.QLabel('   Confirm')
-    confirmLayout.addWidget(confirmLabel)
+    #confirmLayout.addWidget(confirmLabel)
     confirmLayout.addWidget(self.createPlanningLineButton)
 
     self.createPlanningLineButton.setMaximumHeight(buttonHeight)
@@ -588,7 +588,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.saveDataButton.enabled = True
     self.saveDataButton.connect('clicked(bool)', self.onSaveData)
     saveLabel = qt.QLabel('Save Result')
-    saveLayout.addWidget(saveLabel)
+    #saveLayout.addWidget(saveLabel)
     saveLayout.addWidget(self.saveDataButton)
 
     self.saveDataButton.setMaximumHeight(buttonHeight)
@@ -618,61 +618,69 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     #
     # Mid-sagittalReference line
     #
-    planningLineLayout = qt.QHBoxLayout()
+    planningSagittalLineLayout = qt.QHBoxLayout()
 
     #-- Curve length
     lengthSagittalPlanningLineLabel = qt.QLabel('Sagittal Length:  ')
-    planningLineLayout.addWidget(lengthSagittalPlanningLineLabel)
+    planningSagittalLineLayout.addWidget(lengthSagittalPlanningLineLabel)
     self.lengthSagittalPlanningLineEdit = qt.QLineEdit()
     self.lengthSagittalPlanningLineEdit.text = '--'
+    self.lengthSagittalPlanningLineEdit.setMaxLength(5)
     self.lengthSagittalPlanningLineEdit.readOnly = True
     self.lengthSagittalPlanningLineEdit.frame = True
     self.lengthSagittalPlanningLineEdit.styleSheet = "QLineEdit { background:transparent; }"
     self.lengthSagittalPlanningLineEdit.cursor = qt.QCursor(qt.Qt.IBeamCursor)
-    planningLineLayout.addWidget(self.lengthSagittalPlanningLineEdit)
+    planningSagittalLineLayout.addWidget(self.lengthSagittalPlanningLineEdit)
     lengthSagittalPlanningLineUnitLabel = qt.QLabel('mm  ')
-    planningLineLayout.addWidget(lengthSagittalPlanningLineUnitLabel)
-    
-    lengthCoronalPlanningLineLabel = qt.QLabel('Coronal Length:  ')
-    planningLineLayout.addWidget(lengthCoronalPlanningLineLabel)
+    planningSagittalLineLayout.addWidget(lengthSagittalPlanningLineUnitLabel)
+
+    planningCoronalLineLayout = qt.QHBoxLayout()
+    lengthCoronalPlanningLineLabel = qt.QLabel('Coronal Length: ')
+    planningCoronalLineLayout.addWidget(lengthCoronalPlanningLineLabel)
     self.lengthCoronalPlanningLineEdit = qt.QLineEdit()
     self.lengthCoronalPlanningLineEdit.text = '--'
+    self.lengthCoronalPlanningLineEdit.setMaxLength(5)
     self.lengthCoronalPlanningLineEdit.readOnly = True
     self.lengthCoronalPlanningLineEdit.frame = True
     self.lengthCoronalPlanningLineEdit.styleSheet = "QLineEdit { background:transparent; }"
     self.lengthCoronalPlanningLineEdit.cursor = qt.QCursor(qt.Qt.IBeamCursor)
-    planningLineLayout.addWidget(self.lengthCoronalPlanningLineEdit)
+    planningCoronalLineLayout.addWidget(self.lengthCoronalPlanningLineEdit)
     lengthCoronalPlanningLineUnitLabel = qt.QLabel('mm  ')
-    planningLineLayout.addWidget(lengthCoronalPlanningLineUnitLabel)
-    
-    planningAnglesLayout = qt.QHBoxLayout()
+    planningCoronalLineLayout.addWidget(lengthCoronalPlanningLineUnitLabel)
+
+    planningPitchAnglesLayout = qt.QHBoxLayout()
     #-- Curve length
-    pitchAngleLabel = qt.QLabel('Pitch Angle:  ') 
-    planningAnglesLayout.addWidget(pitchAngleLabel)
+    pitchAngleLabel = qt.QLabel('Pitch Angle:       ')
+    planningPitchAnglesLayout.addWidget(pitchAngleLabel)
     self.pitchAngleEdit = qt.QLineEdit()
     self.pitchAngleEdit.text = '--'
+    self.pitchAngleEdit.setMaxLength(5)
     self.pitchAngleEdit.readOnly = True
     self.pitchAngleEdit.frame = True
     self.pitchAngleEdit.styleSheet = "QLineEdit { background:transparent; }"
     self.pitchAngleEdit.cursor = qt.QCursor(qt.Qt.IBeamCursor)
-    planningAnglesLayout.addWidget(self.pitchAngleEdit)
+    planningPitchAnglesLayout.addWidget(self.pitchAngleEdit)
     pitchAngleUnitLabel = qt.QLabel('degree  ')
-    planningAnglesLayout.addWidget(pitchAngleUnitLabel)
-    
-    yawAngleLabel = qt.QLabel('Yaw Angle:  ') 
-    planningAnglesLayout.addWidget(yawAngleLabel)
+    planningPitchAnglesLayout.addWidget(pitchAngleUnitLabel)
+
+    planningYawAnglesLayout = qt.QHBoxLayout()
+    yawAngleLabel = qt.QLabel('Yaw Angle:        ')
+    planningYawAnglesLayout.addWidget(yawAngleLabel)
     self.yawAngleEdit = qt.QLineEdit()
     self.yawAngleEdit.text = '--'
+    self.yawAngleEdit.setMaxLength(5)
     self.yawAngleEdit.readOnly = True
     self.yawAngleEdit.frame = True
     self.yawAngleEdit.styleSheet = "QLineEdit { background:transparent; }"
     self.yawAngleEdit.cursor = qt.QCursor(qt.Qt.IBeamCursor)
-    planningAnglesLayout.addWidget(self.yawAngleEdit)
+    planningYawAnglesLayout.addWidget(self.yawAngleEdit)
     yawAngleUnitLabel = qt.QLabel('degree  ')
-    planningAnglesLayout.addWidget(yawAngleUnitLabel)
+    planningYawAnglesLayout.addWidget(yawAngleUnitLabel)
 
-    self.infoGroupBoxLayout.addLayout(planningLineLayout)
-    self.infoGroupBoxLayout.addLayout(planningAnglesLayout)
+    self.infoGroupBoxLayout.addLayout(planningSagittalLineLayout)
+    self.infoGroupBoxLayout.addLayout(planningCoronalLineLayout)
+    self.infoGroupBoxLayout.addLayout(planningPitchAnglesLayout)
+    self.infoGroupBoxLayout.addLayout(planningYawAnglesLayout)
     #end of GUI section
     #####################################
     self.viewGroupBox = qt.QGroupBox()
@@ -699,7 +707,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.setWindowLevelButton = WindowLevelEffectsButton()
     self.viewSubGroupBoxLayout.addWidget(ventricleVolumeLabel)
     self.viewSubGroupBoxLayout.addWidget(self.setWindowLevelButton, 0, 3)
-    self.viewSubGroupBoxLayout.addWidget(self.setReverseViewButton,0,4)
+    self.viewGroupBoxLayout.addWidget(self.setReverseViewButton)
 
     self.imageSlider.connect('valueChanged(int)', self.onChangeSliceViewImage)
 
@@ -708,7 +716,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
 
     # Refresh Apply button state
     self.onSelect(self.inputVolumeSelector.currentNode())
-    self.onSetSliceViewer()
+    self.logic.setSliceViewer()
 
   def cleanup(self):
     pass
@@ -775,7 +783,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       self.logic.updatePathPlanningRadius(float(self.radiusPathPlanningEdit.text))
       self.lengthSagittalReferenceLineEdit.text = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagittalLength")
       self.lengthCoronalReferenceLineEdit.text = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_coronalLength")
-      self.radiusPathPlanningEdit.text = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_planningAngle")
+      self.radiusPathPlanningEdit.text = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_planningRadius")
 
       ReferenceModelID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_saggitalReferenceModel")
       self.logic.sagittalReferenceCurveManager._curveModel = slicer.mrmlScene.GetNodeByID(ReferenceModelID)
@@ -801,39 +809,10 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       self.logic.trajectoryManager.startEditLine()
       self.onCreatePlanningLine()
       self.isReverseView = False
-      self.onSetSliceViewer()
+      self.logic.setSliceViewer()
       layoutManager = slicer.app.layoutManager()
       threeDView = layoutManager.threeDWidget(0).threeDView()
       threeDView.lookFromViewAxis(ctkAxesWidget.Anterior)
-          
-    pass
-
-  def onSetSliceViewer(self):
-    red_widget = slicer.app.layoutManager().sliceWidget("Red")
-    red_logic = red_widget.sliceLogic()
-    red_cn = red_logic.GetSliceCompositeNode()
-
-    yellow_widget = slicer.app.layoutManager().sliceWidget("Yellow")
-    yellow_logic = yellow_widget.sliceLogic()
-    yellow_cn = yellow_logic.GetSliceCompositeNode()
-
-    green_widget = slicer.app.layoutManager().sliceWidget("Green")
-    green_logic = green_widget.sliceLogic()
-    green_cn = green_logic.GetSliceCompositeNode()
-
-    if self.logic.currentVolumeNode:
-      red_cn.SetBackgroundVolumeID(self.logic.currentVolumeNode.GetID())
-      yellow_cn.SetBackgroundVolumeID(self.logic.currentVolumeNode.GetID())
-      green_cn.SetBackgroundVolumeID(self.logic.currentVolumeNode.GetID())
-      red_widget.fitSliceToBackground()
-      yellow_widget.fitSliceToBackground()
-      green_widget.fitSliceToBackground()
-
-    if self.logic.ventricleVolume:
-      red_cn.SetForegroundVolumeID(self.logic.ventricleVolume.GetID())
-      yellow_cn.SetForegroundVolumeID(self.logic.ventricleVolume.GetID())
-      green_cn.SetForegroundVolumeID(self.logic.ventricleVolume.GetID())
-
     pass
 
   def onCreatePlanningLine(self):
@@ -927,7 +906,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
         if (not outputModelNode) or outputModelNode.GetAttribute("vtkMRMLModelNode.modelCreated") == "False":
             self.logic.createModel(outputModelNode, self.logic.threshold)
         self.logic.selectNasionPointNode(outputModelNode) # when the model is not available, the model will be created, so nodeAdded signal should be disconnected
-        self.onSetSliceViewer()
+        self.logic.setSliceViewer()
 
   def onSaveData(self):
     #caseDirectory = qt.QFileDialog.getExistingDirectory(self.parent.window(), "Select Case Directory", self.scriptDirectory)
@@ -941,12 +920,12 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
   
   def onDefineROI(self):
     self.logic.currentVolumeNode = self.logic.baseVolumeNode
-    self.onSetSliceViewer()
+    self.logic.setSliceViewer()
     self.logic.defineROI()
   
   def onCreateROI(self):
     self.logic.createROI()
-    self.onSetSliceViewer()
+    self.logic.setSliceViewer()
       
   def onModifyMeasureLength(self):
     sagittalReferenceLength = float(self.lengthSagittalReferenceLineEdit.text)
@@ -956,15 +935,15 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     if self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_coronalLength"):
         self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_coronalLength", '%.1f' % coronalReferenceLength)    
 
-  def onModifyPathPlanningAngle(self):
-    angle = float(self.radiusPathPlanningEdit.text)
+  def onModifyPathPlanningRadius(self):
+    radius = float(self.radiusPathPlanningEdit.text)
     if self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_planningRadius"):
-      self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_planningRadius", '%.1f' % angle)
+      self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_planningRadius", '%.1f' % radius)
 
 
   def onCreateEntryPoint(self):
     self.onModifyMeasureLength()
-    self.onModifyPathPlanningAngle()
+    self.onModifyPathPlanningRadius()
     self.logic.createEntryPoint()
 
   # Event handlers for sagittalReference line
@@ -1054,7 +1033,8 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     if status == 'Completed':
       self.vesselnessCalcButton.setEnabled(1)
       self.grayScaleMakerButton.setEnabled(1)
-      self.onSelect(self.logic.baseVolumeNode) ## the slice widgets are set to none after the  cli module calculation. reason unclear...
+      #self.onSelect(self.logic.baseVolumeNode)
+      self.logic.setSliceViewer()## the slice widgets are set to none after the  cli module calculation. reason unclear...
     pass
   
   # Event handlers for trajectory
@@ -1478,6 +1458,33 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     self.sagittalReferenceCurveManager.unlockLine()
     self.coronalReferenceCurveManager.unlockLine()
 
+  def setSliceViewer(self):
+    red_widget = slicer.app.layoutManager().sliceWidget("Red")
+    red_logic = red_widget.sliceLogic()
+    red_cn = red_logic.GetSliceCompositeNode()
+
+    yellow_widget = slicer.app.layoutManager().sliceWidget("Yellow")
+    yellow_logic = yellow_widget.sliceLogic()
+    yellow_cn = yellow_logic.GetSliceCompositeNode()
+
+    green_widget = slicer.app.layoutManager().sliceWidget("Green")
+    green_logic = green_widget.sliceLogic()
+    green_cn = green_logic.GetSliceCompositeNode()
+
+    if self.currentVolumeNode:
+      red_cn.SetBackgroundVolumeID(self.currentVolumeNode.GetID())
+      yellow_cn.SetBackgroundVolumeID(self.currentVolumeNode.GetID())
+      green_cn.SetBackgroundVolumeID(self.currentVolumeNode.GetID())
+      red_widget.fitSliceToBackground()
+      yellow_widget.fitSliceToBackground()
+      green_widget.fitSliceToBackground()
+
+    if self.ventricleVolume:
+      red_cn.SetForegroundVolumeID(self.ventricleVolume.GetID())
+      yellow_cn.SetForegroundVolumeID(self.ventricleVolume.GetID())
+      green_cn.SetForegroundVolumeID(self.ventricleVolume.GetID())
+    pass
+
   def startEditCannula(self):
     if self.baseVolumeNode:
       nasionID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_nasion")
@@ -1574,6 +1581,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       if imageCollection:
         distanceMapNode = imageCollection.GetItemAsObject(0)
         self.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_distanceVolume", distanceMapNode.GetID())
+      self.setSliceViewer()
     else:
       distanceMapNodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_distanceVolume")
       distanceMapNode = slicer.mrmlScene.GetNodeByID(distanceMapNodeID)
@@ -1602,12 +1610,13 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       obbTree.BuildLocator()
       pointsVTKintersection = vtk.vtkPoints()
       hasIntersection = obbTree.IntersectWithLine(posEntry, posTarget, pointsVTKintersection, None)
+      slicer.mrmlScene.RemoveNode(grayScaleModelWithMarginNode)
       if hasIntersection > 0:
         if slicer.util.confirmYesNoDisplay("The cannula is within the safty margin of the venous, use location optimization?",
                                            windowTitle=""):
           self.relocateCannula(self.pathReceived)
 
-    slicer.mrmlScene.RemoveNode(grayScaleModelWithMarginNode)
+
       #slicer.mrmlScene.RemoveNode(distanceMapNode)
 
   def relocateCannula(self, pathReceived):
