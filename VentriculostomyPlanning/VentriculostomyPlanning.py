@@ -430,18 +430,22 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     selectNasionLayout = qt.QVBoxLayout()
     selectNasionLayout.setAlignment(qt.Qt.AlignCenter)
     self.selectNasionBox.setLayout(selectNasionLayout)
+    self.selectNasionBox.setStyleSheet('QGroupBox{border:0;}')
+    self.mainGUIGroupBoxLayout.addWidget(self.selectNasionBox, 2, 1)
+
     self.selectNasionButton = qt.QPushButton("")
     self.selectNasionButton.toolTip = "Add a point in the 3D window"
     self.selectNasionButton.enabled = True
-    selectNasionLabel = qt.QLabel('Select Nasion')
-    #selectNasionLayout.addWidget(selectNasionLabel)
-    selectNasionLayout.addWidget(self.selectNasionButton)
     self.selectNasionButton.setMaximumHeight(buttonHeight)
     self.selectNasionButton.setMaximumWidth(buttonWidth)
     self.selectNasionButton.setIcon(qt.QIcon(qt.QPixmap(os.path.join(self.scriptDirectory, "nasion.png"))))
     self.selectNasionButton.setIconSize(qt.QSize(self.selectNasionButton.size))
-    self.selectNasionBox.setStyleSheet('QGroupBox{border:0;}')
-    self.mainGUIGroupBoxLayout.addWidget(self.selectNasionBox, 2, 1)
+    selectNasionLabel = qt.QLabel('Select Nasion')
+    selectNasionLayout.addWidget(self.selectNasionButton)
+    self.selectSagittalButton = qt.QPushButton("")
+    self.selectSagittalButton.toolTip = "Add a point in the 3D window to identify the sagittal plane"
+    self.selectSagittalButton.enabled = True
+    selectNasionLayout.addWidget(self.selectSagittalButton)
 
     self.createEntryPointButton = qt.QPushButton("Create Entry Point")
     self.createEntryPointButton.toolTip = "Create the initial entry point."
@@ -449,7 +453,8 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.createEntryPointButton.enabled = True
 
     self.LoadCaseButton.connect('clicked(bool)', self.onLoadCase)
-    self.selectNasionButton.connect('clicked(bool)', self.onSelectNasionPointNode)
+    self.selectNasionButton.connect('clicked(bool)', self.onSelectNasionPoint)
+    self.selectSagittalButton.connect('clicked(bool)', self.onSelectSagittalPoint)
     self.createEntryPointButton.connect('clicked(bool)', self.onCreateEntryPoint)
 
     
@@ -766,11 +771,12 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
         caseName = self.logic.baseVolumeNode.GetName()
       self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_model",caseName)
       self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_nasion",caseName)
+      self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_sagittalPoint", caseName)
       self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_trajectory",caseName)
       self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_trajectoryModel",caseName)
-      self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_saggitalReferenceModel",caseName)
+      self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_sagittalReferenceModel",caseName)
       self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_coronalReferenceModel",caseName)
-      self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_saggitalPlanningModel",caseName)
+      self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_sagittalPlanningModel",caseName)
       self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_coronalPlanningModel",caseName)
       self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_grayScaleModel",caseName)
       self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_vesselnessVolume",caseName)
@@ -785,11 +791,11 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       self.lengthCoronalReferenceLineEdit.text = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_coronalLength")
       self.radiusPathPlanningEdit.text = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_planningRadius")
 
-      ReferenceModelID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_saggitalReferenceModel")
+      ReferenceModelID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagittalReferenceModel")
       self.logic.sagittalReferenceCurveManager._curveModel = slicer.mrmlScene.GetNodeByID(ReferenceModelID)
       ReferenceModelID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_coronalReferenceModel")
       self.logic.coronalReferenceCurveManager._curveModel = slicer.mrmlScene.GetNodeByID(ReferenceModelID)
-      ReferenceModelID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_saggitalPlanningModel")
+      ReferenceModelID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagittalPlanningModel")
       self.logic.sagittalPlanningCurveManager._curveModel = slicer.mrmlScene.GetNodeByID(ReferenceModelID)
       ReferenceModelID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_coronalPlanningModel")
       self.logic.coronalPlanningCurveManager._curveModel = slicer.mrmlScene.GetNodeByID(ReferenceModelID)
@@ -896,7 +902,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
         outputModelNode.SetAttribute("vtkMRMLModelNode.modelCreated","False")
         self.logic.createModel(outputModelNode, self.logic.threshold)
   
-  def onSelectNasionPointNode(self):
+  def onSelectNasionPoint(self):
     if not self.inputVolumeSelector.currentNode():
       slicer.util.warningDisplay("No case is selceted, please select the case in the combox", windowTitle="")
     else:
@@ -906,6 +912,18 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
         if (not outputModelNode) or outputModelNode.GetAttribute("vtkMRMLModelNode.modelCreated") == "False":
             self.logic.createModel(outputModelNode, self.logic.threshold)
         self.logic.selectNasionPointNode(outputModelNode) # when the model is not available, the model will be created, so nodeAdded signal should be disconnected
+        self.logic.setSliceViewer()
+
+  def onSelectSagittalPoint(self):
+    if not self.inputVolumeSelector.currentNode():
+      slicer.util.warningDisplay("No case is selceted, please select the case in the combox", windowTitle="")
+    else:
+      outputModelNodeID = self.inputVolumeSelector.currentNode().GetAttribute("vtkMRMLScalarVolumeNode.rel_model")
+      if outputModelNodeID:
+        outputModelNode = slicer.mrmlScene.GetNodeByID(outputModelNodeID)
+        if (not outputModelNode) or outputModelNode.GetAttribute("vtkMRMLModelNode.modelCreated") == "False":
+            self.logic.createModel(outputModelNode, self.logic.threshold)
+        self.logic.selectSagittalPointNode(outputModelNode) # when the model is not available, the model will be created, so nodeAdded signal should be disconnected
         self.logic.setSliceViewer()
 
   def onSaveData(self):
@@ -1377,6 +1395,8 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     self.threshold = -500.0
     self.yawAngle = 0
     self.pitchAngle = 0
+    self.sagittalYawAngle = 0
+    self.trueSagittalPlane = None
     self.activeTrajectoryMarkup = 0
     self.trajectoryProjectedMarker = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
     self.trajectoryProjectedMarker.SetName("trajectoryProject")
@@ -1384,6 +1404,10 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     self.nasionProjectedMarker = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
     self.nasionProjectedMarker.SetName("nasionProject")
     slicer.mrmlScene.AddNode(self.nasionProjectedMarker)
+
+    self.interactionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLInteractionNodeSingleton")
+    self.interactionNode.AddObserver(self.interactionNode.EndPlacementEvent, self.endPlacement)
+    self.interactionMode = "none"
 
   def clear(self):
     slicer.mrmlScene.RemoveNode(slicer.mrmlScene.GetNodeByID(self.trajectoryProjectedMarker.GetID()))
@@ -1507,21 +1531,20 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
           dnode.SetVisibility(0)
           dnode.SetGlyphScale(2.5)
         selectionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSelectionNodeSingleton")
-        interactionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLInteractionNodeSingleton")
-        if (selectionNode == None) or (interactionNode == None):
+        #interactionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLInteractionNodeSingleton")
+        if (selectionNode == None) or (self.interactionNode == None):
           return
         
         selectionNode.SetReferenceActivePlaceNodeClassName("vtkMRMLMarkupsFiducialNode");
         selectionNode.SetActivePlaceNodeID(trajectoryNode.GetID())
     
-        interactionNode.SwitchToSinglePlaceMode ()
-        interactionNode.SetCurrentInteractionMode(slicer.vtkMRMLInteractionNode.Place) 
+        self.interactionNode.SwitchToSinglePlaceMode ()
+        self.interactionNode.SetCurrentInteractionMode(slicer.vtkMRMLInteractionNode.Place)
         trajectoryNode.AddObserver(trajectoryNode.PointStartInteractionEvent, self.updateSelectedMarker)
         trajectoryNode.AddObserver(trajectoryNode.PointModifiedEvent, self.updateTrajectoryPosition)
         trajectoryNode.AddObserver(trajectoryNode.PointEndInteractionEvent, self.endTrajectoryInteraction)
-        interactionNode.SetAttribute("vtkMRMLInteractionNode.rel_marker", "trajectory")
-        interactionNode.AddObserver(interactionNode.EndPlacementEvent, self.endPlacement) 
-        
+        #self.interactionNode.SetAttribute("vtkMRMLInteractionNode.rel_marker", "trajectory")
+        self.interactionMode = "trajectory"
         pos = [0.0] * 3
         if trajectoryNode.GetNumberOfMarkups () > 0:
           pos = None
@@ -1533,6 +1556,9 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     self.trajectoryManager.endEditLine()
 
   def generatePath(self):
+    #interactionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLInteractionNodeSingleton")
+    #self.interactionNode.SetAttribute("vtkMRMLInteractionNode.rel_marker", "none")  # prevent generating the endplacement event from PercutaneousApproachAnalysisLogic calculation
+    self.interactionMode = "none"
     posTarget = numpy.array([0.0] * 3)
     self.trajectoryManager.getLastPoint(posTarget)
     posEntry = numpy.array([0.0]*3)
@@ -1926,6 +1952,12 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         slicer.mrmlScene.AddNode(self.nasionNode)
         self.nasionNode.SetLocked(True)
         self.baseVolumeNode.SetAttribute(attribute, self.nasionNode.GetID())
+      if attribute == "vtkMRMLScalarVolumeNode.rel_sagittalPoint":
+        self.sagittalPointNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
+        self.sagittalPointNode.SetName(caseName+"sagittalPoint")
+        slicer.mrmlScene.AddNode(self.sagittalPointNode)
+        self.sagittalPointNode.SetLocked(True)
+        self.baseVolumeNode.SetAttribute(attribute, self.sagittalPointNode.GetID())
       elif attribute == "vtkMRMLScalarVolumeNode.rel_trajectory":
         self.trajectoryNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
         self.trajectoryNode.SetName(caseName+"trajectory")
@@ -1947,21 +1979,21 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         modelNode.SetName(caseName+"trajectoryModel")
         slicer.mrmlScene.AddNode(modelNode)
         self.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_trajectoryModel", modelNode.GetID())
-      elif attribute == "vtkMRMLScalarVolumeNode.rel_saggitalReferenceModel":
+      elif attribute == "vtkMRMLScalarVolumeNode.rel_sagittalReferenceModel":
         modelNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
-        modelNode.SetName(caseName+"saggitalReferenceModel")
+        modelNode.SetName(caseName+"sagittalReferenceModel")
         slicer.mrmlScene.AddNode(modelNode)
-        self.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_saggitalReferenceModel", modelNode.GetID())
+        self.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_sagittalReferenceModel", modelNode.GetID())
       elif attribute == "vtkMRMLScalarVolumeNode.rel_coronalReferenceModel":
         modelNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
         modelNode.SetName(caseName+"coronalReferenceModel")
         slicer.mrmlScene.AddNode(modelNode)
         self.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_coronalReferenceModel", modelNode.GetID())
-      elif attribute == "vtkMRMLScalarVolumeNode.rel_saggitalPlanningModel":
+      elif attribute == "vtkMRMLScalarVolumeNode.rel_sagittalPlanningModel":
         modelNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
-        modelNode.SetName(caseName+"saggitalPlanningModel")
+        modelNode.SetName(caseName+"sagittalPlanningModel")
         slicer.mrmlScene.AddNode(modelNode)
-        self.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_saggitalPlanningModel", modelNode.GetID())
+        self.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_sagittalPlanningModel", modelNode.GetID())
       elif attribute == "vtkMRMLScalarVolumeNode.rel_coronalPlanningModel":
         modelNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
         modelNode.SetName(caseName+"coronalPlanningModel")
@@ -2072,7 +2104,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       else:
         numOfFiducial = self.trajectoryProjectedMarker.GetNumberOfFiducials()
         for idx in range(1, numOfFiducial):
-          self.trajectoryProjectedMarker.SetNthFiducialLabel(idx,"invalid")  
+          self.trajectoryProjectedMarker.SetNthFiducialLabel(idx,"invalid")
     pass
   
   def updateNasionPosition(self, fiducicalMarkerNode, eventID):
@@ -2118,16 +2150,20 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
   def endPlacement(self, interactionNode, event):
     ## when place a new trajectory point, the UpdatePosition is called, the projectedMarker will be visiable.
     ## set the projected marker to invisiable here
-    interactionNode.SetCurrentInteractionMode(slicer.vtkMRMLInteractionNode.ViewTransform)
-    if interactionNode.GetAttribute("vtkMRMLInteractionNode.rel_marker") == "nasion":
+    self.interactionNode.SetCurrentInteractionMode(slicer.vtkMRMLInteractionNode.ViewTransform)
+    if self.interactionMode == "nasion":
       self.createEntryPoint()
       self.nasionProjectedMarker.GetMarkupsDisplayNode().SetVisibility(0)
-    if interactionNode.GetAttribute("vtkMRMLInteractionNode.rel_marker") == "trajectory":
+    if self.interactionMode == "sagittalPoint":
+      self.createTrueSagittalPlane()
+      self.createEntryPoint()
+    if self.interactionMode == "trajectory":
       self.trajectoryProjectedMarker.GetMarkupsDisplayNode().SetVisibility(0)    
       ## Trigger the venous intersection computation
       trajectoryNode = slicer.mrmlScene.GetNodeByID(self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_trajectory"))
       self.updateTrajectoryPosition(trajectoryNode)
-      self.endTrajectoryInteraction(trajectoryNode)                                              
+      self.endTrajectoryInteraction(trajectoryNode)
+      #self.generatePath()
     pass
   
   def endNasionInteraction(self, nasionNode, event):
@@ -2155,20 +2191,43 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
           dnode.SetSelectedColor(rgbColor)
           dnode.SetVisibility(0)
         selectionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSelectionNodeSingleton")
-        interactionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLInteractionNodeSingleton")
-        if (selectionNode == None) or (interactionNode == None):
+        #interactionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLInteractionNodeSingleton")
+        if (selectionNode == None) or (self.interactionNode == None):
           return
     
-        selectionNode.SetReferenceActivePlaceNodeClassName("vtkMRMLMarkupsFiducialNode");
+        selectionNode.SetReferenceActivePlaceNodeClassName("vtkMRMLMarkupsFiducialNode")
         selectionNode.SetActivePlaceNodeID(nasionNode.GetID())
-        
-        interactionNode.SetAttribute("vtkMRMLInteractionNode.rel_marker", "nasion")
-        interactionNode.SwitchToSinglePlaceMode ()
-        interactionNode.SetCurrentInteractionMode(slicer.vtkMRMLInteractionNode.Place)
-        interactionNode.AddObserver(interactionNode.EndPlacementEvent, self.endPlacement) 
+        #interactionNode.RemoveObserver(interactionNode.EndPlacementEvent, self.endPlacement)
+        #self.interactionNode.SetAttribute("vtkMRMLInteractionNode.rel_marker", "nasion")
+        self.interactionMode = "nasion"
+        self.interactionNode.SwitchToSinglePlaceMode ()
+        self.interactionNode.SetCurrentInteractionMode(slicer.vtkMRMLInteractionNode.Place)
+        #interactionNode.AddObserver(interactionNode.EndPlacementEvent, self.endPlacement)
         nasionNode.AddObserver(nasionNode.PointModifiedEvent, self.updateNasionPosition)
         nasionNode.AddObserver(nasionNode.PointEndInteractionEvent, self.endNasionInteraction)
-        
+
+  def selectSagittalPointNode(self, modelNode):
+    if self.baseVolumeNode:
+      if self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagittalPoint"):
+        sagittalPointNode = slicer.mrmlScene.GetNodeByID(
+          self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagittalPoint"))
+        dnode = sagittalPointNode.GetMarkupsDisplayNode()
+        sagittalPointNode.RemoveAllMarkups()
+        # slicer.mrmlScene.AddNode(nasionNode)
+        sagittalPointNode.SetLocked(True)
+
+        selectionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSelectionNodeSingleton")
+        #interactionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLInteractionNodeSingleton")
+        if (selectionNode == None) or (self.interactionNode == None):
+          return
+
+        selectionNode.SetReferenceActivePlaceNodeClassName("vtkMRMLMarkupsFiducialNode")
+        selectionNode.SetActivePlaceNodeID(sagittalPointNode.GetID())
+        #self.interactionNode.SetAttribute("vtkMRMLInteractionNode.rel_marker", "sagittalPoint")
+        self.interactionMode = "sagittalPoint"
+        self.interactionNode.SwitchToSinglePlaceMode()
+        self.interactionNode.SetCurrentInteractionMode(slicer.vtkMRMLInteractionNode.Place)
+
   def createROI(self):
     cropVolumeLogic = slicer.modules.cropvolume.logic()
     if self.baseVolumeNode:
@@ -2317,37 +2376,45 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     eps = 1e-2
     if axis == 1:
       lastRefPos = [0.0]*3
-      CurveManagerReference.curveFiducials.GetNthFiducialPosition(numOfRef-1, lastRefPos)  
-      if abs(lastRefPos[1]-points.GetPoint(0)[1])<eps: #if the planning and reference entry points are identical 
-        for jPos in range(step, points.GetNumberOfPoints(), step):
-          if abs(points.GetPoint(jPos)[0]-posNasion[0])>abs(lastRefPos[0]-posNasion[0]):
-            CurveManager.curveFiducials.AddFiducial(points.GetPoint(jPos)[0],points.GetPoint(jPos)[1],points.GetPoint(jPos)[2])
-          else:
-            break
+      CurveManagerReference.curveFiducials.GetNthFiducialPosition(numOfRef-1, lastRefPos)
+      if numpy.linalg.norm(numpy.array(lastRefPos)-numpy.array(points.GetPoint(0)))<eps: #if the planning and reference entry points are identical
         pos = [0.0]*3  
         for iPos in range(1,numOfRef): 
           CurveManagerReference.curveFiducials.GetNthFiducialPosition(numOfRef-iPos-1, pos)
-          if abs(pos[0]-posNasion[0])< abs(points.GetPoint(0)[0]-posNasion[0]):
-            CurveManager.curveFiducials.AddFiducial(pos[0],pos[1],pos[2])
+          CurveManager.curveFiducials.AddFiducial(pos[0],pos[1],pos[2])
         CurveManagerReference.curveFiducials.GetNthFiducialPosition(0, pos)    
         self.topPoint = pos       
-      else:   
+      else:
+        posIntersect = [0.0]*3
+        posSearch = [0.0]*3
+        minDistance = 1e10
+        for iSearch in range(points.GetNumberOfPoints()):
+          posSearch = points.GetPoint(iSearch)
+          if posSearch[2] > posNasion[2]: #Only the upper part of the cutted sagittal plan is considered
+            distance = self.trueSagittalPlane.DistanceToPlane(posSearch)
+            if distance < minDistance:
+              minDistance = distance
+              posIntersect = posSearch
+
         shift = step
-        for iPos in range(1,numOfRef): 
+        """
+        for iPos in range(1,numOfRef):
           pos = [0.0]*3
-          CurveManagerReference.curveFiducials.GetNthFiducialPosition(numOfRef-iPos-1, pos) 
-          if abs(pos[0]-posNasion[0])< abs(points.GetPoint(0)[0]-posNasion[0])and abs(pos[1]-points.GetPoint(0)[1])<eps and abs(pos[2]-points.GetPoint(0)[2])<eps:
-            CurveManager.curveFiducials.AddFiducial(pos[0],pos[1],pos[2]) 
+          CurveManagerReference.curveFiducials.GetNthFiducialPosition(numOfRef-iPos-1, pos)
+          #check if the points is aligned with the reference coronal line, if yes, take the point into the planning curvemanager
+          if abs(pos[0]-posIntersect[0])< abs(points.GetPoint(0)[0]-posIntersect[0])and abs(pos[1]-points.GetPoint(0)[1])<eps and abs(pos[2]-points.GetPoint(0)[2])<eps:
+            CurveManager.curveFiducials.AddFiducial(pos[0],pos[1],pos[2])
             shift = iPos
             break
+        """
         for iPos in range(shift,points.GetNumberOfPoints(),step):
           posModel = numpy.array(points.GetPoint(iPos))
           posModelValid = numpy.array(points.GetPoint(iPosValid))
           if  numpy.linalg.norm(posModel-posModelValid)> 50.0:
             continue
-          if (not self.useLeftHemisphere) and (abs(posModel[0]-posNasion[0])<eps or (posModel[0]<posNasion[0])):
+          if (not self.useLeftHemisphere) and (abs(posModel[0]-posIntersect[0])<eps or (posModel[0]<posIntersect[0])):
             break
-          elif self.useLeftHemisphere and (abs(posModel[0]-posNasion[0])<eps or (posModel[0]>posNasion[0])):
+          elif self.useLeftHemisphere and (abs(posModel[0]-posIntersect[0])<eps or (posModel[0]>posIntersect[0])):
             break
           iPosValid = iPos
           CurveManager.curveFiducials.AddFiducial(posModel[0],posModel[1],posModel[2]) #adding fiducials takes too long, check the event triggered by this operation
@@ -2358,14 +2425,14 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
           posModelValid = numpy.array(points.GetPoint(jPosValid))
           if  numpy.linalg.norm(posModel-posModelValid)> 50.0:
             continue
-          if (not self.useLeftHemisphere) and (abs(posModel[0]-posNasion[0])<eps or (posModel[0]<posNasion[0])):
+          if (not self.useLeftHemisphere) and (abs(posModel[0]-posIntersect[0])<eps or (posModel[0]<posIntersect[0])):
             break
-          elif self.useLeftHemisphere and (abs(posModel[0]-posNasion[0])<eps or (posModel[0]>posNasion[0])):
+          elif self.useLeftHemisphere and (abs(posModel[0]-posIntersect[0])<eps or (posModel[0]>posIntersect[0])):
             break
-          jPosValid = jPos   
-        self.topPoint = points.GetPoint(jPosValid)    
-        posModel = numpy.array(points.GetPoint(jPosValid))  
-        CurveManager.curveFiducials.AddFiducial(posModel[0],posModel[1],posModel[2]) 
+          jPosValid = jPos
+        self.topPoint = points.GetPoint(jPosValid)
+        posModel = numpy.array(points.GetPoint(jPosValid))
+        CurveManager.curveFiducials.AddFiducial(posModel[0],posModel[1],posModel[2])
 
     if axis ==0:
       for iPos in range(1,numOfRef): 
@@ -2404,7 +2471,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     cutter.SetInputData(polyData)
     cutter.Update()
     cuttedPolyData = cutter.GetOutput()
-    points = cuttedPolyData.GetPoints()      
+    points = cuttedPolyData.GetPoints()
     for iPos in range(points.GetNumberOfPoints()):
       posModel = numpy.array(points.GetPoint(iPos))
       ## distance calculation could be simplified if the patient is well aligned in the scanner
@@ -2441,7 +2508,22 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
           valid = (posModel[0]<=referencePoint[0] or abs(posModel[0]-referencePoint[0])<1e-3 )
       if valid:        
           intersectPoints.InsertNextPoint(posModel)        
-  
+
+  def createTrueSagittalPlane(self):
+    nasionNodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_nasion")
+    sagittalPointNodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagittalPoint")
+    if nasionNodeID and sagittalPointNodeID:
+      nasionNode = slicer.mrmlScene.GetNodeByID(nasionNodeID)
+      sagittalPointNode = slicer.mrmlScene.GetNodeByID(sagittalPointNodeID)
+      posNasion = numpy.array([0.0, 0.0, 0.0])
+      nasionNode.GetNthFiducialPosition(0, posNasion)
+      posSagittal = numpy.array([0.0, 0.0, 0.0])
+      sagittalPointNode.GetNthFiducialPosition(0, posSagittal)
+      self.sagittalYawAngle = -numpy.arctan2(posNasion[0] - posSagittal[0], posNasion[1] - posSagittal[1])
+      self.trueSagittalPlane = vtk.vtkPlane()
+      self.trueSagittalPlane.SetOrigin(posNasion[0], posNasion[1], posNasion[2])
+      self.trueSagittalPlane.SetNormal(math.cos(self.sagittalYawAngle), math.sin(self.sagittalYawAngle), 0)
+
   def createEntryPoint(self) :
     ###All calculation is based on the RAS coordinates system 
     inputModelNode = None
@@ -2460,15 +2542,12 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       coronalReferenceLength = float(self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_coronalLength")  )  
     if inputModelNode and (inputModelNode.GetAttribute("vtkMRMLModelNode.modelCreated") == "True") and (nasionNode.GetNumberOfMarkups()) and sagittalReferenceLength and coronalReferenceLength:
       polyData = inputModelNode.GetPolyData()
-      if polyData: 
+      if polyData and self.trueSagittalPlane:
         posNasion = numpy.array([0.0,0.0,0.0])
         nasionNode.GetNthFiducialPosition(0,posNasion)
-        plane = vtk.vtkPlane()
-        plane.SetOrigin(posNasion[0],0,0)
-        plane.SetNormal(1,0,0)
         sagittalPoints = vtk.vtkPoints()
-        self.getIntersectPoints(polyData, plane, posNasion, sagittalReferenceLength, 0, sagittalPoints)
-              
+        self.getIntersectPoints(polyData, self.trueSagittalPlane, posNasion, sagittalReferenceLength, 0, sagittalPoints)
+
         ## Sorting   
         self.sortPoints(sagittalPoints, posNasion)
         self.constructCurveReference(self.sagittalReferenceCurveManager, sagittalPoints, sagittalReferenceLength)  
@@ -2476,10 +2555,11 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         ##To do, calculate the curvature value points by point might be necessary to exclude the outliers   
         if self.topPoint:
           posNasionBack100 = self.topPoint
-          coronalPoints = vtk.vtkPoints() 
-          plane.SetOrigin(0,posNasionBack100[1],0)
-          plane.SetNormal(0,1,0)
-          self.getIntersectPoints(polyData, plane, posNasionBack100, coronalReferenceLength, 1, coronalPoints) 
+          coronalPoints = vtk.vtkPoints()
+          coronalPlane = vtk.vtkPlane()
+          coronalPlane.SetOrigin(posNasionBack100[0],posNasionBack100[1],posNasionBack100[2])
+          coronalPlane.SetNormal(math.sin(self.sagittalYawAngle),-math.cos(self.sagittalYawAngle),0)
+          self.getIntersectPoints(polyData, coronalPlane, posNasionBack100, coronalReferenceLength, 1, coronalPoints)
                     
           ## Sorting      
           self.sortPoints(coronalPoints, posNasionBack100)  
@@ -2501,35 +2581,39 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       nasionNode = slicer.mrmlScene.GetNodeByID(nasionNodeID)   
     if inputModelNode and (inputModelNode.GetAttribute("vtkMRMLModelNode.modelCreated") == "True") and (nasionNode.GetNumberOfMarkups()):
       polyData = inputModelNode.GetPolyData()
-      if polyData: 
+      if polyData and self.trueSagittalPlane:
         posNasion = numpy.array([0.0,0.0,0.0])
         nasionNode.GetNthFiducialPosition(0,posNasion)
         posTrajectory = numpy.array([0.0,0.0,0.0])
         if self.trajectoryManager.getFirstPoint(posTrajectory):
-          if posNasion[0]>posTrajectory[0] and self.useLeftHemisphere ==False:
+          normalVec = numpy.array(self.trueSagittalPlane.GetNormal())
+          originPos = numpy.array(self.trueSagittalPlane.GetOrigin())
+          entryPointAtLeft = -numpy.sign(numpy.dot(numpy.array(posTrajectory)-originPos, normalVec)) # here left hemisphere means from the patient's perspective
+          if entryPointAtLeft >= 0 and self.useLeftHemisphere ==False:
             self.useLeftHemisphere = True
             self.createEntryPoint()
-          if posNasion[0]<posTrajectory[0] and self.useLeftHemisphere == True:
+          if entryPointAtLeft < 0 and self.useLeftHemisphere == True:
             self.useLeftHemisphere = False
             self.createEntryPoint()
-          plane = vtk.vtkPlane()
-          plane.SetOrigin(0,posTrajectory[1],0)
-          plane.SetNormal(0,1,0)
+          coronalPlane = vtk.vtkPlane()
+          coronalPlane.SetOrigin(posTrajectory[0], posTrajectory[1], posTrajectory[2])
+          coronalPlane.SetNormal(math.sin(self.sagittalYawAngle), -math.cos(self.sagittalYawAngle), 0)
           coronalPoints = vtk.vtkPoints()
-          self.getIntersectPointsPlanning(polyData, plane, posTrajectory, 1 , coronalPoints)
-                
+          self.getIntersectPointsPlanning(polyData, coronalPlane, posTrajectory, 1 , coronalPoints)
+
           ## Sorting   
           self.sortPoints(coronalPoints, posTrajectory)
           
-          self.constructCurvePlanning(self.coronalPlanningCurveManager, self.coronalReferenceCurveManager, coronalPoints, 1)  
+          self.constructCurvePlanning(self.coronalPlanningCurveManager, self.coronalReferenceCurveManager, coronalPoints, 1)
               
           ##To do, calculate the curvature value points by point might be necessary to exclude the outliers   
           if self.topPoint:
             posTractoryBack = self.topPoint
-            sagittalPoints = vtk.vtkPoints() 
-            plane.SetOrigin(posTractoryBack[0],0,0)
-            plane.SetNormal(1,0,0)
-            self.getIntersectPointsPlanning(polyData, plane, posTractoryBack, 0, sagittalPoints) 
+            sagittalPoints = vtk.vtkPoints()
+            sagittalPlane = vtk.vtkPlane()
+            sagittalPlane.SetOrigin(posTractoryBack[0],posTractoryBack[1],posTractoryBack[2])
+            sagittalPlane.SetNormal(math.cos(self.sagittalYawAngle), math.sin(self.sagittalYawAngle), 0)
+            self.getIntersectPointsPlanning(polyData, sagittalPlane, posTractoryBack, 0, sagittalPoints)
                       
             ## Sorting      
             self.sortPoints(sagittalPoints, posTractoryBack)  
