@@ -501,18 +501,22 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     addCannulaLayout = qt.QVBoxLayout()
     addCannulaLayout.setAlignment(qt.Qt.AlignCenter)
     self.addCannulaBox.setLayout(addCannulaLayout)
-    self.addCannulaPointButton = qt.QPushButton("")
-    self.addCannulaPointButton.toolTip = ""
-    self.addCannulaPointButton.enabled = True
+    self.addCannulaTargetButton = qt.QPushButton("")
+    self.addCannulaTargetButton.toolTip = ""
+    self.addCannulaTargetButton.enabled = True
     addCannulaLabel = qt.QLabel('Add Cannula')
     #addCannulaLayout.addWidget(addCannulaLabel)
-    addCannulaLayout.addWidget(self.addCannulaPointButton)
-    self.addCannulaPointButton.setMaximumHeight(buttonHeight)
-    self.addCannulaPointButton.setMaximumWidth(buttonWidth)
-    self.addCannulaPointButton.setToolTip("Define the end cannula point")
-    self.addCannulaPointButton.setIcon(qt.QIcon(qt.QPixmap(os.path.join(self.scriptDirectory, "cannula.png"))))
-    self.addCannulaPointButton.setIconSize(qt.QSize(self.addCannulaPointButton.size))
+    addCannulaLayout.addWidget(self.addCannulaTargetButton)
+    self.addCannulaTargetButton.setMaximumHeight(buttonHeight)
+    self.addCannulaTargetButton.setMaximumWidth(buttonWidth)
+    self.addCannulaTargetButton.setToolTip("Define the end cannula point")
+    self.addCannulaTargetButton.setIcon(qt.QIcon(qt.QPixmap(os.path.join(self.scriptDirectory, "cannula.png"))))
+    self.addCannulaTargetButton.setIconSize(qt.QSize(self.addCannulaTargetButton.size))
     self.addCannulaBox.setStyleSheet('QGroupBox{border:0;}')
+    self.addCannulaDistalButton = qt.QPushButton("")
+    self.addCannulaDistalButton.toolTip = ""
+    self.addCannulaDistalButton.enabled = True
+    addCannulaLayout.addWidget(self.addCannulaDistalButton)
     self.mainGUIGroupBoxLayout.addWidget(self.addCannulaBox,2,3)
 
     self.generatePathBox = qt.QGroupBox()
@@ -613,7 +617,8 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.isReverseView = False
 
      # Needle trajectory
-    self.addCannulaPointButton.connect('clicked(bool)', self.onEditCannula)
+    self.addCannulaTargetButton.connect('clicked(bool)', self.onEditPlanningTarget)
+    self.addCannulaDistalButton.connect('clicked(bool)', self.onEditPlanningTarget)
     self.generatePathButton.connect('clicked(bool)', self.onGeneratePath)
     self.clearTrajectoryButton.connect('clicked(bool)', self.onClearTrajectory)
     self.logic.setTrajectoryModifiedEventHandler(self.onTrajectoryModified)
@@ -773,6 +778,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_nasion",caseName)
       self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_sagittalPoint", caseName)
       self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_trajectory",caseName)
+      self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_cannula", caseName)
       self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_trajectoryModel",caseName)
       self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_sagittalReferenceModel",caseName)
       self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_coronalReferenceModel",caseName)
@@ -968,7 +974,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
   def onEditSagittalReferenceLine(self, switch):
 
     if switch == True:
-      self.addCannulaPointButton.checked = False
+      self.addCannulaTargetButton.checked = False
       self.logic.startEditSagittalReferenceLine()
     else:
       self.logic.endEditSagittalReferenceLine()
@@ -986,7 +992,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
   def onEditCoronalReferenceLine(self, switch):
 
     if switch == True:
-      self.addCannulaPointButton.checked = False
+      self.addCannulaTargetButton.checked = False
       self.logic.startEditCoronalReferenceLine()
     else:
       self.logic.endEditCoronalReferenceLine()
@@ -1056,14 +1062,14 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     pass
   
   # Event handlers for trajectory
-  def onEditCannula(self):
+  def onEditPlanningTarget(self):
     self.imageSlider.setValue(100.0)
     self.lengthTrajectoryEdit.text = '--'
     self.lengthSagittalPlanningLineEdit.text = '--'
     self.lengthCoronalPlanningLineEdit.text = '--'
     self.pitchAngleEdit.text = '--'
     self.yawAngleEdit.text = '--'
-    self.logic.startEditCannula()
+    self.logic.startEditPlanningTarget()
 
   def onGeneratePath(self):
     self.logic.generatePath()
@@ -1078,7 +1084,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
   def onEditSagittalPlanningLine(self, switch):
 
     if switch == True:
-      self.addCannulaPointButton.checked = False
+      self.addCannulaTargetButton.checked = False
       self.logic.startEditSagittalPlanningLine()
     else:
       self.logic.endEditSagittalPlanningLine()
@@ -1096,7 +1102,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
   def onEditCoronalPlanningLine(self, switch):
 
     if switch == True:
-      self.addCannulaPointButton.checked = False
+      self.addCannulaTargetButton.checked = False
       self.logic.startEditCoronalPlanningLine()
     else:
       self.logic.endEditCoronalPlanningLine()
@@ -1113,11 +1119,11 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
 
   def onLock(self):
     if self.lockTrajectoryCheckBox.checked == 1:
-      self.addCannulaPointButton.enabled = False
+      self.addCannulaTargetButton.enabled = False
       self.clearTrajectoryButton.enabled = False
       self.logic.lockTrajectoryLine()
     else:
-      self.addCannulaPointButton.enabled = True
+      self.addCannulaTargetButton.enabled = True
       self.clearTrajectoryButton.enabled = True
       self.logic.unlockTrajectoryLine()
 
@@ -1360,6 +1366,12 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     self.trajectoryManager.setModelColor(0.0, 1.0, 1.0)
     self.trajectoryManager.setDefaultSlicePositionToFirstPoint()
 
+    self.cannulaManager = CurveManager()
+    self.cannulaManager.setName("Cannula")
+    self.cannulaManager.setDefaultSlicePositionToLastPoint()
+    self.cannulaManager.setModelColor(0.5, 1.0, 0.0)
+    self.cannulaManager.setDefaultSlicePositionToFirstPoint()
+
     self.coronalPlanningCurveManager = CurveManager()
     self.coronalPlanningCurveManager.setName("CP1")
     self.coronalPlanningCurveManager.setSliceID("vtkMRMLSliceNodeGreen")
@@ -1398,6 +1410,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     self.sagittalYawAngle = 0
     self.trueSagittalPlane = None
     self.activeTrajectoryMarkup = 0
+    self.cylindarRadius = 2.5 # unit mm
     self.trajectoryProjectedMarker = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
     self.trajectoryProjectedMarker.SetName("trajectoryProject")
     slicer.mrmlScene.AddNode(self.trajectoryProjectedMarker)
@@ -1509,11 +1522,11 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       green_cn.SetForegroundVolumeID(self.ventricleVolume.GetID())
     pass
 
-  def startEditCannula(self):
+  def startEditPlanningTarget(self):
     if self.baseVolumeNode:
       nasionID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_nasion")
       nasionNode = slicer.mrmlScene.GetNodeByID(nasionID)
-      if nasionNode.GetNumberOfFiducials()>0:
+      if 1: #nasionNode.GetNumberOfFiducials()>0:
         trajectoryNode = slicer.mrmlScene.GetNodeByID(self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_trajectory"))
         #slicer.mrmlScene.AddNode(trajectoryNode)
         dnode = trajectoryNode.GetMarkupsDisplayNode()
@@ -1522,7 +1535,8 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
           dnode.SetSelectedColor(rgbColor)
           dnode.SetVisibility(1)
         self.trajectoryManager.curveFiducials = trajectoryNode
-        self.trajectoryManager.clearLine()
+        if trajectoryNode.GetNumberOfFiducials() > 1:
+          self.trajectoryManager.clearLine()
         self.trajectoryProjectedMarker.RemoveAllMarkups()
         dnode = self.trajectoryProjectedMarker.GetMarkupsDisplayNode()
         if dnode:
@@ -1535,7 +1549,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         if (selectionNode == None) or (self.interactionNode == None):
           return
         
-        selectionNode.SetReferenceActivePlaceNodeClassName("vtkMRMLMarkupsFiducialNode");
+        selectionNode.SetReferenceActivePlaceNodeClassName("vtkMRMLMarkupsFiducialNode")
         selectionNode.SetActivePlaceNodeID(trajectoryNode.GetID())
     
         self.interactionNode.SwitchToSinglePlaceMode ()
@@ -1550,7 +1564,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
           pos = None
         else:  
           self.coronalReferenceCurveManager.getLastPoint(pos)    
-        self.trajectoryManager.startEditLine(pos)
+        self.trajectoryManager.startEditLine() # not using the reference point
   
   def endEditTrajectory(self):
     self.trajectoryManager.endEditLine()
@@ -1560,9 +1574,12 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     #self.interactionNode.SetAttribute("vtkMRMLInteractionNode.rel_marker", "none")  # prevent generating the endplacement event from PercutaneousApproachAnalysisLogic calculation
     self.interactionMode = "none"
     posTarget = numpy.array([0.0] * 3)
-    self.trajectoryManager.getLastPoint(posTarget)
+    self.trajectoryManager.getFirstPoint(posTarget)
+    posDistal = numpy.array([0.0] * 3)
+    self.trajectoryManager.getLastPoint(posDistal)
     posEntry = numpy.array([0.0]*3)
-    self.trajectoryManager.getFirstPoint(posEntry)
+    self.endTrajectoryInteraction(self.trajectoryManager.curveFiducials)
+    self.trajectoryProjectedMarker.GetNthFiducialPosition(0,posEntry)
     self.targetPointNode.RemoveAllMarkups()
     self.targetPointNode.AddFiducial(posTarget[0], posTarget[1], posTarget[2])
     grayScaleModelNodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_grayScaleModel")
@@ -1584,7 +1601,10 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     phiResolution = 5*numpy.pi/180.0
     radiusResolution = 1.5
     points.InsertNextPoint(posEntry)
-    for radius in numpy.arange(radiusResolution, 30, radiusResolution):
+    distance2 = numpy.linalg.norm(numpy.array(posTarget) - numpy.array(posEntry))
+    distance1 = numpy.linalg.norm(numpy.array(posTarget) - numpy.array(posDistal))
+    maximumRadius = self.cylindarRadius * distance2 / distance1
+    for radius in numpy.arange(radiusResolution, maximumRadius, radiusResolution):
       for angle in numpy.arange(phiResolution, numpy.pi, phiResolution):
         point = matrix.MultiplyPoint(numpy.array([radius*math.cos(angle), radius*math.sin(angle),0,1]))
         pointTranslated = [point[0]+pathPlanningBasePoint[0],point[1]+pathPlanningBasePoint[1],point[2]+pathPlanningBasePoint[2]]
@@ -1638,9 +1658,28 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       hasIntersection = obbTree.IntersectWithLine(posEntry, posTarget, pointsVTKintersection, None)
       slicer.mrmlScene.RemoveNode(grayScaleModelWithMarginNode)
       if hasIntersection > 0:
-        if slicer.util.confirmYesNoDisplay("The cannula is within the safty margin of the venous, use location optimization?",
-                                           windowTitle=""):
-          self.relocateCannula(self.pathReceived)
+        cannulaNode = slicer.mrmlScene.GetNodeByID(
+          self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_cannula"))
+        # slicer.mrmlScene.AddNode(trajectoryNode)
+        dnode = cannulaNode.GetMarkupsDisplayNode()
+        if dnode:
+          rgbColor = [0.0, 1.0, 1.0]
+          dnode.SetSelectedColor(rgbColor)
+          dnode.SetVisibility(1)
+        self.cannulaManager.curveFiducials = cannulaNode
+        self.cannulaManager.clearLine()
+        self.cannulaManager.curveFiducials.RemoveAllMarkups()
+        if self.nPathReceived>0:
+          if slicer.util.confirmYesNoDisplay("The cannula is within the safty margin of the venous, use location optimization?",
+                                             windowTitle=""):
+            self.relocateCannula(self.pathReceived)
+          else:
+            self.cannulaManager.curveFiducials.SetNthFiducialPositionFromArray(0, posTarget)
+            self.cannulaManager.curveFiducials.SetNthFiducialPositionFromArray(1, posEntry)
+        else:
+          slicer.util.warningDisplay(
+            "No any cannula candidate exists here, considering redefine the ventricle area?")
+
 
 
       #slicer.mrmlScene.RemoveNode(distanceMapNode)
@@ -1648,10 +1687,10 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
   def relocateCannula(self, pathReceived):
     if pathReceived:
       posTarget = numpy.array([0.0] * 3)
-      self.trajectoryManager.getLastPoint(posTarget)
-      posEntry = numpy.array([0.0] * 3)
-      self.trajectoryManager.getFirstPoint(posEntry)
-      direction1Norm = (posEntry - posTarget)/numpy.linalg.norm(posTarget - posEntry)
+      self.trajectoryManager.getFirstPoint(posTarget)
+      posDistal = numpy.array([0.0] * 3)
+      self.trajectoryManager.getLastPoint(posDistal)
+      direction1Norm = (posDistal - posTarget)/numpy.linalg.norm(posTarget - posDistal)
       angleMin =numpy.pi
       optimizedEntry = []
       for pointIndex in range(1, len(pathReceived),2):
@@ -1661,10 +1700,19 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         if angle < angleMin:
           angleMin = angle
           optimizedEntry = pathReceived[pointIndex]
-      if optimizedEntry.any():
-        self.trajectoryManager.curveFiducials.SetNthFiducialPositionFromArray(0,optimizedEntry)
-        self.updateTrajectoryPosition(self.trajectoryManager.curveFiducials)
-        self.endTrajectoryInteraction(self.trajectoryManager.curveFiducials)
+      if optimizedEntry and optimizedEntry.any():
+        posEntry = numpy.array([0.0] * 3)
+        self.trajectoryProjectedMarker.GetNthFiducialPosition(0, posEntry)
+        distance2 = numpy.linalg.norm(numpy.array(posTarget) - numpy.array(posEntry))
+        distance1 = numpy.linalg.norm(numpy.array(posTarget) - numpy.array(posDistal))
+        posDistalModified = numpy.array(posTarget) + (numpy.array(optimizedEntry) - numpy.array(posTarget))/distance2*distance1
+        #self.trajectoryManager.curveFiducials.SetNthFiducialPositionFromArray(1,optimizedEntry)
+        self.cannulaManager.curveFiducials.SetNthFiducialPositionFromArray(0, posTarget)
+        self.cannulaManager.curveFiducials.SetNthFiducialPositionFromArray(1, posDistalModified)
+        self.updateTrajectoryPosition(self.cannulaManager.curveFiducials)
+        posProject =  numpy.array([0.0] * 3)
+        self.trajectoryProjectedMarker.GetNthFiducialPosition(0,posProject)
+        self.cannulaManager.curveFiducials.SetNthFiducialPositionFromArray(1, posProject)
     pass
 
   def clearTrajectory(self):
@@ -1916,13 +1964,13 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
   def calculateVenousVesselness(self,inputVolumeNode, vesselnessNode):      
       convolutionFilter = vtk.vtkImageSeparableConvolution()
       zKernel = vtk.vtkFloatArray()
-      zKernel.SetNumberOfTuples(5);
-      zKernel.SetNumberOfComponents(1);
-      zKernel.SetValue(0,1);
-      zKernel.SetValue(1,1);
-      zKernel.SetValue(2,1);
-      zKernel.SetValue(3,1);
-      zKernel.SetValue(4,1);
+      zKernel.SetNumberOfTuples(5)
+      zKernel.SetNumberOfComponents(1)
+      zKernel.SetValue(0,1)
+      zKernel.SetValue(1,1)
+      zKernel.SetValue(2,1)
+      zKernel.SetValue(3,1)
+      zKernel.SetValue(4,1)
       convolutionFilter.SetZKernel(zKernel)
       convolutionFilter.SetInputData(inputVolumeNode.GetImageData())
       convolutionFilter.Update()
@@ -1947,22 +1995,27 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         attributeNode.GetDisplayNode().SetVisibility(1)
     else:
       if attribute == "vtkMRMLScalarVolumeNode.rel_nasion":
-        self.nasionNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
-        self.nasionNode.SetName(caseName+"nasion")
-        slicer.mrmlScene.AddNode(self.nasionNode)
-        self.nasionNode.SetLocked(True)
-        self.baseVolumeNode.SetAttribute(attribute, self.nasionNode.GetID())
+        nasionNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
+        nasionNode.SetName(caseName+"nasion")
+        slicer.mrmlScene.AddNode(nasionNode)
+        nasionNode.SetLocked(True)
+        self.baseVolumeNode.SetAttribute(attribute, nasionNode.GetID())
       if attribute == "vtkMRMLScalarVolumeNode.rel_sagittalPoint":
-        self.sagittalPointNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
-        self.sagittalPointNode.SetName(caseName+"sagittalPoint")
-        slicer.mrmlScene.AddNode(self.sagittalPointNode)
-        self.sagittalPointNode.SetLocked(True)
-        self.baseVolumeNode.SetAttribute(attribute, self.sagittalPointNode.GetID())
+        sagittalPointNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
+        sagittalPointNode.SetName(caseName+"sagittalPoint")
+        slicer.mrmlScene.AddNode(sagittalPointNode)
+        sagittalPointNode.SetLocked(True)
+        self.baseVolumeNode.SetAttribute(attribute, sagittalPointNode.GetID())
       elif attribute == "vtkMRMLScalarVolumeNode.rel_trajectory":
-        self.trajectoryNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
-        self.trajectoryNode.SetName(caseName+"trajectory")
-        slicer.mrmlScene.AddNode(self.trajectoryNode)
-        self.baseVolumeNode.SetAttribute(attribute, self.trajectoryNode.GetID())
+        trajectoryNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
+        trajectoryNode.SetName(caseName+"trajectory")
+        slicer.mrmlScene.AddNode(trajectoryNode)
+        self.baseVolumeNode.SetAttribute(attribute, trajectoryNode.GetID())
+      elif attribute == "vtkMRMLScalarVolumeNode.rel_cannula":
+        cannulaNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
+        cannulaNode.SetName(caseName+"cannula")
+        slicer.mrmlScene.AddNode(cannulaNode)
+        self.baseVolumeNode.SetAttribute(attribute, cannulaNode.GetID())
       elif attribute == "vtkMRMLScalarVolumeNode.rel_model":  
         modelNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
         modelNode.SetAttribute("vtkMRMLModelNode.modelCreated", "False")
@@ -2042,8 +2095,8 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         fiducicalMarkerNode.GetNthFiducialPosition(0,posFirst)
         posSecond = [0.0,0.0,0.0]
         fiducicalMarkerNode.GetNthFiducialPosition(1,posSecond)
-        if self.activeTrajectoryMarkup == 0:
-          direction = numpy.array(posFirst)- numpy.array(posSecond)
+        if 1: #  self.activeTrajectoryMarkup == 0 means the target fiducial, 1 is the fiducial closer to the surface
+          direction = numpy.array(posSecond)- numpy.array(posFirst)
           locator = vtk.vtkCellLocator()
           locator.SetDataSet(polyData)
           locator.BuildLocator()
@@ -2051,35 +2104,35 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
           x = [0.0,0.0,0.0]
           pcoords = [0.0,0.0,0.0]
           subId = vtk.mutable(0)
-          hasIntersection = locator.IntersectWithLine( posFirst + 1e6*direction, posSecond -  1e6*direction, 1e-2, t, x, pcoords, subId)
+          hasIntersection = locator.IntersectWithLine( posSecond + 1e6*direction, posFirst -  1e6*direction, 1e-2, t, x, pcoords, subId)
           if hasIntersection>0:
             self.trajectoryProjectedMarker.SetNthFiducialPositionFromArray(0,x)
             self.trajectoryProjectedMarker.SetNthFiducialLabel(0,"")  
           else:
-            self.trajectoryProjectedMarker.SetNthFiducialLabel(0,"invalid")  
+            self.trajectoryProjectedMarker.SetNthFiducialLabel(0,"invalid")
         else:
-          self.trajectoryProjectedMarker.SetNthFiducialPositionFromArray(0,posFirst)
-          self.trajectoryProjectedMarker.SetNthFiducialLabel(0,"")    
-          self.trajectoryProjectedMarker.SetNthFiducialVisibility(0,False)
+          self.trajectoryProjectedMarker.SetNthFiducialPositionFromArray(0,posSecond)
+          self.trajectoryProjectedMarker.SetNthFiducialLabel(0,"")
+          #self.trajectoryProjectedMarker.SetNthFiducialVisibility(0,False)
     
                 
     self.updateSlicePosition(fiducicalMarkerNode,self.activeTrajectoryMarkup)
     #self.calcPitchYawAngles()
   
-  def endTrajectoryInteraction(self, trajectoryNode, event=None):
+  def endTrajectoryInteraction(self, fiducialNode, event=None):
     posFirst = [0.0,0.0,0.0]
     if not self.trajectoryProjectedMarker.GetNthFiducialLabel(0) == "invalid":
       self.trajectoryProjectedMarker.GetNthFiducialPosition(0,posFirst)
       posFirst[1] = posFirst[1] + 0.005
-      trajectoryNode.SetNthFiducialPositionFromArray(0,posFirst)  
-    self.trajectoryProjectedMarker.SetNthFiducialVisibility(0,False)
+      #fiducialNode.SetNthFiducialPositionFromArray(0,posFirst)
+    #self.trajectoryProjectedMarker.SetNthFiducialVisibility(0,False)
     self.trajectoryProjectedMarker.SetLocked(True)
     
     # update the intersection of trajectory with venous
     posFirst = [0.0,0.0,0.0]
-    trajectoryNode.GetNthFiducialPosition(0,posFirst)
+    fiducialNode.GetNthFiducialPosition(0,posFirst)
     posSecond = [0.0,0.0,0.0]
-    trajectoryNode.GetNthFiducialPosition(1,posSecond)
+    fiducialNode.GetNthFiducialPosition(1,posSecond)
     inputVesselModelNodeID =  self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_grayScaleModel")
     if inputVesselModelNodeID:
       inputVesselModelNode = slicer.mrmlScene.GetNodeByID(inputVesselModelNodeID)   
@@ -2090,9 +2143,9 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       hasIntersection = obbTree.IntersectWithLine(posFirst, posSecond, pointsVTKintersection, None)  
       if hasIntersection>0: 
         pointsVTKIntersectionData = pointsVTKintersection.GetData()
-        noPointsVTKIntersection = pointsVTKIntersectionData.GetNumberOfTuples()
+        numPointsVTKIntersection = pointsVTKIntersectionData.GetNumberOfTuples()
         validPosIndex = 1
-        for idx in range(noPointsVTKIntersection):
+        for idx in range(numPointsVTKIntersection):
           posTuple = pointsVTKIntersectionData.GetTuple3(idx)
           if ((posTuple[0]-posFirst[0])*(posSecond[0]-posFirst[0])>0) and abs(posTuple[0]-posFirst[0])<abs(posSecond[0]-posFirst[0]): 
             # check if the intersection if within the posFist and posSecond
@@ -2585,7 +2638,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         posNasion = numpy.array([0.0,0.0,0.0])
         nasionNode.GetNthFiducialPosition(0,posNasion)
         posTrajectory = numpy.array([0.0,0.0,0.0])
-        if self.trajectoryManager.getFirstPoint(posTrajectory):
+        if self.cannulaManager.getFirstPoint(posTrajectory):
           normalVec = numpy.array(self.trueSagittalPlane.GetNormal())
           originPos = numpy.array(self.trueSagittalPlane.GetOrigin())
           entryPointAtLeft = -numpy.sign(numpy.dot(numpy.array(posTrajectory)-originPos, normalVec)) # here left hemisphere means from the patient's perspective
@@ -2624,11 +2677,11 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     
   def calcPitchYawAngles(self):
     firstPos = numpy.array([0.0,0.0,0.0])
-    self.trajectoryManager.getFirstPoint(firstPos)
+    self.cannulaManager.getFirstPoint(firstPos)
     lastPos = numpy.array([0.0,0.0,0.0])
-    self.trajectoryManager.getLastPoint(lastPos)
-    self.pitchAngle = numpy.arctan2(firstPos[2]-lastPos[2], firstPos[1]-lastPos[1])*180.0/numpy.pi
-    self.yawAngle = -numpy.arctan2(firstPos[0]-lastPos[0], firstPos[1]-lastPos[1])*180.0/numpy.pi
+    self.cannulaManager.getLastPoint(lastPos)
+    self.pitchAngle = numpy.arctan2(lastPos[2]-firstPos[2], lastPos[1]-firstPos[1])*180.0/numpy.pi
+    self.yawAngle = -numpy.arctan2(lastPos[0]-firstPos[0], lastPos[1]-firstPos[1])*180.0/numpy.pi
     self.updateSliceView()
     pass
 
