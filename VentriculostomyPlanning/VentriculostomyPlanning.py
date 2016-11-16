@@ -779,6 +779,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_target",caseName)
       self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_distal", caseName)
       self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_cannula", caseName)
+      self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_skullNorm", caseName)
       self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_cannulaModel",caseName)
       self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_sagittalReferenceModel",caseName)
       self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_coronalReferenceModel",caseName)
@@ -831,6 +832,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.logic.yawAngle = "--"
     if self.logic.createPlanningLine():
       self.logic.calcPitchYawAngles()
+      self.logic.calcSkullNormAngles()
       self.lengthSagittalPlanningLineEdit.text = '%.1f' % self.logic.getSagittalPlanningLineLength()
       self.lengthCoronalPlanningLineEdit.text = '%.1f' % self.logic.getCoronalPlanningLineLength()
       self.pitchAngleEdit.text = '%.1f' % self.logic.pitchAngle
@@ -2117,6 +2119,11 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         distalNode.SetName(caseName+"distal")
         slicer.mrmlScene.AddNode(distalNode)
         self.baseVolumeNode.SetAttribute(attribute, distalNode.GetID())
+      elif attribute == "vtkMRMLScalarVolumeNode.rel_skullNorm":
+        skullNormNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
+        skullNormNode.SetName(caseName+"skullNorm")
+        slicer.mrmlScene.AddNode(skullNormNode)
+        self.baseVolumeNode.SetAttribute(attribute, skullNormNode.GetID())
       elif attribute == "vtkMRMLScalarVolumeNode.rel_cannula":
         cannulaNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
         cannulaNode.SetName(caseName+"cannula")
@@ -2713,8 +2720,6 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     ###All calculation is based on the RAS coordinates system 
     inputModelNode = None
     nasionNode = None
-    sagittalReferenceLength = None
-    coronalReferenceLength = None
     inputModelNodeID =  self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_model")
     if inputModelNodeID:
       inputModelNode = slicer.mrmlScene.GetNodeByID(inputModelNodeID) 
@@ -2769,11 +2774,11 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       if polyData and self.trueSagittalPlane:
         posNasion = numpy.array([0.0,0.0,0.0])
         nasionNode.GetNthFiducialPosition(0,posNasion)
-        posTrajectory = numpy.array([0.0,0.0,0.0])
-        if self.cannulaManager.getLastPoint(posTrajectory):
+        posEntry = numpy.array([0.0,0.0,0.0])
+        if self.cannulaManager.getLastPoint(posEntry):
           normalVec = numpy.array(self.trueSagittalPlane.GetNormal())
           originPos = numpy.array(self.trueSagittalPlane.GetOrigin())
-          entryPointAtLeft = -numpy.sign(numpy.dot(numpy.array(posTrajectory)-originPos, normalVec)) # here left hemisphere means from the patient's perspective
+          entryPointAtLeft = -numpy.sign(numpy.dot(numpy.array(posEntry)-originPos, normalVec)) # here left hemisphere means from the patient's perspective
           if entryPointAtLeft >= 0 and self.useLeftHemisphere ==False:
             self.useLeftHemisphere = True
             self.createEntryPoint()
@@ -2781,13 +2786,13 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
             self.useLeftHemisphere = False
             self.createEntryPoint()
           coronalPlane = vtk.vtkPlane()
-          coronalPlane.SetOrigin(posTrajectory[0], posTrajectory[1], posTrajectory[2])
+          coronalPlane.SetOrigin(posEntry[0], posEntry[1], posEntry[2])
           coronalPlane.SetNormal(math.sin(self.sagittalYawAngle), -math.cos(self.sagittalYawAngle), 0)
           coronalPoints = vtk.vtkPoints()
-          self.getIntersectPointsPlanning(polyData, coronalPlane, posTrajectory, 1 , coronalPoints)
+          self.getIntersectPointsPlanning(polyData, coronalPlane, posEntry, 1 , coronalPoints)
 
           ## Sorting   
-          self.sortPoints(coronalPoints, posTrajectory)
+          self.sortPoints(coronalPoints, posEntry)
           
           self.constructCurvePlanning(self.coronalPlanningCurveManager, self.coronalReferenceCurveManager, coronalPoints, 1)
               
@@ -2815,6 +2820,24 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     self.pitchAngle = numpy.arctan2(lastPos[2]-firstPos[2], lastPos[1]-firstPos[1])*180.0/numpy.pi
     self.yawAngle = -numpy.arctan2(lastPos[0]-firstPos[0], lastPos[1]-firstPos[1])*180.0/numpy.pi
     self.updateSliceView()
+    pass
+  
+  def calcSkullNormAngles(self):
+    if self.cannulaManager.curveFiducials:
+      if self.cannulaManager.curveFiducials.GetNumberOfFiducials():
+        posTarget = [0.0,0.0,0.0]
+        self.cannulaManager.curveFiducials.GetNthFiducialPosition(0,posTarget)
+        posEntry = [0.0,0.0,0.0]
+        self.cannulaManager.curveFiducials.GetNthFiducialPosition(1,posEntry)
+        p_EC = numpy.array([math.sin(self.sagittalYawAngle), -math.cos(self.sagittalYawAngle), 0])
+        p_EN = numpy.array([0.5,-0.5,sqrt(0.5)]) #this vector we need to get from the skull Norm calculation 
+        p_EC = p_EC/numpy.linalg.norm(p_EC)
+        p_EN = p_EN/numpy.linalg.norm(p_EN)
+        sinTheta1 = numpy.dot(p_EC, p_EN)
+        cosTheta1 = sqrt(1-sinTheta1*sinTheta1)
+        p_TE = numpy.array(posEntry) - numpy.array(posTarget)
+        cosCalc = numpy.dot(p_EN,p_TE)/
+        
     pass
 
   def updateSliceView(self):
