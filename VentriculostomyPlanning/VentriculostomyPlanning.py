@@ -657,10 +657,10 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     lengthCoronalPlanningLineUnitLabel = qt.QLabel('mm  ')
     planningCoronalLineLayout.addWidget(lengthCoronalPlanningLineUnitLabel)
 
-    planningPitchAnglesLayout = qt.QHBoxLayout()
+    planningPitchAngleLayout = qt.QHBoxLayout()
     #-- Curve length
     pitchAngleLabel = qt.QLabel('Pitch Angle:       ')
-    planningPitchAnglesLayout.addWidget(pitchAngleLabel)
+    planningPitchAngleLayout.addWidget(pitchAngleLabel)
     self.pitchAngleEdit = qt.QLineEdit()
     self.pitchAngleEdit.text = '--'
     self.pitchAngleEdit.setMaxLength(5)
@@ -668,13 +668,13 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.pitchAngleEdit.frame = True
     self.pitchAngleEdit.styleSheet = "QLineEdit { background:transparent; }"
     self.pitchAngleEdit.cursor = qt.QCursor(qt.Qt.IBeamCursor)
-    planningPitchAnglesLayout.addWidget(self.pitchAngleEdit)
+    planningPitchAngleLayout.addWidget(self.pitchAngleEdit)
     pitchAngleUnitLabel = qt.QLabel('degree  ')
-    planningPitchAnglesLayout.addWidget(pitchAngleUnitLabel)
+    planningPitchAngleLayout.addWidget(pitchAngleUnitLabel)
 
-    planningYawAnglesLayout = qt.QHBoxLayout()
+    planningYawAngleLayout = qt.QHBoxLayout()
     yawAngleLabel = qt.QLabel('Yaw Angle:        ')
-    planningYawAnglesLayout.addWidget(yawAngleLabel)
+    planningYawAngleLayout.addWidget(yawAngleLabel)
     self.yawAngleEdit = qt.QLineEdit()
     self.yawAngleEdit.text = '--'
     self.yawAngleEdit.setMaxLength(5)
@@ -682,14 +682,49 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.yawAngleEdit.frame = True
     self.yawAngleEdit.styleSheet = "QLineEdit { background:transparent; }"
     self.yawAngleEdit.cursor = qt.QCursor(qt.Qt.IBeamCursor)
-    planningYawAnglesLayout.addWidget(self.yawAngleEdit)
+    planningYawAngleLayout.addWidget(self.yawAngleEdit)
     yawAngleUnitLabel = qt.QLabel('degree  ')
-    planningYawAnglesLayout.addWidget(yawAngleUnitLabel)
+    planningYawAngleLayout.addWidget(yawAngleUnitLabel)
+
+    planningCannulaToNormAngleLayout = qt.QHBoxLayout()
+    cannulaToNormAngleLabel = qt.QLabel('Cannula To Norm Angle:   ')
+    planningCannulaToNormAngleLayout.addWidget(cannulaToNormAngleLabel)
+    self.cannulaToNormAngleEdit = qt.QLineEdit()
+    self.cannulaToNormAngleEdit.text = '--'
+    self.cannulaToNormAngleEdit.setMaxLength(5)
+    self.cannulaToNormAngleEdit.readOnly = True
+    self.cannulaToNormAngleEdit.frame = True
+    self.cannulaToNormAngleEdit.styleSheet = "QLineEdit { background:transparent; }"
+    self.cannulaToNormAngleEdit.cursor = qt.QCursor(qt.Qt.IBeamCursor)
+    planningCannulaToNormAngleLayout.addWidget(self.cannulaToNormAngleEdit)
+    cannulaToNormAngleUnitLabel = qt.QLabel('degree  ')
+    planningCannulaToNormAngleLayout.addWidget(cannulaToNormAngleUnitLabel)
+
+
+    planningCannulaToCoronalAngleLayout = qt.QHBoxLayout()
+    cannulaToCoronalAngleLabel = qt.QLabel('Cannula To Coronal Angle:')
+    planningCannulaToCoronalAngleLayout.addWidget(cannulaToCoronalAngleLabel)
+    self.cannulaToCoronalAngleEdit = qt.QLineEdit()
+    self.cannulaToCoronalAngleEdit.text = '--'
+    self.cannulaToCoronalAngleEdit.setMaxLength(5)
+    self.cannulaToCoronalAngleEdit.readOnly = True
+    self.cannulaToCoronalAngleEdit.frame = True
+    self.cannulaToCoronalAngleEdit.styleSheet = "QLineEdit { background:transparent; }"
+    self.cannulaToCoronalAngleEdit.cursor = qt.QCursor(qt.Qt.IBeamCursor)
+    planningCannulaToCoronalAngleLayout.addWidget(self.cannulaToCoronalAngleEdit)
+    cannulaToCoronalAngleUnitLabel = qt.QLabel('degree  ')
+    planningCannulaToCoronalAngleLayout.addWidget(cannulaToCoronalAngleUnitLabel)
+
+
+
 
     self.infoGroupBoxLayout.addLayout(planningSagittalLineLayout)
     self.infoGroupBoxLayout.addLayout(planningCoronalLineLayout)
-    self.infoGroupBoxLayout.addLayout(planningPitchAnglesLayout)
-    self.infoGroupBoxLayout.addLayout(planningYawAnglesLayout)
+    self.infoGroupBoxLayout.addLayout(planningPitchAngleLayout)
+    self.infoGroupBoxLayout.addLayout(planningYawAngleLayout)
+    self.infoGroupBoxLayout.addLayout(planningCannulaToNormAngleLayout)
+    self.infoGroupBoxLayout.addLayout(planningCannulaToCoronalAngleLayout)
+
     #end of GUI section
     #####################################
     self.viewGroupBox = qt.QGroupBox()
@@ -810,6 +845,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       self.logic.coronalReferenceCurveManager.startEditLine()
       self.logic.sagittalPlanningCurveManager.startEditLine()
       self.logic.coronalPlanningCurveManager.startEditLine()
+      self.logic.createTrueSagittalPlane()
       self.logic.createEntryPoint()
       cannulaModelID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_cannulaModel")
       cannulaFiducialsID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_cannula")
@@ -819,6 +855,8 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       self.logic.cannulaManager.curveFiducials.AddObserver(slicer.vtkMRMLMarkupsNode().PointModifiedEvent, self.logic.updateCannulaPosition)
       self.logic.cannulaManager.curveFiducials.AddObserver(slicer.vtkMRMLMarkupsNode().PointEndInteractionEvent, self.logic.endTrajectoryInteraction)
       self.logic.cannulaManager.setModifiedEventHandler(self.onCannulaModified)
+      self.logic.createVentricleCylindar()
+      #self.logic.generatePath()
       self.onCreatePlanningLine()
       self.isReverseView = False
       self.logic.setSliceViewer()
@@ -830,13 +868,18 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
   def onCreatePlanningLine(self):
     self.logic.pitchAngle="--"
     self.logic.yawAngle = "--"
+    self.logic.cannulaToNormAngle = "--"
+    self.logic.cannulaToCoronalAngle = "--"
+    self.logic.pathCandidatesModel.SetDisplayVisibility(0)
     if self.logic.createPlanningLine():
       self.logic.calcPitchYawAngles()
-      self.logic.calcSkullNormAngles()
       self.lengthSagittalPlanningLineEdit.text = '%.1f' % self.logic.getSagittalPlanningLineLength()
       self.lengthCoronalPlanningLineEdit.text = '%.1f' % self.logic.getCoronalPlanningLineLength()
       self.pitchAngleEdit.text = '%.1f' % self.logic.pitchAngle
       self.yawAngleEdit.text = '%.1f' % (-self.logic.yawAngle)
+      if self.logic.calcCannulaAngles():
+        self.cannulaToNormAngleEdit.text = '%.1f' % self.logic.cannulaToNormAngle
+        self.cannulaToCoronalAngleEdit.text = '%.1f' % self.logic.cannulaToCoronalAngle
     if self.logic.baseVolumeNode:
       cannulaNode = slicer.mrmlScene.GetNodeByID(self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_cannula"))
       cannulaNode.AddObserver(cannulaNode.PointStartInteractionEvent, self.onResetPlanningOutput)
@@ -1257,6 +1300,11 @@ class CurveManager():
       self._curveModel.SetName(self.curveModelName)
       self.setModelOpacity(self.opacity)
       slicer.mrmlScene.AddNode(self._curveModel)
+      modelDisplayNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelDisplayNode")
+      modelDisplayNode.SetColor(self.cmLogic.ModelColor)
+      modelDisplayNode.SetOpacity(self.opacity)
+      slicer.mrmlScene.AddNode(modelDisplayNode)
+      self._curveModel.SetAndObserveDisplayNodeID(modelDisplayNode.GetID())
 
     # Set exetrnal handler, if it has not been.
     if self.tagEventExternal == None and self.externalHandler:
@@ -1412,10 +1460,10 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     ##Path Planning variables
     self.PercutaneousApproachAnalysisLogic = PercutaneousApproachAnalysisLogic()
     self.targetPointNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
-    self.allLines = vtk.vtkPolyData()
-    self.singleLine = vtk.vtkPolyData()
-    self.extendedLine = vtk.vtkPolyData()
-    self.PathModel = slicer.vtkMRMLModelNode()
+    self.pathCandidatesModel = slicer.vtkMRMLModelNode()
+    self.pathNavigationModel = slicer.vtkMRMLModelNode()
+    self.pathCandidatesPoly = vtk.vtkPolyData()
+    self.pathNavigationPoly = vtk.vtkPolyData()
     ##
 
     self.ROIListNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLAnnotationHierarchyNode")
@@ -1431,8 +1479,10 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     self.topPoint = []
     self.resetROI = False 
     self.threshold = -500.0
-    self.yawAngle = 0
-    self.pitchAngle = 0
+    self.yawAngle = 0.0
+    self.pitchAngle = 0.0
+    self.cannulaToNormAngle = 0.0
+    self.cannulaToCoronalAngle = 0.0
     self.sagittalYawAngle = 0
     self.trueSagittalPlane = None
     self.activeTrajectoryMarkup = 0
@@ -1450,12 +1500,24 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     self.interactionMode = "none"
 
   def clear(self):
-    slicer.mrmlScene.RemoveNode(slicer.mrmlScene.GetNodeByID(self.trajectoryProjectedMarker.GetID()))
-    self.trajectoryProjectedMarker = None
-    slicer.mrmlScene.RemoveNode(slicer.mrmlScene.GetNodeByID(self.nasionProjectedMarker.GetID()))
-    self.nasionProjectedMarker = None
-    slicer.mrmlScene.RemoveNode(self.PathModel)
-    self.PathModel = None
+    if self.trajectoryProjectedMarker and self.trajectoryProjectedMarker.GetID():
+      slicer.mrmlScene.RemoveNode(slicer.mrmlScene.GetNodeByID(self.trajectoryProjectedMarker.GetID()))
+      self.trajectoryProjectedMarker = None
+    if self.nasionProjectedMarker and self.nasionProjectedMarker.GetID():
+      slicer.mrmlScene.RemoveNode(slicer.mrmlScene.GetNodeByID(self.nasionProjectedMarker.GetID()))
+      self.nasionProjectedMarker = None
+    if self.pathCandidatesModel and self.pathCandidatesModel.GetID():
+      slicer.mrmlScene.RemoveNode(self.pathCandidatesModel)
+      self.pathCandidatesModel = None
+    if self.pathNavigationModel and self.pathNavigationModel.GetID():
+      slicer.mrmlScene.RemoveNode(self.pathNavigationModel)
+      self.pathNavigationModel = None
+    if self.trajectoryProjectedMarker and self.trajectoryProjectedMarker.GetID():
+      slicer.mrmlScene.RemoveNode(self.trajectoryProjectedMarker)
+      self.trajectoryProjectedMarker = None
+    if self.nasionProjectedMarker and self.nasionProjectedMarker.GetID():
+      slicer.mrmlScene.RemoveNode(self.nasionProjectedMarker)
+      self.nasionProjectedMarker = None
 
   def hasImageData(self,volumeNode):
     """This is an example logic method that
@@ -1685,7 +1747,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         # display all paths model
         yellow = [1, 1, 0]
         red =[1, 0, 0]
-        self.makePath(self.pathReceived, self.nPathReceived,   1, yellow, "candidatePaths", self.allLines)
+        self.makePath(self.pathReceived, self.nPathReceived,   1, yellow, "candidatePaths", self.pathCandidatesPoly, self.pathCandidatesModel)
         obbTree = vtk.vtkOBBTree()
         obbTree.SetDataSet(grayScaleModelWithMarginNode.GetPolyData())
         obbTree.BuildLocator()
@@ -1724,7 +1786,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
 
 
       #slicer.mrmlScene.RemoveNode(distanceMapNode)
-  def makePath(self, path, approachablePoints, visibilityParam, color, modelName, lineType):
+  def makePath(self, path, approachablePoints, visibilityParam, color, modelName, polyData, modelNode):
 
     # Create an array for all approachable points
     p = numpy.zeros([approachablePoints * 2, 3])
@@ -1733,8 +1795,6 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     scene = slicer.mrmlScene
 
     points = vtk.vtkPoints()
-    polyData = vtk.vtkPolyData()
-    polyData = lineType
     polyData.SetPoints(points)
 
     lines = vtk.vtkCellArray()
@@ -1766,9 +1826,9 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         p[pointIndex] = coord
 
     # Create model node
-    self.PathModel.SetScene(scene)
-    self.PathModel.SetName(scene.GenerateUniqueName(modelName))
-    self.PathModel.SetAndObservePolyData(polyData)
+    modelNode.SetScene(scene)
+    modelNode.SetName(scene.GenerateUniqueName(modelName))
+    modelNode.SetAndObservePolyData(polyData)
 
     # Create display node
     modelDisplay = slicer.vtkMRMLModelDisplayNode()
@@ -1777,12 +1837,13 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     modelDisplay.SetVisibility(visibilityParam)
     modelDisplay.SetSliceIntersectionVisibility(True)  # Show in slice view
     scene.AddNode(modelDisplay)
-    self.PathModel.SetAndObserveDisplayNodeID(modelDisplay.GetID())
+    scene.AddNode(modelDisplay)
+    modelNode.SetAndObserveDisplayNodeID(modelDisplay.GetID())
 
     # Add to scene
     if vtk.VTK_MAJOR_VERSION <= 5:
-      modelDisplay.SetInputPolyData(self.PathModel.GetPolyData())
-    scene.AddNode(self.PathModel)
+      modelDisplay.SetInputPolyData(modelNode.GetPolyData())
+    scene.AddNode(modelNode)
 
     pass
 
@@ -1794,14 +1855,14 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       self.trajectoryManager.getLastPoint(posDistal)
       direction1Norm = (posDistal - posTarget)/numpy.linalg.norm(posTarget - posDistal)
       angleMin =numpy.pi
-      optimizedEntry = []
+      optimizedEntry = numpy.array([])
       for pointIndex in range(1, len(pathReceived),2):
         direction2 = numpy.array(pathReceived[pointIndex]) - numpy.array(pathReceived[pointIndex-1])
         direction2Norm = direction2/numpy.linalg.norm(direction2)
         angle = math.acos(numpy.dot(direction1Norm, direction2Norm))
         if angle < angleMin:
           angleMin = angle
-          optimizedEntry = pathReceived[pointIndex]
+          optimizedEntry = numpy.array(pathReceived[pointIndex])
       if optimizedEntry.any():
         posEntry = numpy.array([0.0] * 3)
         self.trajectoryProjectedMarker.GetNthFiducialPosition(0, posEntry)
@@ -2320,6 +2381,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     ## set the projected marker to invisiable here
     self.interactionNode.SetCurrentInteractionMode(slicer.vtkMRMLInteractionNode.ViewTransform)
     if self.interactionMode == "nasion":
+      self.createTrueSagittalPlane()
       self.createEntryPoint()
       self.nasionProjectedMarker.GetMarkupsDisplayNode().SetVisibility(0)
     if self.interactionMode == "sagittalPoint":
@@ -2787,7 +2849,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
             self.createEntryPoint()
           coronalPlane = vtk.vtkPlane()
           coronalPlane.SetOrigin(posEntry[0], posEntry[1], posEntry[2])
-          coronalPlane.SetNormal(math.sin(self.sagittalYawAngle), -math.cos(self.sagittalYawAngle), 0)
+          coronalPlane.SetNormal(-math.sin(self.sagittalYawAngle), math.cos(self.sagittalYawAngle), 0)
           coronalPoints = vtk.vtkPoints()
           self.getIntersectPointsPlanning(polyData, coronalPlane, posEntry, 1 , coronalPoints)
 
@@ -2822,23 +2884,55 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     self.updateSliceView()
     pass
   
-  def calcSkullNormAngles(self):
+  def calcCannulaAngles(self):
     if self.cannulaManager.curveFiducials:
       if self.cannulaManager.curveFiducials.GetNumberOfFiducials():
         posTarget = [0.0,0.0,0.0]
         self.cannulaManager.curveFiducials.GetNthFiducialPosition(0,posTarget)
         posEntry = [0.0,0.0,0.0]
         self.cannulaManager.curveFiducials.GetNthFiducialPosition(1,posEntry)
-        p_EC = numpy.array([math.sin(self.sagittalYawAngle), -math.cos(self.sagittalYawAngle), 0])
-        p_EN = numpy.array([0.5,-0.5,sqrt(0.5)]) #this vector we need to get from the skull Norm calculation 
+        p_EC = numpy.array([-math.sin(self.sagittalYawAngle), math.cos(self.sagittalYawAngle), 0])
+        p_EN = numpy.array([-0.5,math.sqrt(0.5),0.5]) #this vector we need to get from the skull Norm calculation
         p_EC = p_EC/numpy.linalg.norm(p_EC)
         p_EN = p_EN/numpy.linalg.norm(p_EN)
-        sinTheta1 = numpy.dot(p_EC, p_EN)
-        cosTheta1 = sqrt(1-sinTheta1*sinTheta1)
-        p_TE = numpy.array(posEntry) - numpy.array(posTarget)
-        cosCalc = numpy.dot(p_EN,p_TE)/
+        p_ET = numpy.array(posEntry) - numpy.array(posTarget)
+        p_ET = p_ET / numpy.linalg.norm(p_ET)
+        cosCalc = numpy.dot(p_EN, p_ET)
+        sinCalc = math.sqrt(1 - cosCalc*cosCalc)
+        p_EM = numpy.array([])
+        if cosCalc>1e-6: # make sure the p_EN and p_ET are not perpenticular.
+          sinTheta1 = numpy.dot(p_EC, p_EN)
+          cosTheta1 = math.sqrt(1-sinTheta1*sinTheta1)
+          if cosTheta1 < cosCalc:  # here means no intesection between the coronal plan and the cone composed by p_EN and p_ET
+            p_EN2 = p_EN - p_EC * (sinTheta1 * cosCalc - cosTheta1 * sinCalc)  # sin(theta1 - Calc) = sin(theta1)*cos(Calc) -
+            p_EM = p_EN2 + p_EC*math.sin(math.asin(sinTheta1))
+            p_EM = p_EM / numpy.linalg.norm(p_EM)
+          else:
+            p_EN2 = p_EN - p_EC * (sinTheta1)
+            cosTheta2 = cosCalc/cosTheta1
+            tanTheta2 =  math.sqrt(1/(cosTheta2*cosTheta2) - 1)
+            p_EM = p_EN2 + numpy.cross(p_EC, p_EN2)*tanTheta2
+            p_EM = p_EM / numpy.linalg.norm(p_EM)
+          cosMT = numpy.dot(p_EM, p_ET)
+          cosMN = numpy.dot(p_EN, p_EM)
+          if p_EM.any():
+            self.cannulaToCoronalAngle = math.acos(cosMT) * 180.0 / numpy.pi
+            self.cannulaToNormAngle = math.acos(cosCalc) * 180.0 / numpy.pi
+            pathNavigationPoints = [numpy.array(posEntry), numpy.array(posEntry) + p_EN * 10, numpy.array(posEntry),
+                                    numpy.array(posEntry) + p_EC * 10, numpy.array(posEntry),
+                                    numpy.array(posEntry) + p_EM * 10, numpy.array(posEntry),
+                                    numpy.array(posEntry) + p_ET * 10]
+            self.makePath(pathNavigationPoints, 4, 1, [1, 1, 0], "CannulaNavigationLines", self.pathNavigationPoly,
+                          self.pathNavigationModel)
+            return 1
+          else:
+            return 0
+        else:
+          self.cannulaToCoronalAngle = 0.0
+          self.cannulaToNormAngle = 0.0
+          return 1
         
-    pass
+    return 0
 
   def updateSliceView(self):
     ## due to the RAS and vtk space difference, the X axis is flipped, So the standard rotation matrix is multiplied by -1 in the X axis
