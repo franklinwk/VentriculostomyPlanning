@@ -715,6 +715,34 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     cannulaToCoronalAngleUnitLabel = qt.QLabel('degree  ')
     planningCannulaToCoronalAngleLayout.addWidget(cannulaToCoronalAngleUnitLabel)
 
+    planningSkullNormToSagittalAngleLayout = qt.QHBoxLayout()
+    skullNormToSagittalAngleLabel = qt.QLabel('Skull Norm To Sagital Angle:')
+    planningSkullNormToSagittalAngleLayout.addWidget(skullNormToSagittalAngleLabel)
+    self.skullNormToSagittalAngleEdit = qt.QLineEdit()
+    self.skullNormToSagittalAngleEdit.text = '--'
+    self.skullNormToSagittalAngleEdit.setMaxLength(5)
+    self.skullNormToSagittalAngleEdit.readOnly = True
+    self.skullNormToSagittalAngleEdit.frame = True
+    self.skullNormToSagittalAngleEdit.styleSheet = "QLineEdit { background:transparent; }"
+    self.skullNormToSagittalAngleEdit.cursor = qt.QCursor(qt.Qt.IBeamCursor)
+    planningSkullNormToSagittalAngleLayout.addWidget(self.skullNormToSagittalAngleEdit)
+    skullNormToSagittalAngleUnitLabel = qt.QLabel('degree  ')
+    planningSkullNormToSagittalAngleLayout.addWidget(skullNormToSagittalAngleUnitLabel)
+
+    planningSkullNormToCoronalAngleLayout = qt.QHBoxLayout()
+    skullNormToCoronalAngleLabel = qt.QLabel('Skull Norm To Coronal Angle:')
+    planningSkullNormToCoronalAngleLayout.addWidget(skullNormToCoronalAngleLabel)
+    self.skullNormToCoronalAngleEdit = qt.QLineEdit()
+    self.skullNormToCoronalAngleEdit.text = '--'
+    self.skullNormToCoronalAngleEdit.setMaxLength(5)
+    self.skullNormToCoronalAngleEdit.readOnly = True
+    self.skullNormToCoronalAngleEdit.frame = True
+    self.skullNormToCoronalAngleEdit.styleSheet = "QLineEdit { background:transparent; }"
+    self.skullNormToCoronalAngleEdit.cursor = qt.QCursor(qt.Qt.IBeamCursor)
+    planningSkullNormToCoronalAngleLayout.addWidget(self.skullNormToCoronalAngleEdit)
+    skullNormToCoronalAngleUnitLabel = qt.QLabel('degree  ')
+    planningSkullNormToCoronalAngleLayout.addWidget(skullNormToCoronalAngleUnitLabel)
+
 
 
 
@@ -722,6 +750,8 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.infoGroupBoxLayout.addLayout(planningCoronalLineLayout)
     self.infoGroupBoxLayout.addLayout(planningPitchAngleLayout)
     self.infoGroupBoxLayout.addLayout(planningYawAngleLayout)
+    self.infoGroupBoxLayout.addLayout(planningSkullNormToSagittalAngleLayout)
+    self.infoGroupBoxLayout.addLayout(planningSkullNormToCoronalAngleLayout)
     self.infoGroupBoxLayout.addLayout(planningCannulaToNormAngleLayout)
     self.infoGroupBoxLayout.addLayout(planningCannulaToCoronalAngleLayout)
 
@@ -845,6 +875,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       self.logic.coronalReferenceCurveManager.startEditLine()
       self.logic.sagittalPlanningCurveManager.startEditLine()
       self.logic.coronalPlanningCurveManager.startEditLine()
+      self.logic.trajectoryManager.startEditLine()
       self.logic.createTrueSagittalPlane()
       self.logic.createEntryPoint()
       cannulaModelID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_cannulaModel")
@@ -855,6 +886,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       self.logic.cannulaManager.curveFiducials.AddObserver(slicer.vtkMRMLMarkupsNode().PointModifiedEvent, self.logic.updateCannulaPosition)
       self.logic.cannulaManager.curveFiducials.AddObserver(slicer.vtkMRMLMarkupsNode().PointEndInteractionEvent, self.logic.endTrajectoryInteraction)
       self.logic.cannulaManager.setModifiedEventHandler(self.onCannulaModified)
+      self.logic.cannulaManager.startEditLine()
       self.logic.createVentricleCylindar()
       #self.logic.generatePath()
       self.onCreatePlanningLine()
@@ -868,6 +900,8 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
   def onCreatePlanningLine(self):
     self.logic.pitchAngle="--"
     self.logic.yawAngle = "--"
+    self.logic.skullNormToSaggitalAngle = "--"
+    self.logic.skullNormToCoronalAngle = "--"
     self.logic.cannulaToNormAngle = "--"
     self.logic.cannulaToCoronalAngle = "--"
     self.logic.pathCandidatesModel.SetDisplayVisibility(0)
@@ -880,6 +914,8 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       if self.logic.calcCannulaAngles():
         self.cannulaToNormAngleEdit.text = '%.1f' % self.logic.cannulaToNormAngle
         self.cannulaToCoronalAngleEdit.text = '%.1f' % self.logic.cannulaToCoronalAngle
+        self.skullNormToSagittalAngleEdit.text = '%.1f' % self.logic.skullNormToSaggitalAngle
+        self.skullNormToCoronalAngleEdit.text = '%.1f' % self.logic.skullNormToCoronalAngle
     if self.logic.baseVolumeNode:
       cannulaNode = slicer.mrmlScene.GetNodeByID(self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_cannula"))
       cannulaNode.AddObserver(cannulaNode.PointStartInteractionEvent, self.onResetPlanningOutput)
@@ -892,6 +928,10 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.lengthCoronalPlanningLineEdit.text = '--'
     self.pitchAngleEdit.text = '--'
     self.yawAngleEdit.text = '--'
+    self.cannulaToCoronalAngleEdit.text = '--'
+    self.cannulaToNormAngleEdit.text = '--'
+    self.skullNormToSagittalAngleEdit.text = '--'
+    self.skullNormToCoronalAngleEdit.text = '--'
 
   def onSetReverseView(self):
     if self.logic.baseVolumeNode:
@@ -1483,10 +1523,13 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     self.pitchAngle = 0.0
     self.cannulaToNormAngle = 0.0
     self.cannulaToCoronalAngle = 0.0
+    self.skullNormToCoronalAngle = 0.0
+    self.skullNormToSagittalAngle = 0.0
     self.sagittalYawAngle = 0
     self.trueSagittalPlane = None
     self.activeTrajectoryMarkup = 0
     self.cylindarRadius = 2.5 # unit mm
+    self.entryRadius = 25.0
     self.trajectoryManager.setManagerTubeRadius(self.cylindarRadius)
     self.trajectoryProjectedMarker = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
     self.trajectoryProjectedMarker.SetName("trajectoryProject")
@@ -1668,120 +1711,121 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     if targetNodeID and distalNodeID:
       targetNode = slicer.mrmlScene.GetNodeByID(targetNodeID)
       distalNode = slicer.mrmlScene.GetNodeByID(distalNodeID)
-      targetNode.SetLocked(True)
-      distalNode.SetLocked(True)
-      posTarget = numpy.array([0.0, 0.0, 0.0])
-      targetNode.GetNthFiducialPosition(0, posTarget)
-      posDistal = numpy.array([0.0, 0.0, 0.0])
-      distalNode.GetNthFiducialPosition(0, posDistal)
-      modelID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_model")
-      direction = (numpy.array(posDistal) - numpy.array(posTarget))/numpy.linalg.norm(numpy.array(posDistal) - numpy.array(posTarget))
-      if self.trajectoryProjectedMarker.GetNumberOfFiducials() == 0:
-        self.trajectoryProjectedMarker.AddFiducial(0,0,0)
-      self.calculateLineModelIntersect(modelID, posDistal+1e6*direction, posTarget-1e6*direction, self.trajectoryProjectedMarker)
-      posEntry = numpy.array([0.0, 0.0, 0.0])
-      self.trajectoryProjectedMarker.GetNthFiducialPosition(1,posEntry)
-      self.targetPointNode.RemoveAllMarkups()
-      self.targetPointNode.AddFiducial(posTarget[0], posTarget[1], posTarget[2])
-      grayScaleModelNodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_grayScaleModel")
-      grayScaleModelNode = slicer.mrmlScene.GetNodeByID(grayScaleModelNodeID)
-      skullModelNodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_model")
-      skullModelNode = slicer.mrmlScene.GetNodeByID(skullModelNodeID)
-      angleForModelCut = float(self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_planningRadius"))
+      if targetNode.GetNumberOfFiducials() and distalNode.GetNumberOfFiducials():
+        targetNode.SetLocked(True)
+        distalNode.SetLocked(True)
+        posTarget = numpy.array([0.0, 0.0, 0.0])
+        targetNode.GetNthFiducialPosition(0, posTarget)
+        posDistal = numpy.array([0.0, 0.0, 0.0])
+        distalNode.GetNthFiducialPosition(0, posDistal)
+        modelID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_model")
+        direction = (numpy.array(posDistal) - numpy.array(posTarget))/numpy.linalg.norm(numpy.array(posDistal) - numpy.array(posTarget))
+        if self.trajectoryProjectedMarker.GetNumberOfFiducials() == 0:
+          self.trajectoryProjectedMarker.AddFiducial(0,0,0)
+        self.calculateLineModelIntersect(modelID, posDistal+1e6*direction, posTarget-1e6*direction, self.trajectoryProjectedMarker)
+        posEntry = numpy.array([0.0, 0.0, 0.0])
+        self.trajectoryProjectedMarker.GetNthFiducialPosition(1,posEntry)
+        self.targetPointNode.RemoveAllMarkups()
+        self.targetPointNode.AddFiducial(posTarget[0], posTarget[1], posTarget[2])
+        grayScaleModelNodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_grayScaleModel")
+        grayScaleModelNode = slicer.mrmlScene.GetNodeByID(grayScaleModelNodeID)
+        skullModelNodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_model")
+        skullModelNode = slicer.mrmlScene.GetNodeByID(skullModelNodeID)
+        angleForModelCut = float(self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_planningRadius"))
 
-      pathPlanningBasePoint = numpy.array(posTarget) + (numpy.array(posEntry)-numpy.array(posTarget))*1.2
-      cannulaDirection = (numpy.array(posEntry) - numpy.array(posTarget))/numpy.linalg.norm(numpy.array(posTarget) - numpy.array(posEntry))
-      angle = math.acos(numpy.dot(numpy.array([0,0,1.0]),cannulaDirection))
-      rotationAxis = numpy.cross(numpy.array([0,0,1.0]),cannulaDirection)
-      matrix = vtk.vtkMatrix4x4()
-      transform = vtk.vtkTransform()
-      transform.RotateWXYZ(angle*180.0/numpy.pi, rotationAxis[0],rotationAxis[1],rotationAxis[2])
-      matrix = transform.GetMatrix()
-      synthesizedData = vtk.vtkPolyData()
-      points = vtk.vtkPoints()
-      phiResolution = 5*numpy.pi/180.0
-      radiusResolution = 1.0
-      points.InsertNextPoint(posEntry)
-      distance2 = numpy.linalg.norm(numpy.array(posTarget) - numpy.array(posEntry))
-      distance1 = numpy.linalg.norm(numpy.array(posTarget) - numpy.array(posDistal))
-      maximumRadius = self.cylindarRadius * distance2 / distance1
-      for radius in numpy.arange(radiusResolution, maximumRadius+radiusResolution, radiusResolution):
-        for angle in numpy.arange(phiResolution, numpy.pi, phiResolution):
-          point = matrix.MultiplyPoint(numpy.array([radius*math.cos(angle), radius*math.sin(angle),0,1]))
-          pointTranslated = [point[0]+pathPlanningBasePoint[0],point[1]+pathPlanningBasePoint[1],point[2]+pathPlanningBasePoint[2]]
-          points.InsertNextPoint(pointTranslated)
-        for angle in numpy.arange(numpy.pi, 2*numpy.pi, phiResolution):
-          point = matrix.MultiplyPoint(numpy.array([-radius * math.cos(angle), radius * math.sin(angle), 0, 1]))
-          pointTranslated = [point[0] + pathPlanningBasePoint[0], point[1] + pathPlanningBasePoint[1], point[2] + pathPlanningBasePoint[2]]
-          points.InsertNextPoint(pointTranslated)
-      synthesizedData.SetPoints(points)
-      tempModel = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
-      tempModel.SetAndObservePolyData(synthesizedData)
-      distanceMapNode = None
-      if not self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_distanceVolume"):
-        distanceMapFilter = sitk.ApproximateSignedDistanceMapImageFilter()
-        originImage = sitk.Cast(sitkUtils.PullFromSlicer(self.currentVolumeNode.GetID()), sitk.sitkInt16)
-        threshold = 100
-        distanceMap = distanceMapFilter.Execute(originImage, threshold - 10, threshold )
-        sitkUtils.PushToSlicer(distanceMap, "distanceMap", 0, True)
-        imageCollection = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLScalarVolumeNode", "distanceMap")
-        if imageCollection:
-          distanceMapNode = imageCollection.GetItemAsObject(0)
-          self.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_distanceVolume", distanceMapNode.GetID())
-        self.setSliceViewer()
-      else:
-        distanceMapNodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_distanceVolume")
-        distanceMapNode = slicer.mrmlScene.GetNodeByID(distanceMapNodeID)
-      if synthesizedData.GetNumberOfPoints() and distanceMapNode:
-        grayScaleModelWithMarginNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
-        slicer.mrmlScene.AddNode(grayScaleModelWithMarginNode)
-        parameters = {}
-        parameters["InputVolume"] = distanceMapNode.GetID()
-        parameters["OutputGeometry"] = grayScaleModelWithMarginNode.GetID()
-        parameters["Threshold"] = -10.0
-        grayMaker = slicer.modules.grayscalemodelmaker
-        self.cliNode = slicer.cli.run(grayMaker, None, parameters, wait_for_completion=True)
-
-        self.pathReceived, self.nPathReceived, self.apReceived, self.minimumPoint, self.minimumDistance, self.maximumPoint, self.maximumDistance = self.PercutaneousApproachAnalysisLogic.makePaths(
-          self.targetPointNode, None, 0, grayScaleModelWithMarginNode, tempModel)
-        # display all paths model
-        yellow = [1, 1, 0]
-        red =[1, 0, 0]
-        self.makePath(self.pathReceived, self.nPathReceived,   1, yellow, "candidatePaths", self.pathCandidatesPoly, self.pathCandidatesModel)
-        obbTree = vtk.vtkOBBTree()
-        obbTree.SetDataSet(grayScaleModelWithMarginNode.GetPolyData())
-        obbTree.BuildLocator()
-        pointsVTKintersection = vtk.vtkPoints()
-        hasIntersection = obbTree.IntersectWithLine(posEntry, posTarget, pointsVTKintersection, None)
-        slicer.mrmlScene.RemoveNode(grayScaleModelWithMarginNode)
-        cannulaNode = slicer.mrmlScene.GetNodeByID(
-          self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_cannula"))
-        # slicer.mrmlScene.AddNode(trajectoryNode)
-        dnode = cannulaNode.GetMarkupsDisplayNode()
-        if dnode:
-          rgbColor = [0.0, 1.0, 1.0]
-          dnode.SetSelectedColor(rgbColor)
-          dnode.SetVisibility(1)
-        self.cannulaManager.curveFiducials = cannulaNode
-        self.cannulaManager.clearLine()
-        self.cannulaManager.curveFiducials.RemoveAllMarkups()
-        self.cannulaManager.startEditLine() # initialize the tube model
-        if hasIntersection > 0:
-          if self.nPathReceived>0:
-            if slicer.util.confirmYesNoDisplay("The cannula is within the safty margin of the venous, use location optimization?",
-                                               windowTitle=""):
-              self.relocateCannula(self.pathReceived)
-            else:
-              self.cannulaManager.curveFiducials.AddFiducialFromArray(posTarget)
-              self.cannulaManager.curveFiducials.AddFiducialFromArray(posEntry + 0.005*cannulaDirection)
-          else:
-            slicer.util.warningDisplay(
-              "No any cannula candidate exists here, considering redefine the ventricle area?")
-            distalNode.SetLocked(False)
-            targetNode.SetLocked(False)
+        pathPlanningBasePoint = numpy.array(posTarget) + (numpy.array(posEntry)-numpy.array(posTarget))*1.2
+        cannulaDirection = (numpy.array(posEntry) - numpy.array(posTarget))/numpy.linalg.norm(numpy.array(posTarget) - numpy.array(posEntry))
+        angle = math.acos(numpy.dot(numpy.array([0,0,1.0]),cannulaDirection))
+        rotationAxis = numpy.cross(numpy.array([0,0,1.0]),cannulaDirection)
+        matrix = vtk.vtkMatrix4x4()
+        transform = vtk.vtkTransform()
+        transform.RotateWXYZ(angle*180.0/numpy.pi, rotationAxis[0],rotationAxis[1],rotationAxis[2])
+        matrix = transform.GetMatrix()
+        synthesizedData = vtk.vtkPolyData()
+        points = vtk.vtkPoints()
+        phiResolution = 5*numpy.pi/180.0
+        radiusResolution = 1.0
+        points.InsertNextPoint(posEntry)
+        distance2 = numpy.linalg.norm(numpy.array(posTarget) - numpy.array(posEntry))
+        distance1 = numpy.linalg.norm(numpy.array(posTarget) - numpy.array(posDistal))
+        self.entryRadius = self.cylindarRadius * distance2 / distance1
+        for radius in numpy.arange(radiusResolution, self.entryRadius+radiusResolution, radiusResolution):
+          for angle in numpy.arange(phiResolution, numpy.pi, phiResolution):
+            point = matrix.MultiplyPoint(numpy.array([radius*math.cos(angle), radius*math.sin(angle),0,1]))
+            pointTranslated = [point[0]+pathPlanningBasePoint[0],point[1]+pathPlanningBasePoint[1],point[2]+pathPlanningBasePoint[2]]
+            points.InsertNextPoint(pointTranslated)
+          for angle in numpy.arange(numpy.pi, 2*numpy.pi, phiResolution):
+            point = matrix.MultiplyPoint(numpy.array([-radius * math.cos(angle), radius * math.sin(angle), 0, 1]))
+            pointTranslated = [point[0] + pathPlanningBasePoint[0], point[1] + pathPlanningBasePoint[1], point[2] + pathPlanningBasePoint[2]]
+            points.InsertNextPoint(pointTranslated)
+        synthesizedData.SetPoints(points)
+        tempModel = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
+        tempModel.SetAndObservePolyData(synthesizedData)
+        distanceMapNode = None
+        if not self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_distanceVolume"):
+          distanceMapFilter = sitk.ApproximateSignedDistanceMapImageFilter()
+          originImage = sitk.Cast(sitkUtils.PullFromSlicer(self.currentVolumeNode.GetID()), sitk.sitkInt16)
+          threshold = 100
+          distanceMap = distanceMapFilter.Execute(originImage, threshold - 10, threshold )
+          sitkUtils.PushToSlicer(distanceMap, "distanceMap", 0, True)
+          imageCollection = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLScalarVolumeNode", "distanceMap")
+          if imageCollection:
+            distanceMapNode = imageCollection.GetItemAsObject(0)
+            self.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_distanceVolume", distanceMapNode.GetID())
+          self.setSliceViewer()
         else:
-          self.cannulaManager.curveFiducials.AddFiducialFromArray(posTarget)
-          self.cannulaManager.curveFiducials.AddFiducialFromArray(posEntry + 0.005*cannulaDirection)
+          distanceMapNodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_distanceVolume")
+          distanceMapNode = slicer.mrmlScene.GetNodeByID(distanceMapNodeID)
+        if synthesizedData.GetNumberOfPoints() and distanceMapNode:
+          grayScaleModelWithMarginNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
+          slicer.mrmlScene.AddNode(grayScaleModelWithMarginNode)
+          parameters = {}
+          parameters["InputVolume"] = distanceMapNode.GetID()
+          parameters["OutputGeometry"] = grayScaleModelWithMarginNode.GetID()
+          parameters["Threshold"] = -10.0
+          grayMaker = slicer.modules.grayscalemodelmaker
+          self.cliNode = slicer.cli.run(grayMaker, None, parameters, wait_for_completion=True)
+
+          self.pathReceived, self.nPathReceived, self.apReceived, self.minimumPoint, self.minimumDistance, self.maximumPoint, self.maximumDistance = self.PercutaneousApproachAnalysisLogic.makePaths(
+            self.targetPointNode, None, 0, grayScaleModelWithMarginNode, tempModel)
+          # display all paths model
+          yellow = [1, 1, 0]
+          red =[1, 0, 0]
+          self.makePath(self.pathReceived, self.nPathReceived,   1, yellow, "candidatePaths", self.pathCandidatesPoly, self.pathCandidatesModel)
+          obbTree = vtk.vtkOBBTree()
+          obbTree.SetDataSet(grayScaleModelWithMarginNode.GetPolyData())
+          obbTree.BuildLocator()
+          pointsVTKintersection = vtk.vtkPoints()
+          hasIntersection = obbTree.IntersectWithLine(posEntry, posTarget, pointsVTKintersection, None)
+          slicer.mrmlScene.RemoveNode(grayScaleModelWithMarginNode)
+          #cannulaNode = slicer.mrmlScene.GetNodeByID(
+          #  self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_cannula"))
+          # slicer.mrmlScene.AddNode(trajectoryNode)
+          #dnode = cannulaNode.GetMarkupsDisplayNode()
+          #if dnode:
+          #  rgbColor = [0.0, 1.0, 1.0]
+          #  dnode.SetSelectedColor(rgbColor)
+          #  dnode.SetVisibility(1)
+          #self.cannulaManager.curveFiducials = cannulaNode
+          self.cannulaManager.clearLine()
+          self.cannulaManager.curveFiducials.RemoveAllMarkups()
+          self.cannulaManager.startEditLine() # initialize the tube model
+          if hasIntersection > 0:
+            if self.nPathReceived>0:
+              if slicer.util.confirmYesNoDisplay("The cannula is within the safty margin of the venous, use location optimization?",
+                                                 windowTitle=""):
+                self.relocateCannula(self.pathReceived)
+              else:
+                self.cannulaManager.curveFiducials.AddFiducialFromArray(posTarget)
+                self.cannulaManager.curveFiducials.AddFiducialFromArray(posEntry + 0.005*cannulaDirection)
+            else:
+              slicer.util.warningDisplay(
+                "No any cannula candidate exists here, considering redefine the ventricle area?")
+              distalNode.SetLocked(False)
+              targetNode.SetLocked(False)
+          else:
+            self.cannulaManager.curveFiducials.AddFiducialFromArray(posTarget)
+            self.cannulaManager.curveFiducials.AddFiducialFromArray(posEntry + 0.005*cannulaDirection)
 
 
 
@@ -2883,56 +2927,98 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     self.yawAngle = -numpy.arctan2(lastPos[0]-firstPos[0], lastPos[1]-firstPos[1])*180.0/numpy.pi
     self.updateSliceView()
     pass
-  
+
   def calcCannulaAngles(self):
-    if self.cannulaManager.curveFiducials:
-      if self.cannulaManager.curveFiducials.GetNumberOfFiducials():
-        posTarget = [0.0,0.0,0.0]
-        self.cannulaManager.curveFiducials.GetNthFiducialPosition(0,posTarget)
-        posEntry = [0.0,0.0,0.0]
-        self.cannulaManager.curveFiducials.GetNthFiducialPosition(1,posEntry)
-        p_EC = numpy.array([-math.sin(self.sagittalYawAngle), math.cos(self.sagittalYawAngle), 0])
-        p_EN = numpy.array([-0.5,math.sqrt(0.5),0.5]) #this vector we need to get from the skull Norm calculation
-        p_EC = p_EC/numpy.linalg.norm(p_EC)
-        p_EN = p_EN/numpy.linalg.norm(p_EN)
-        p_ET = numpy.array(posEntry) - numpy.array(posTarget)
-        p_ET = p_ET / numpy.linalg.norm(p_ET)
-        cosCalc = numpy.dot(p_EN, p_ET)
-        sinCalc = math.sqrt(1 - cosCalc*cosCalc)
-        p_EM = numpy.array([])
-        if cosCalc>1e-6: # make sure the p_EN and p_ET are not perpenticular.
-          sinTheta1 = numpy.dot(p_EC, p_EN)
-          cosTheta1 = math.sqrt(1-sinTheta1*sinTheta1)
-          if cosTheta1 < cosCalc:  # here means no intesection between the coronal plan and the cone composed by p_EN and p_ET
-            p_EN2 = p_EN - p_EC * (sinTheta1 * cosCalc - cosTheta1 * sinCalc)  # sin(theta1 - Calc) = sin(theta1)*cos(Calc) -
-            p_EM = p_EN2 + p_EC*math.sin(math.asin(sinTheta1))
-            p_EM = p_EM / numpy.linalg.norm(p_EM)
+    inputModelNodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_model")
+    if inputModelNodeID:
+      inputModelNode = slicer.mrmlScene.GetNodeByID(inputModelNodeID)
+      if self.cannulaManager.curveFiducials and inputModelNode:
+        if self.cannulaManager.curveFiducials.GetNumberOfFiducials():
+          posTarget = [0.0,0.0,0.0]
+          self.cannulaManager.curveFiducials.GetNthFiducialPosition(0,posTarget)
+          posEntry = [0.0,0.0,0.0]
+          self.cannulaManager.curveFiducials.GetNthFiducialPosition(1,posEntry)
+          p_ES = numpy.array([math.cos(self.sagittalYawAngle), math.sin(self.sagittalYawAngle), 0])
+          p_EC = numpy.array([-math.sin(self.sagittalYawAngle), math.cos(self.sagittalYawAngle), 0])
+          p_EN = self.calculateModelNorm(inputModelNode, posEntry, self.entryRadius)#numpy.array([-0.5,math.sqrt(0.5),0.5]) #this vector we need to get from the skull Norm calculation
+
+          self.skullNormToCoronalAngle = 90.0 - math.acos(abs(numpy.dot(p_EC, p_EN))) * 180.0 / numpy.pi
+          self.skullNormToSaggitalAngle = 90.0 - math.acos(abs(numpy.dot(p_ES, p_EN))) * 180.0 / numpy.pi
+          p_EC = p_EC/numpy.linalg.norm(p_EC)
+          p_EN = p_EN/numpy.linalg.norm(p_EN)
+          p_ET = numpy.array(posEntry) - numpy.array(posTarget)
+          p_ET = p_ET / numpy.linalg.norm(p_ET)
+          cosCalc = numpy.dot(p_EN, p_ET)
+          sinCalc = math.sqrt(1 - cosCalc*cosCalc)
+          p_EM = numpy.array([])
+          if cosCalc>1e-6: # make sure the p_EN and p_ET are not perpenticular.
+            sinTheta1 = numpy.dot(p_EC, p_EN)
+            cosTheta1 = math.sqrt(1-sinTheta1*sinTheta1)
+            if cosTheta1 < cosCalc:  # here means no intesection between the coronal plan and the cone composed by p_EN and p_ET
+              p_EN2 = p_EN - p_EC * sinTheta1
+              p_EM = p_EN2 + p_EC * cosTheta1*(sinTheta1 * cosCalc - cosTheta1 * sinCalc) / (cosTheta1 * cosCalc + sinTheta1 * sinCalc)  # sin(theta1 - Calc) = sin(theta1)*cos(Calc) - cos(theta1)*sin(Calc)
+              p_EM = p_EM / numpy.linalg.norm(p_EM)
+            else:
+              p_EN2 = p_EN - p_EC * (sinTheta1)
+              cosTheta2 = cosCalc/cosTheta1
+              tanTheta2 =  math.sqrt(1/(cosTheta2*cosTheta2) - 1)
+              p_EM = p_EN2 + numpy.cross(p_EC, p_EN2)*tanTheta2
+              p_EM = p_EM / numpy.linalg.norm(p_EM)
+            cosMT = numpy.dot(p_EM, p_ET)
+            cosMN = numpy.dot(p_EN, p_EM)
+            if p_EM.any():
+              self.cannulaToCoronalAngle = math.acos(cosMT) * 180.0 / numpy.pi
+              self.cannulaToNormAngle = math.acos(cosCalc) * 180.0 / numpy.pi
+              pathNavigationPoints = [numpy.array(posEntry), numpy.array(posEntry) + p_EN * 80,
+                                      #numpy.array(posEntry), numpy.array(posEntry) + p_EM * 50,
+                                      numpy.array(posEntry), numpy.array(posEntry) + p_ET * 20]
+              self.makePath(pathNavigationPoints, 3, 1, [1, 1, 0], "CannulaNavigationLines", self.pathNavigationPoly,
+                            self.pathNavigationModel)
+              return 1
+            else:
+              return 0
           else:
-            p_EN2 = p_EN - p_EC * (sinTheta1)
-            cosTheta2 = cosCalc/cosTheta1
-            tanTheta2 =  math.sqrt(1/(cosTheta2*cosTheta2) - 1)
-            p_EM = p_EN2 + numpy.cross(p_EC, p_EN2)*tanTheta2
-            p_EM = p_EM / numpy.linalg.norm(p_EM)
-          cosMT = numpy.dot(p_EM, p_ET)
-          cosMN = numpy.dot(p_EN, p_EM)
-          if p_EM.any():
-            self.cannulaToCoronalAngle = math.acos(cosMT) * 180.0 / numpy.pi
-            self.cannulaToNormAngle = math.acos(cosCalc) * 180.0 / numpy.pi
-            pathNavigationPoints = [numpy.array(posEntry), numpy.array(posEntry) + p_EN * 10, numpy.array(posEntry),
-                                    numpy.array(posEntry) + p_EC * 10, numpy.array(posEntry),
-                                    numpy.array(posEntry) + p_EM * 10, numpy.array(posEntry),
-                                    numpy.array(posEntry) + p_ET * 10]
-            self.makePath(pathNavigationPoints, 4, 1, [1, 1, 0], "CannulaNavigationLines", self.pathNavigationPoly,
-                          self.pathNavigationModel)
+            self.cannulaToCoronalAngle = 0.0
+            self.cannulaToNormAngle = 0.0
             return 1
-          else:
-            return 0
-        else:
-          self.cannulaToCoronalAngle = 0.0
-          self.cannulaToNormAngle = 0.0
-          return 1
         
     return 0
+
+  def calculateModelNorm(self, inputModel, spherePos, sphereRadius):
+    sphere = vtk.vtkSphere()
+    sphere.SetCenter(spherePos)
+    sphere.SetRadius(sphereRadius)
+
+    triangle = vtk.vtkTriangleFilter()
+    triangle.SetInputData(inputModel.GetPolyData())
+    triangle.Update()
+
+    clip = vtk.vtkClipPolyData()
+    clip.SetInputData(triangle.GetOutput())
+    clip.SetClipFunction(sphere)
+    clip.InsideOutOn()
+    clip.Update()
+
+    clean = vtk.vtkCleanPolyData()
+    clean.SetInputConnection(clip.GetOutputPort())
+    clean.Update()
+
+    clippedModel = clip.GetOutput()
+    cellsNormal = clippedModel.GetPointData().GetNormals()
+
+    averageNormal = numpy.array([0.0, 0.0, 0.0])
+
+    for cellIndex in range(0, cellsNormal.GetNumberOfTuples()):
+      cellNormal = [0.0, 0.0, 0.0]
+      cellsNormal.GetTuple(cellIndex, cellNormal)
+
+      if not (math.isnan(cellNormal[0]) or math.isnan(cellNormal[1]) or math.isnan(cellNormal[2])):
+        averageNormal[0] = averageNormal[0] + cellNormal[0]
+        averageNormal[1] = averageNormal[1] + cellNormal[1]
+        averageNormal[2] = averageNormal[2] + cellNormal[2]
+    averageNormal = averageNormal/numpy.linalg.norm(averageNormal)
+
+    return averageNormal
 
   def updateSliceView(self):
     ## due to the RAS and vtk space difference, the X axis is flipped, So the standard rotation matrix is multiplied by -1 in the X axis
