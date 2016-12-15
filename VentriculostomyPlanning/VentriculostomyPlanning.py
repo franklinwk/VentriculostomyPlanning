@@ -443,8 +443,12 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     selectNasionLabel = qt.QLabel('Select Nasion')
     selectNasionLayout.addWidget(self.selectNasionButton)
     self.selectSagittalButton = qt.QPushButton("")
+    self.selectSagittalButton.setMaximumHeight(buttonHeight)
+    self.selectSagittalButton.setMaximumWidth(buttonWidth)
     self.selectSagittalButton.toolTip = "Add a point in the 3D window to identify the sagittal plane"
     self.selectSagittalButton.enabled = True
+    self.selectSagittalButton.setIcon(qt.QIcon(qt.QPixmap(os.path.join(self.scriptDirectory, "nasion.png"))))
+    self.selectSagittalButton.setIconSize(qt.QSize(self.selectSagittalButton.size))
     selectNasionLayout.addWidget(self.selectSagittalButton)
 
     self.createEntryPointButton = qt.QPushButton("Create Entry Point")
@@ -509,13 +513,17 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     addCannulaLayout.addWidget(self.addCannulaTargetButton)
     self.addCannulaTargetButton.setMaximumHeight(buttonHeight)
     self.addCannulaTargetButton.setMaximumWidth(buttonWidth)
-    self.addCannulaTargetButton.setToolTip("Define the end cannula point")
+    self.addCannulaTargetButton.setToolTip("Define the target cannula point")
     self.addCannulaTargetButton.setIcon(qt.QIcon(qt.QPixmap(os.path.join(self.scriptDirectory, "cannula.png"))))
     self.addCannulaTargetButton.setIconSize(qt.QSize(self.addCannulaTargetButton.size))
     self.addCannulaBox.setStyleSheet('QGroupBox{border:0;}')
     self.addCannulaDistalButton = qt.QPushButton("")
-    self.addCannulaDistalButton.toolTip = ""
+    self.addCannulaDistalButton.setMaximumHeight(buttonHeight)
+    self.addCannulaDistalButton.setMaximumWidth(buttonWidth)
+    self.addCannulaDistalButton.toolTip = "Define the distal cannula point"
     self.addCannulaDistalButton.enabled = True
+    self.addCannulaDistalButton.setIcon(qt.QIcon(qt.QPixmap(os.path.join(self.scriptDirectory, "cannula.png"))))
+    self.addCannulaDistalButton.setIconSize(qt.QSize(self.addCannulaDistalButton.size))
     addCannulaLayout.addWidget(self.addCannulaDistalButton)
     self.mainGUIGroupBoxLayout.addWidget(self.addCannulaBox,2,3)
 
@@ -821,7 +829,8 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       if self.logic.baseVolumeNode and self.logic.ventricleVolume:
         self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_ventricleVolume", self.logic.ventricleVolume.GetID())
         self.caseNum = self.caseNum + 1
-        #self.inputVolumeSelector.setCurrentNode(self.logic.baseVolumeNode)
+        self.onSelect(self.logic.baseVolumeNode)
+        self.inputVolumeSelector.setCurrentNode(self.logic.baseVolumeNode)
         # the setForegroundVolume will not work, because the slicerapp triggers the SetBackgroundVolume after the volume is loaded
 
 
@@ -836,8 +845,8 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       else:
         self.logic.ventricleVolume = slicer.mrmlScene.GetNodeByID(ventricleVolumeID)
       caseName = ""
-      if self.caseNum>1:
-        caseName = self.logic.baseVolumeNode.GetName()
+      #if self.caseNum>1:
+      #  caseName = self.logic.baseVolumeNode.GetName()
       self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_model",caseName)
       self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_nasion",caseName)
       self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_sagittalPoint", caseName)
@@ -1228,6 +1237,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.logic.clear()
     slicer.mrmlScene.Clear(0)
     globals()[moduleName] = slicer.util.reloadScriptedModule(moduleName)
+    self.logic = VentriculostomyPlanningLogic()
     
 class CurveManager():
 
@@ -1501,7 +1511,24 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     self.PercutaneousApproachAnalysisLogic = PercutaneousApproachAnalysisLogic()
     self.targetPointNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
     self.pathCandidatesModel = slicer.vtkMRMLModelNode()
+    # Create display node
+    modelDisplay = slicer.vtkMRMLModelDisplayNode()
+    yellow = [1, 1, 0]
+    modelDisplay.SetColor(yellow[0], yellow[1], yellow[2])
+    modelDisplay.SetScene(slicer.mrmlScene)
+    modelDisplay.SetVisibility(0)
+    modelDisplay.SetSliceIntersectionVisibility(True)  # Show in slice view
+    slicer.mrmlScene.AddNode(modelDisplay)
+    self.pathCandidatesModel.SetAndObserveDisplayNodeID(modelDisplay.GetID())
+    slicer.mrmlScene.AddNode(self.pathCandidatesModel)
+    modelDisplay = slicer.vtkMRMLModelDisplayNode()
+    modelDisplay.SetColor(yellow[0], yellow[1], yellow[2])
+    modelDisplay.SetScene(slicer.mrmlScene)
+    modelDisplay.SetVisibility(0)
+    slicer.mrmlScene.AddNode(modelDisplay)
     self.pathNavigationModel = slicer.vtkMRMLModelNode()
+    self.pathNavigationModel.SetAndObserveDisplayNodeID(modelDisplay.GetID())
+    slicer.mrmlScene.AddNode(self.pathNavigationModel)
     self.pathCandidatesPoly = vtk.vtkPolyData()
     self.pathNavigationPoly = vtk.vtkPolyData()
     ##
@@ -1550,9 +1577,11 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       slicer.mrmlScene.RemoveNode(slicer.mrmlScene.GetNodeByID(self.nasionProjectedMarker.GetID()))
       self.nasionProjectedMarker = None
     if self.pathCandidatesModel and self.pathCandidatesModel.GetID():
+      slicer.mrmlScene.RemoveNode(self.pathCandidatesModel.GetDisplayNode())
       slicer.mrmlScene.RemoveNode(self.pathCandidatesModel)
       self.pathCandidatesModel = None
     if self.pathNavigationModel and self.pathNavigationModel.GetID():
+      slicer.mrmlScene.RemoveNode(self.pathNavigationModel.GetDisplayNode())
       slicer.mrmlScene.RemoveNode(self.pathNavigationModel)
       self.pathNavigationModel = None
     if self.trajectoryProjectedMarker and self.trajectoryProjectedMarker.GetID():
@@ -1661,7 +1690,6 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       if self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_target"):
         targetNode = slicer.mrmlScene.GetNodeByID(
           self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_target"))
-        dnode = targetNode.GetMarkupsDisplayNode()
         targetNode.RemoveAllMarkups()
         #targetNode.SetLocked(True)
         selectionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSelectionNodeSingleton")
@@ -1674,7 +1702,23 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         self.interactionMode = "target"
         self.interactionNode.SwitchToSinglePlaceMode()
         self.interactionNode.SetCurrentInteractionMode(slicer.vtkMRMLInteractionNode.Place)
+        targetNode = slicer.mrmlScene.GetNodeByID(
+          self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_target"))
+        #targetNode.AddObserver(self.interactionNode.EndPlacementEvent, self.endTargetSelectInteraction)
 
+
+  def endTargetSelectInteraction(self, targetNode = None, event=None):
+    if self.baseVolumeNode:
+      if self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_distal"):
+        distalNode = slicer.mrmlScene.GetNodeByID(
+          self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_distal"))
+        if(distalNode and (distalNode.GetNumberOfFiducials()==0)):
+          self.startEditPlanningDistal()
+      if self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_target"):
+        targetNode = slicer.mrmlScene.GetNodeByID(
+          self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_target"))
+        targetNode.AddObserver(slicer.vtkMRMLMarkupsNode().PointModifiedEvent, self.createVentricleCylindar)
+    pass
 
   def startEditPlanningDistal(self):
     if self.baseVolumeNode:
@@ -1696,10 +1740,20 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         self.interactionMode = "distal"
         self.interactionNode.SwitchToSinglePlaceMode()
         self.interactionNode.SetCurrentInteractionMode(slicer.vtkMRMLInteractionNode.Place)
+        #distalNode.AddObserver(self.interactionNode.EndPlacementEvent, self.endDistalSelectInteraction)
+
+  def endDistalSelectInteraction(self, distalnode = None, event=None):
+    if self.baseVolumeNode:
+      if self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_target"):
         targetNode = slicer.mrmlScene.GetNodeByID(
           self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_target"))
-        targetNode.AddObserver(slicer.vtkMRMLMarkupsNode().PointModifiedEvent, self.createVentricleCylindar)
+        if(targetNode and (targetNode.GetNumberOfFiducials()==0)):
+          self.startEditPlanningTarget()
+      if self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_distal"):
+        distalNode = slicer.mrmlScene.GetNodeByID(
+          self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_distal"))
         distalNode.AddObserver(slicer.vtkMRMLMarkupsNode().PointModifiedEvent, self.createVentricleCylindar)
+    pass
   
   def endEditTrajectory(self):
     self.trajectoryManager.endEditLine()
@@ -1725,6 +1779,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         self.calculateLineModelIntersect(modelID, posDistal+1e6*direction, posTarget-1e6*direction, self.trajectoryProjectedMarker)
         posEntry = numpy.array([0.0, 0.0, 0.0])
         self.trajectoryProjectedMarker.GetNthFiducialPosition(1,posEntry)
+        self.trajectoryProjectedMarker.RemoveAllMarkups()
         self.targetPointNode.RemoveAllMarkups()
         self.targetPointNode.AddFiducial(posTarget[0], posTarget[1], posTarget[2])
         grayScaleModelNodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_grayScaleModel")
@@ -1789,9 +1844,8 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
           self.pathReceived, self.nPathReceived, self.apReceived, self.minimumPoint, self.minimumDistance, self.maximumPoint, self.maximumDistance = self.PercutaneousApproachAnalysisLogic.makePaths(
             self.targetPointNode, None, 0, grayScaleModelWithMarginNode, tempModel)
           # display all paths model
-          yellow = [1, 1, 0]
           red =[1, 0, 0]
-          self.makePath(self.pathReceived, self.nPathReceived,   1, yellow, "candidatePaths", self.pathCandidatesPoly, self.pathCandidatesModel)
+          self.makePath(self.pathReceived, self.nPathReceived,   1, "candidatePaths", self.pathCandidatesPoly, self.pathCandidatesModel)
           obbTree = vtk.vtkOBBTree()
           obbTree.SetDataSet(grayScaleModelWithMarginNode.GetPolyData())
           obbTree.BuildLocator()
@@ -1830,7 +1884,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
 
 
       #slicer.mrmlScene.RemoveNode(distanceMapNode)
-  def makePath(self, path, approachablePoints, visibilityParam, color, modelName, polyData, modelNode):
+  def makePath(self, path, approachablePoints, visibilityParam, modelName, polyData, modelNode):
 
     # Create an array for all approachable points
     p = numpy.zeros([approachablePoints * 2, 3])
@@ -1870,25 +1924,8 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         p[pointIndex] = coord
 
     # Create model node
-    modelNode.SetScene(scene)
-    modelNode.SetName(scene.GenerateUniqueName(modelName))
     modelNode.SetAndObservePolyData(polyData)
-
-    # Create display node
-    modelDisplay = slicer.vtkMRMLModelDisplayNode()
-    modelDisplay.SetColor(color[0], color[1], color[2])
-    modelDisplay.SetScene(scene)
-    modelDisplay.SetVisibility(visibilityParam)
-    modelDisplay.SetSliceIntersectionVisibility(True)  # Show in slice view
-    scene.AddNode(modelDisplay)
-    scene.AddNode(modelDisplay)
-    modelNode.SetAndObserveDisplayNodeID(modelDisplay.GetID())
-
-    # Add to scene
-    if vtk.VTK_MAJOR_VERSION <= 5:
-      modelDisplay.SetInputPolyData(modelNode.GetPolyData())
-    scene.AddNode(modelNode)
-
+    modelNode.GetDisplayNode().SetVisibility(visibilityParam)
     pass
 
   def relocateCannula(self, pathReceived):
@@ -2205,24 +2242,36 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       if attribute == "vtkMRMLScalarVolumeNode.rel_nasion":
         nasionNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
         nasionNode.SetName(caseName+"nasion")
+        displayNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsDisplayNode")
+        slicer.mrmlScene.AddNode(displayNode)
         slicer.mrmlScene.AddNode(nasionNode)
+        nasionNode.SetAndObserveDisplayNodeID(displayNode.GetID())
         nasionNode.SetLocked(True)
         self.baseVolumeNode.SetAttribute(attribute, nasionNode.GetID())
       if attribute == "vtkMRMLScalarVolumeNode.rel_sagittalPoint":
         sagittalPointNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
         sagittalPointNode.SetName(caseName+"sagittalPoint")
+        displayNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsDisplayNode")
+        slicer.mrmlScene.AddNode(displayNode)
         slicer.mrmlScene.AddNode(sagittalPointNode)
+        sagittalPointNode.SetAndObserveDisplayNodeID(displayNode.GetID())
         sagittalPointNode.SetLocked(True)
         self.baseVolumeNode.SetAttribute(attribute, sagittalPointNode.GetID())
       elif attribute == "vtkMRMLScalarVolumeNode.rel_target":
         targetNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
         targetNode.SetName(caseName+"target")
+        displayNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsDisplayNode")
+        slicer.mrmlScene.AddNode(displayNode)
         slicer.mrmlScene.AddNode(targetNode)
+        targetNode.SetAndObserveDisplayNodeID(displayNode.GetID())
         self.baseVolumeNode.SetAttribute(attribute, targetNode.GetID())
       elif attribute == "vtkMRMLScalarVolumeNode.rel_distal":
         distalNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
         distalNode.SetName(caseName+"distal")
+        displayNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsDisplayNode")
+        slicer.mrmlScene.AddNode(displayNode)
         slicer.mrmlScene.AddNode(distalNode)
+        distalNode.SetAndObserveDisplayNodeID(displayNode.GetID())
         self.baseVolumeNode.SetAttribute(attribute, distalNode.GetID())
       elif attribute == "vtkMRMLScalarVolumeNode.rel_skullNorm":
         skullNormNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
@@ -2428,13 +2477,15 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       self.createTrueSagittalPlane()
       self.createEntryPoint()
       self.nasionProjectedMarker.GetMarkupsDisplayNode().SetVisibility(0)
-    if self.interactionMode == "sagittalPoint":
+    elif self.interactionMode == "sagittalPoint":
       self.createTrueSagittalPlane()
       self.createEntryPoint()
-    if self.interactionMode == "target":
+    elif self.interactionMode == "target":
+      self.endTargetSelectInteraction()
       if self.trajectoryProjectedMarker:
         self.trajectoryProjectedMarker.GetMarkupsDisplayNode().SetVisibility(0)
-    if self.interactionMode == "distal":
+    elif self.interactionMode == "distal":
+      self.endDistalSelectInteraction()
       if self.trajectoryProjectedMarker:
         self.trajectoryProjectedMarker.GetMarkupsDisplayNode().SetVisibility(1)
       self.createVentricleCylindar()
@@ -2455,6 +2506,8 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       if self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_nasion"):
         nasionNode = slicer.mrmlScene.GetNodeByID(self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_nasion"))
         dnode = nasionNode.GetMarkupsDisplayNode()
+        if dnode :
+          dnode.SetVisibility(1)
         nasionNode.RemoveAllMarkups()
         #slicer.mrmlScene.AddNode(nasionNode)
         nasionNode.SetLocked(True)
@@ -2509,22 +2562,23 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     if targetNodeID and distalNodeID:
       targetNode = slicer.mrmlScene.GetNodeByID(targetNodeID)
       distalNode = slicer.mrmlScene.GetNodeByID(distalNodeID)
-      posTarget = numpy.array([0.0, 0.0, 0.0])
-      targetNode.GetNthFiducialPosition(0, posTarget)
-      posDistal = numpy.array([0.0, 0.0, 0.0])
-      distalNode.GetNthFiducialPosition(0, posDistal)
-      if self.trajectoryManager.curveFiducials:
-        slicer.mrmlScene.RemoveNode(self.trajectoryManager.curveFiducials)
-        self.trajectoryManager.curveFiducials = None
-      tempFiducialNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
-      tempFiducialNode.RemoveAllMarkups()
-      tempFiducialNode.AddFiducial(posTarget[0], posTarget[1], posTarget[2])
-      tempFiducialNode.AddFiducial(posDistal[0], posDistal[1], posDistal[2])
-      slicer.mrmlScene.AddNode(tempFiducialNode)
-      tempFiducialNode.SetDisplayVisibility(0)
-      self.trajectoryManager.curveFiducials = tempFiducialNode
-      self.trajectoryManager.startEditLine()
-      self.trajectoryManager.onLineSourceUpdated()
+      if targetNode.GetNumberOfFiducials() and distalNode.GetNumberOfFiducials():
+        posTarget = numpy.array([0.0, 0.0, 0.0])
+        targetNode.GetNthFiducialPosition(0, posTarget)
+        posDistal = numpy.array([0.0, 0.0, 0.0])
+        distalNode.GetNthFiducialPosition(0, posDistal)
+        if self.trajectoryManager.curveFiducials:
+          slicer.mrmlScene.RemoveNode(self.trajectoryManager.curveFiducials)
+          self.trajectoryManager.curveFiducials = None
+        tempFiducialNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
+        tempFiducialNode.RemoveAllMarkups()
+        tempFiducialNode.AddFiducial(posTarget[0], posTarget[1], posTarget[2])
+        tempFiducialNode.AddFiducial(posDistal[0], posDistal[1], posDistal[2])
+        slicer.mrmlScene.AddNode(tempFiducialNode)
+        tempFiducialNode.SetDisplayVisibility(0)
+        self.trajectoryManager.curveFiducials = tempFiducialNode
+        self.trajectoryManager.startEditLine()
+        self.trajectoryManager.onLineSourceUpdated()
 
 
   def createROI(self):
@@ -2972,7 +3026,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
               pathNavigationPoints = [numpy.array(posEntry), numpy.array(posEntry) + p_EN * 80,
                                       #numpy.array(posEntry), numpy.array(posEntry) + p_EM * 50,
                                       numpy.array(posEntry), numpy.array(posEntry) + p_ET * 20]
-              self.makePath(pathNavigationPoints, 3, 1, [1, 1, 0], "CannulaNavigationLines", self.pathNavigationPoly,
+              self.makePath(pathNavigationPoints, 3, 1, "CannulaNavigationLines", self.pathNavigationPoly,
                             self.pathNavigationModel)
               return 1
             else:
