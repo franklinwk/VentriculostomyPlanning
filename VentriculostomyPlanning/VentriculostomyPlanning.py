@@ -889,6 +889,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       self.logic.createEntryPoint()
       cannulaModelID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_cannulaModel")
       cannulaFiducialsID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_cannula")
+      self.logic.pathNavigationModel.SetDisplayVisibility(0)
       self.logic.cannulaManager._curveModel = slicer.mrmlScene.GetNodeByID(cannulaModelID)
       self.logic.cannulaManager.curveFiducials = slicer.mrmlScene.GetNodeByID(cannulaFiducialsID)
       self.logic.cannulaManager.curveFiducials.AddObserver(slicer.vtkMRMLMarkupsNode().PointStartInteractionEvent, self.logic.updateSelectedMarker)
@@ -1702,9 +1703,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         self.interactionMode = "target"
         self.interactionNode.SwitchToSinglePlaceMode()
         self.interactionNode.SetCurrentInteractionMode(slicer.vtkMRMLInteractionNode.Place)
-        targetNode = slicer.mrmlScene.GetNodeByID(
-          self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_target"))
-        #targetNode.AddObserver(self.interactionNode.EndPlacementEvent, self.endTargetSelectInteraction)
+        targetNode.AddObserver(slicer.vtkMRMLMarkupsNode().PointModifiedEvent, self.createVentricleCylindar)
 
 
   def endTargetSelectInteraction(self, targetNode = None, event=None):
@@ -1717,7 +1716,6 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       if self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_target"):
         targetNode = slicer.mrmlScene.GetNodeByID(
           self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_target"))
-        targetNode.AddObserver(slicer.vtkMRMLMarkupsNode().PointModifiedEvent, self.createVentricleCylindar)
     pass
 
   def startEditPlanningDistal(self):
@@ -1740,7 +1738,8 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         self.interactionMode = "distal"
         self.interactionNode.SwitchToSinglePlaceMode()
         self.interactionNode.SetCurrentInteractionMode(slicer.vtkMRMLInteractionNode.Place)
-        #distalNode.AddObserver(self.interactionNode.EndPlacementEvent, self.endDistalSelectInteraction)
+        distalNode.AddObserver(slicer.vtkMRMLMarkupsNode().PointModifiedEvent, self.createVentricleCylindar)
+      self.createVentricleCylindar()
 
   def endDistalSelectInteraction(self, distalnode = None, event=None):
     if self.baseVolumeNode:
@@ -1752,7 +1751,6 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       if self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_distal"):
         distalNode = slicer.mrmlScene.GetNodeByID(
           self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_distal"))
-        distalNode.AddObserver(slicer.vtkMRMLMarkupsNode().PointModifiedEvent, self.createVentricleCylindar)
     pass
   
   def endEditTrajectory(self):
@@ -1958,6 +1956,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         posProject =  numpy.array([0.0] * 3)
         self.trajectoryProjectedMarker.GetNthFiducialPosition(0,posProject)
         self.cannulaManager.curveFiducials.SetNthFiducialPositionFromArray(1, posProject)
+        self.trajectoryProjectedMarker.RemoveAllMarkups()
     pass
 
   def clearTrajectory(self):
@@ -2484,6 +2483,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       self.endTargetSelectInteraction()
       if self.trajectoryProjectedMarker:
         self.trajectoryProjectedMarker.GetMarkupsDisplayNode().SetVisibility(0)
+      self.createVentricleCylindar()
     elif self.interactionMode == "distal":
       self.endDistalSelectInteraction()
       if self.trajectoryProjectedMarker:
@@ -2579,6 +2579,10 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         self.trajectoryManager.curveFiducials = tempFiducialNode
         self.trajectoryManager.startEditLine()
         self.trajectoryManager.onLineSourceUpdated()
+      else:
+        self.trajectoryManager.clearLine()
+    else:
+      self.trajectoryManager.clearLine()
 
 
   def createROI(self):
@@ -3028,6 +3032,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
                                       numpy.array(posEntry), numpy.array(posEntry) + p_ET * 20]
               self.makePath(pathNavigationPoints, 3, 1, "CannulaNavigationLines", self.pathNavigationPoly,
                             self.pathNavigationModel)
+              self.pathNavigationModel.GetDisplayNode().SetVisibility(1)
               return 1
             else:
               return 0
