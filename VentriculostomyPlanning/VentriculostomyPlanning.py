@@ -12,6 +12,7 @@ import DICOM
 from DICOM import DICOMWidget
 import PercutaneousApproachAnalysis
 from PercutaneousApproachAnalysis import *
+from numpy import linalg
 #import SlicerCaseManager
 
 #
@@ -852,6 +853,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_sagittalPoint", caseName)
       self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_target",caseName)
       self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_distal", caseName)
+      self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_cylindarRadius",caseName)
       self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_cannula", caseName)
       self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_skullNorm", caseName)
       self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_cannulaModel",caseName)
@@ -1167,13 +1169,13 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
 
   # Event handlers for trajectory
   def onEditPlanningDistal(self):
-      self.imageSlider.setValue(100.0)
-      self.lengthCannulaEdit.text = '--'
-      self.lengthSagittalPlanningLineEdit.text = '--'
-      self.lengthCoronalPlanningLineEdit.text = '--'
-      self.pitchAngleEdit.text = '--'
-      self.yawAngleEdit.text = '--'
-      self.logic.startEditPlanningDistal()
+    self.imageSlider.setValue(100.0)
+    self.lengthCannulaEdit.text = '--'
+    self.lengthSagittalPlanningLineEdit.text = '--'
+    self.lengthCoronalPlanningLineEdit.text = '--'
+    self.pitchAngleEdit.text = '--'
+    self.yawAngleEdit.text = '--'
+    self.logic.startEditPlanningDistal()
 
   def onGeneratePath(self):
     self.logic.generatePath()
@@ -1547,6 +1549,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     self.topPoint = []
     self.resetROI = False 
     self.threshold = -500.0
+    self.minimalVentricleLen = 10.0 # in mm
     self.yawAngle = 0.0
     self.pitchAngle = 0.0
     self.cannulaToNormAngle = 0.0
@@ -1558,7 +1561,13 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     self.activeTrajectoryMarkup = 0
     self.cylindarRadius = 2.5 # unit mm
     self.entryRadius = 25.0
-    self.trajectoryManager.setManagerTubeRadius(self.cylindarRadius)
+    self.cylindarInteractor = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
+    self.cylindarInteractor.SetName("")
+    slicer.mrmlScene.AddNode(self.cylindarInteractor)
+    self.cylindarInteractor.AddObserver(slicer.vtkMRMLMarkupsNode().PointModifiedEvent, self.updateCylindarRadius)
+    displayNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsDisplayNode")
+    slicer.mrmlScene.AddNode(displayNode)
+    self.cylindarInteractor.SetAndObserveDisplayNodeID(displayNode.GetID())
     self.trajectoryProjectedMarker = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
     self.trajectoryProjectedMarker.SetName("trajectoryProject")
     slicer.mrmlScene.AddNode(self.trajectoryProjectedMarker)
@@ -1739,7 +1748,6 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         self.interactionNode.SwitchToSinglePlaceMode()
         self.interactionNode.SetCurrentInteractionMode(slicer.vtkMRMLInteractionNode.Place)
         distalNode.AddObserver(slicer.vtkMRMLMarkupsNode().PointModifiedEvent, self.createVentricleCylindar)
-      self.createVentricleCylindar()
 
   def endDistalSelectInteraction(self, distalnode = None, event=None):
     if self.baseVolumeNode:
@@ -2272,6 +2280,8 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         slicer.mrmlScene.AddNode(distalNode)
         distalNode.SetAndObserveDisplayNodeID(displayNode.GetID())
         self.baseVolumeNode.SetAttribute(attribute, distalNode.GetID())
+      elif attribute == "vtkMRMLScalarVolumeNode.rel_cylindarRadius":
+        self.baseVolumeNode.SetAttribute(attribute, str(self.cylindarRadius))  
       elif attribute == "vtkMRMLScalarVolumeNode.rel_skullNorm":
         skullNormNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
         skullNormNode.SetName(caseName+"skullNorm")
@@ -2555,7 +2565,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         self.interactionMode = "sagittalPoint"
         self.interactionNode.SwitchToSinglePlaceMode()
         self.interactionNode.SetCurrentInteractionMode(slicer.vtkMRMLInteractionNode.Place)
-
+  
   def createVentricleCylindar(self, caller = None, eventID = None):
     targetNodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_target")
     distalNodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_distal")
@@ -2567,6 +2577,11 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         targetNode.GetNthFiducialPosition(0, posTarget)
         posDistal = numpy.array([0.0, 0.0, 0.0])
         distalNode.GetNthFiducialPosition(0, posDistal)
+        if numpy.linalg.norm(posDistal-posTarget)<self.minimalVentricleLen:
+          slicer.util.warningDisplay("The define ventricle horn is too short, distal point is automatically modified to make length longer than 10.0 mm")
+          posDistalNew = (posDistal-posTarget)/numpy.linalg.norm(posDistal-posTarget)*self.minimalVentricleLen + posTarget
+          distalNode.SetNthFiducialPositionFromArray(0,posDistalNew)
+          posDistal = posDistalNew
         if self.trajectoryManager.curveFiducials:
           slicer.mrmlScene.RemoveNode(self.trajectoryManager.curveFiducials)
           self.trajectoryManager.curveFiducials = None
@@ -2576,14 +2591,54 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         tempFiducialNode.AddFiducial(posDistal[0], posDistal[1], posDistal[2])
         slicer.mrmlScene.AddNode(tempFiducialNode)
         tempFiducialNode.SetDisplayVisibility(0)
+        self.trajectoryManager.setManagerTubeRadius(self.cylindarRadius)
         self.trajectoryManager.curveFiducials = tempFiducialNode
         self.trajectoryManager.startEditLine()
         self.trajectoryManager.onLineSourceUpdated()
+        self.updateSliceViewBasedOnPoints(posTarget,posDistal)
+        redSliceNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSliceNodeRed")
+        matrixRed = redSliceNode.GetSliceToRAS()
+        matrixRedInv = vtk.vtkMatrix4x4()
+        matrixRedInv.DeepCopy(matrixRed)
+        matrixRedInv.Invert()
+        posTarget = [posTarget[0],posTarget[1],posTarget[2],1]
+        posTargetInRAS = matrixRedInv.MultiplyPoint(posTarget)
+        posDistal = [posDistal[0],posDistal[1],posDistal[2],1]
+        posDistalInRAS = matrixRedInv.MultiplyPoint(posDistal)
+        verticalDirect = numpy.array([-(posDistalInRAS[1]-posTargetInRAS[1]), posDistalInRAS[0]-posTargetInRAS[0], 0, 0])
+        verticalDirect = self.cylindarRadius*verticalDirect/numpy.linalg.norm(verticalDirect)
+        cylindarInteractorPosInRAS = numpy.array(posTargetInRAS)/2.0 + verticalDirect 
+        cylindarInteractorPosInRAS[3] = 1.0
+        cylindarInteractorPos = matrixRed.MultiplyPoint(cylindarInteractorPosInRAS)
+        self.cylindarInteractor.RemoveAllMarkups()
+        self.cylindarInteractor.AddFiducial(cylindarInteractorPos[0],cylindarInteractorPos[1],cylindarInteractorPos[2])
+        self.cylindarInteractor.SetNthFiducialLabel(0,"")
       else:
         self.trajectoryManager.clearLine()
     else:
       self.trajectoryManager.clearLine()
 
+  def updateCylindarRadius(self, fiducicalMarkerNode = None, eventID = None):
+    posInteractor = [0.0,0.0,0.0]
+    fiducicalMarkerNode.GetNthFiducialPosition(0,posInteractor)
+    targetNodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_target")
+    distalNodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_distal")
+    if targetNodeID and distalNodeID:
+      targetNode = slicer.mrmlScene.GetNodeByID(targetNodeID)
+      distalNode = slicer.mrmlScene.GetNodeByID(distalNodeID)
+      if targetNode.GetNumberOfFiducials() and distalNode.GetNumberOfFiducials():
+        posTarget = numpy.array([0.0, 0.0, 0.0])
+        targetNode.GetNthFiducialPosition(0, posTarget)
+        posDistal = numpy.array([0.0, 0.0, 0.0])
+        distalNode.GetNthFiducialPosition(0, posDistal)
+        a = (posDistal- posTarget)/numpy.linalg.norm(posDistal-posTarget)
+        radius = numpy.linalg.norm(numpy.cross(posInteractor-posTarget,a))
+        self.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_cylindarRadius", str(radius))
+        self.cylindarRadius = radius
+        self.trajectoryManager.setManagerTubeRadius(radius)
+        self.trajectoryManager.startEditLine()
+        self.trajectoryManager.onLineSourceUpdated()
+    pass 
 
   def createROI(self):
     cropVolumeLogic = slicer.modules.cropvolume.logic()
@@ -2872,13 +2927,14 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       nasionNode = slicer.mrmlScene.GetNodeByID(nasionNodeID)
       sagittalPointNode = slicer.mrmlScene.GetNodeByID(sagittalPointNodeID)
       posNasion = numpy.array([0.0, 0.0, 0.0])
-      nasionNode.GetNthFiducialPosition(0, posNasion)
-      posSagittal = numpy.array([0.0, 0.0, 0.0])
-      sagittalPointNode.GetNthFiducialPosition(0, posSagittal)
-      self.sagittalYawAngle = -numpy.arctan2(posNasion[0] - posSagittal[0], posNasion[1] - posSagittal[1])
-      self.trueSagittalPlane = vtk.vtkPlane()
-      self.trueSagittalPlane.SetOrigin(posNasion[0], posNasion[1], posNasion[2])
-      self.trueSagittalPlane.SetNormal(math.cos(self.sagittalYawAngle), math.sin(self.sagittalYawAngle), 0)
+      if nasionNode.GetNumberOfFiducials():
+        nasionNode.GetNthFiducialPosition(0, posNasion)
+        posSagittal = numpy.array([0.0, 0.0, 0.0])
+        sagittalPointNode.GetNthFiducialPosition(0, posSagittal)
+        self.sagittalYawAngle = -numpy.arctan2(posNasion[0] - posSagittal[0], posNasion[1] - posSagittal[1])
+        self.trueSagittalPlane = vtk.vtkPlane()
+        self.trueSagittalPlane.SetOrigin(posNasion[0], posNasion[1], posNasion[2])
+        self.trueSagittalPlane.SetNormal(math.cos(self.sagittalYawAngle), math.sin(self.sagittalYawAngle), 0)
 
   def createEntryPoint(self) :
     ###All calculation is based on the RAS coordinates system 
@@ -2981,9 +3037,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     self.cannulaManager.getFirstPoint(firstPos)
     lastPos = numpy.array([0.0,0.0,0.0])
     self.cannulaManager.getLastPoint(lastPos)
-    self.pitchAngle = numpy.arctan2(lastPos[2]-firstPos[2], lastPos[1]-firstPos[1])*180.0/numpy.pi
-    self.yawAngle = -numpy.arctan2(lastPos[0]-firstPos[0], lastPos[1]-firstPos[1])*180.0/numpy.pi
-    self.updateSliceView()
+    self.updateSliceViewBasedOnPoints(firstPos, lastPos)
     pass
 
   def calcCannulaAngles(self):
@@ -3079,56 +3133,52 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
 
     return averageNormal
 
-  def updateSliceView(self):
+  def updateSliceViewBasedOnPoints(self, firstPos, lastPos):
     ## due to the RAS and vtk space difference, the X axis is flipped, So the standard rotation matrix is multiplied by -1 in the X axis
-    cannulaNodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_cannula")
-    if cannulaNodeID:
-      cannulaNode = slicer.mrmlScene.GetNodeByID(cannulaNodeID)
-      if cannulaNode and (cannulaNode.GetNumberOfFiducials() > 1):
-        pos = [0.0] * 3
-        cannulaNode.GetNthFiducialPosition(1, pos)
-        redSliceNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSliceNodeRed")
-        matrixRedOri = redSliceNode.GetSliceToRAS()
-        matrixRedNew = vtk.vtkMatrix4x4()
-        matrixRedNew.Identity()
-        matrixRedNew.SetElement(0, 3, pos[0])
-        matrixRedNew.SetElement(1, 3, pos[1])
-        matrixRedNew.SetElement(2, 3, pos[2])
-        matrixRedNew.SetElement(0, 0, -1)   # The X axis is flipped
-        matrixRedNew.SetElement(1, 1, numpy.cos(self.pitchAngle / 180.0 * numpy.pi))
-        matrixRedNew.SetElement(1, 2, -numpy.sin(self.pitchAngle / 180.0 * numpy.pi))
-        matrixRedNew.SetElement(2, 1, numpy.sin(self.pitchAngle / 180.0 * numpy.pi))
-        matrixRedNew.SetElement(2, 2, numpy.cos(self.pitchAngle / 180.0 * numpy.pi))
-        matrixRedOri.DeepCopy(matrixRedNew)
-        redSliceNode.UpdateMatrices()
+    self.pitchAngle = numpy.arctan2(lastPos[2]-firstPos[2], lastPos[1]-firstPos[1])*180.0/numpy.pi
+    self.yawAngle = -numpy.arctan2(lastPos[0]-firstPos[0], lastPos[1]-firstPos[1])*180.0/numpy.pi
+    redSliceNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSliceNodeRed")
+    matrixRedOri = redSliceNode.GetSliceToRAS()
+    matrixRedNew = vtk.vtkMatrix4x4()
+    matrixRedNew.Identity()
+    matrixRedNew.SetElement(0, 3, lastPos[0])
+    matrixRedNew.SetElement(1, 3, lastPos[1])
+    matrixRedNew.SetElement(2, 3, lastPos[2])
+    matrixRedNew.SetElement(0, 0, -1)   # The X axis is flipped
+    matrixRedNew.SetElement(1, 1, numpy.cos(self.pitchAngle / 180.0 * numpy.pi))
+    matrixRedNew.SetElement(1, 2, -numpy.sin(self.pitchAngle / 180.0 * numpy.pi))
+    matrixRedNew.SetElement(2, 1, numpy.sin(self.pitchAngle / 180.0 * numpy.pi))
+    matrixRedNew.SetElement(2, 2, numpy.cos(self.pitchAngle / 180.0 * numpy.pi))
+    matrixRedOri.DeepCopy(matrixRedNew)
+    redSliceNode.UpdateMatrices()
 
 
-        matrixMultiplier = vtk.vtkMatrix4x4()
-        yellowSliceNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSliceNodeYellow")
-        matrixYellowOri = yellowSliceNode.GetSliceToRAS()
-        matrixYaw = vtk.vtkMatrix4x4()
-        matrixYaw.Identity()
-        matrixYaw.SetElement(0, 3, pos[0])
-        matrixYaw.SetElement(1, 3, pos[1])
-        matrixYaw.SetElement(2, 3, pos[2])
-        matrixYaw.SetElement(0, 0, -1)  # The X axis is flipped
-        matrixYaw.SetElement(0, 0, numpy.cos(self.yawAngle / 180.0 * numpy.pi)) # definition of
-        matrixYaw.SetElement(0, 1, -numpy.sin(self.yawAngle / 180.0 * numpy.pi))
-        matrixYaw.SetElement(1, 0, numpy.sin(self.yawAngle / 180.0 * numpy.pi))
-        matrixYaw.SetElement(1, 1, numpy.cos(self.yawAngle / 180.0 * numpy.pi))
-        matrixYellowNew = vtk.vtkMatrix4x4()
-        matrixYellowNew.Zero()
-        matrixYellowNew.SetElement(0, 2, 1)
-        matrixYellowNew.SetElement(1, 0, -1)
-        matrixYellowNew.SetElement(2, 1, 1)
-        matrixYellowNew.SetElement(3, 3, 1)
-        matrixMultiplier.Multiply4x4(matrixYaw, matrixYellowNew, matrixYellowOri)
-        yellowSliceNode.UpdateMatrices()
+    matrixMultiplier = vtk.vtkMatrix4x4()
+    yellowSliceNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSliceNodeYellow")
+    matrixYellowOri = yellowSliceNode.GetSliceToRAS()
+    matrixYaw = vtk.vtkMatrix4x4()
+    matrixYaw.Identity()
+    matrixYaw.SetElement(0, 3, lastPos[0])
+    matrixYaw.SetElement(1, 3, lastPos[1])
+    matrixYaw.SetElement(2, 3, lastPos[2])
+    matrixYaw.SetElement(0, 0, -1)  # The X axis is flipped
+    matrixYaw.SetElement(0, 0, numpy.cos(self.yawAngle / 180.0 * numpy.pi)) # definition of
+    matrixYaw.SetElement(0, 1, -numpy.sin(self.yawAngle / 180.0 * numpy.pi))
+    matrixYaw.SetElement(1, 0, numpy.sin(self.yawAngle / 180.0 * numpy.pi))
+    matrixYaw.SetElement(1, 1, numpy.cos(self.yawAngle / 180.0 * numpy.pi))
+    matrixYellowNew = vtk.vtkMatrix4x4()
+    matrixYellowNew.Zero()
+    matrixYellowNew.SetElement(0, 2, 1)
+    matrixYellowNew.SetElement(1, 0, -1)
+    matrixYellowNew.SetElement(2, 1, 1)
+    matrixYellowNew.SetElement(3, 3, 1)
+    matrixMultiplier.Multiply4x4(matrixYaw, matrixYellowNew, matrixYellowOri)
+    yellowSliceNode.UpdateMatrices()
 
-        greenSliceNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSliceNodeGreen")
-        matrixGreenOri = greenSliceNode.GetSliceToRAS()
-        matrixGreenOri.DeepCopy(matrixYellowOri)
-        greenSliceNode.UpdateMatrices()
+    greenSliceNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSliceNodeGreen")
+    matrixGreenOri = greenSliceNode.GetSliceToRAS()
+    matrixGreenOri.DeepCopy(matrixYellowOri)
+    greenSliceNode.UpdateMatrices()
 
     pass
 
