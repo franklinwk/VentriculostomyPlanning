@@ -1514,7 +1514,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
 
     ##Path Planning variables
     self.PercutaneousApproachAnalysisLogic = PercutaneousApproachAnalysisLogic()
-    self.targetPointNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
+    self.cylindarMiddlePointNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
     self.pathCandidatesModel = slicer.vtkMRMLModelNode()
     # Create display node
     modelDisplay = slicer.vtkMRMLModelDisplayNode()
@@ -1811,8 +1811,8 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         posEntry = numpy.array([0.0, 0.0, 0.0])
         self.trajectoryProjectedMarker.GetNthFiducialPosition(1,posEntry)
         self.trajectoryProjectedMarker.RemoveAllMarkups()
-        self.targetPointNode.RemoveAllMarkups()
-        self.targetPointNode.AddFiducial(posTarget[0], posTarget[1], posTarget[2])
+        self.cylindarMiddlePointNode.RemoveAllMarkups()
+        self.cylindarMiddlePointNode.AddFiducial((posTarget[0]+posDistal[0])/2.0, (posTarget[1]+posDistal[1])/2.0, (posTarget[2]+posDistal[2])/2.0)
         grayScaleModelNodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_grayScaleModel")
         grayScaleModelNode = slicer.mrmlScene.GetNodeByID(grayScaleModelNodeID)
         skullModelNodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_model")
@@ -1833,7 +1833,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         radiusResolution = 1.0
         points.InsertNextPoint(posEntry)
         distance2 = numpy.linalg.norm(numpy.array(posTarget) - numpy.array(posEntry))
-        distance1 = numpy.linalg.norm(numpy.array(posTarget) - numpy.array(posDistal))
+        distance1 = numpy.linalg.norm(numpy.array(posTarget) - numpy.array(posDistal))/2 # Divided by 2 is because, all the cylindar bottom are possible target points
         self.entryRadius = self.cylindarRadius * distance2 / distance1
         for radius in numpy.arange(radiusResolution, self.entryRadius+radiusResolution, radiusResolution):
           for angle in numpy.arange(phiResolution, numpy.pi, phiResolution):
@@ -1873,7 +1873,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
           self.cliNode = slicer.cli.run(grayMaker, None, parameters, wait_for_completion=True)
 
           self.pathReceived, self.nPathReceived, self.apReceived, self.minimumPoint, self.minimumDistance, self.maximumPoint, self.maximumDistance = self.PercutaneousApproachAnalysisLogic.makePaths(
-            self.targetPointNode, None, 0, grayScaleModelWithMarginNode, tempModel)
+            self.cylindarMiddlePointNode, None, 0, grayScaleModelWithMarginNode, tempModel)
           # display all paths model
           red =[1, 0, 0]
           self.makePath(self.pathReceived, self.nPathReceived,   1, "candidatePaths", self.pathCandidatesPoly, self.pathCandidatesModel)
