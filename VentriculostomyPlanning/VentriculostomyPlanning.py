@@ -14,7 +14,10 @@ import PercutaneousApproachAnalysis
 from PercutaneousApproachAnalysis import *
 from numpy import linalg
 from code import interact
-#import SlicerCaseManager
+import SlicerCaseManager
+from shutil import copyfile
+from os.path import basename
+from os import listdir
 
 #
 # VentriculostomyPlanning
@@ -331,16 +334,18 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     # Layout within the dummy collapsible button
     #referenceFormLayout = qt.QFormLayout(referenceCollapsibleButton)
 
-    
-    #CaseManagerConfigLayout = qt.QVBoxLayout()
-    #slicerCaseWidgetParent = slicer.qMRMLWidget()
-    #slicerCaseWidgetParent.setLayout(qt.QVBoxLayout())
-    #slicerCaseWidgetParent.setMRMLScene(slicer.mrmlScene)
-    #self.slicerCaseWidget = SlicerCaseManager.SlicerCaseManagerWidget(slicerCaseWidgetParent)
-    #self.slicerCaseWidget.setup()
-    #CaseManagerConfigLayout.addWidget(self.slicerCaseWidget.collapsibleDirectoryConfigurationArea)
-    #CaseManagerConfigLayout.addWidget(self.slicerCaseWidget.mainGUIGroupBox)
-
+    self.caseManagerBox = qt.QGroupBox()
+    CaseManagerConfigLayout = qt.QVBoxLayout()
+    self.caseManagerBox.setLayout(CaseManagerConfigLayout)
+    slicerCaseWidgetParent = slicer.qMRMLWidget()
+    slicerCaseWidgetParent.setLayout(qt.QVBoxLayout())
+    slicerCaseWidgetParent.setMRMLScene(slicer.mrmlScene)
+    self.slicerCaseWidget = SlicerCaseManager.SlicerCaseManagerWidget(slicerCaseWidgetParent)
+    self.slicerCaseWidget.setup()
+    CaseManagerConfigLayout.addWidget(self.slicerCaseWidget.patientWatchBox)
+    CaseManagerConfigLayout.addWidget(self.slicerCaseWidget.collapsibleDirectoryConfigurationArea)
+    CaseManagerConfigLayout.addWidget(self.slicerCaseWidget.mainGUIGroupBox)
+    self.layout.addWidget(self.caseManagerBox)
 
     #referenceFormLayout.addRow(CaseManagerConfigLayout)
     #
@@ -354,11 +359,11 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     buttonWidth = 60
     buttonHeight = 60
 
-    self.infoVolumeBox = qt.QGroupBox()
+    self.inputVolumeBox = qt.QGroupBox()
     inputVolumeLayout = qt.QHBoxLayout()
     inputVolumeLayout.setAlignment(qt.Qt.AlignLeft)
-    self.infoVolumeBox.setLayout(inputVolumeLayout)
-    self.layout.addWidget(self.infoVolumeBox)
+    self.inputVolumeBox.setLayout(inputVolumeLayout)
+    self.layout.addWidget(self.inputVolumeBox)
     inputVolumeLabel = qt.QLabel('Select Case: ')
     inputVolumeLayout.addWidget(inputVolumeLabel)
     self.inputVolumeSelector = slicer.qMRMLNodeComboBox()
@@ -375,7 +380,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     #self.inputVolumeSelector.sortFilterProxyModel().setFilterRegExp("^((?!NotShownEntity31415).)*$" )
     self.inputVolumeSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
     inputVolumeLayout.addWidget(self.inputVolumeSelector)
-    self.layout.addWidget(self.infoVolumeBox)
+    self.layout.addWidget(self.inputVolumeBox)
     self.layout.addWidget(self.mainGUIGroupBox)
     #
     # Create Model Button
@@ -827,7 +832,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.logic.baseVolumeNode = None
     self.logic.ventricleVolume = None
     self.inputVolumeSelector.setCurrentNode(None)
-    self.dicomWidget.detailsPopup.open()
+    self.dicomWidget.detailsPopup.open()  
     pass
 
   def onAddedNode(self, addedNode):
@@ -843,10 +848,19 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       if self.logic.baseVolumeNode and self.logic.ventricleVolume and validNode:
         self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_ventricleVolume", self.logic.ventricleVolume.GetID())
         self.caseNum = self.caseNum + 1
+        self.onSaveDicomFiles()
+        self.slicerCaseWidget.patientWatchBox.sourceFile = listdir(self.slicerCaseWidget.preopDICOMDataDirectory)[0]
         self.onSelect(self.logic.baseVolumeNode)
         self.inputVolumeSelector.setCurrentNode(self.logic.baseVolumeNode)
         # the setForegroundVolume will not work, because the slicerapp triggers the SetBackgroundVolume after the volume is loaded
-
+  
+  def onSaveDicomFiles(self):
+    # use decoration to improve the method
+    checkedFiles = self.dicomWidget.detailsPopup.fileLists
+    for dicomseries in checkedFiles:
+      for dicom in dicomseries: 
+        copyfile(dicom,os.path.join(self.slicerCaseWidget.preopDICOMDataDirectory,basename(dicom)))
+  
 
 
   def onSelect(self, selectedNode=None):

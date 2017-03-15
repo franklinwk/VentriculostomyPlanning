@@ -18,7 +18,7 @@ class SlicerCaseManager(ScriptedLoadableModule):
     self.parent.title = "SlicerCaseManager"
     self.parent.categories = ["Radiology"]
     self.parent.dependencies = ["SlicerProstate"]
-    self.parent.contributors = ["Christian Herz (SPL)","Longquan Chen(SPL)"]
+    self.parent.contributors = ["Longquan Chen(SPL)","Christian Herz (SPL)"]
     self.parent.helpText = """A common module for case management in Slicer"""
     self.parent.acknowledgementText = """Surgical Planning Laboratory, Brigham and Women's Hospital, Harvard
                                         Medical School, Boston, USA This work was supported in part by the National
@@ -230,7 +230,7 @@ class SlicerCaseManagerWidget(ModuleWidgetMixin, ScriptedLoadableModuleWidget):
           if not os.path.exists(os.path.join(newCaseDirectory,fullPath)): 
             os.mkdir(os.path.join(newCaseDirectory,fullPath))      
       self.currentCaseDirectory = newCaseDirectory      
-      self.startPreopDICOMReceiver()
+      #self.startPreopDICOMReceiver()
   
   def onCompleteCaseButtonClicked(self):
     self.logic.caseCompleted = True
