@@ -1,4 +1,5 @@
 import os, inspect
+import json
 import unittest
 import vtk, qt, ctk, slicer
 from slicer.ScriptedLoadableModule import *
@@ -849,7 +850,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
         self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_ventricleVolume", self.logic.ventricleVolume.GetID())
         self.caseNum = self.caseNum + 1
         self.onSaveDicomFiles()
-        self.slicerCaseWidget.patientWatchBox.sourceFile = listdir(self.slicerCaseWidget.preopDICOMDataDirectory)[0]
+        self.slicerCaseWidget.patientWatchBox.sourceFile = listdir(self.slicerCaseWidget.planningDICOMDataDirectory)[0]
         self.onSelect(self.logic.baseVolumeNode)
         self.inputVolumeSelector.setCurrentNode(self.logic.baseVolumeNode)
         # the setForegroundVolume will not work, because the slicerapp triggers the SetBackgroundVolume after the volume is loaded
@@ -859,9 +860,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     checkedFiles = self.dicomWidget.detailsPopup.fileLists
     for dicomseries in checkedFiles:
       for dicom in dicomseries: 
-        copyfile(dicom,os.path.join(self.slicerCaseWidget.preopDICOMDataDirectory,basename(dicom)))
-  
-
+        copyfile(dicom,os.path.join(self.slicerCaseWidget.planningDICOMDataDirectory,basename(dicom)))
 
   def onSelect(self, selectedNode=None):
     if selectedNode:        
@@ -890,6 +889,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_coronalPlanningModel",caseName)
       self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_grayScaleModel",caseName)
       self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_vesselnessVolume",caseName)
+      self.logic.enableAuxilaryNodes()
       #Set the cropped image for processing
       if selectedNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_croppedVolume"):
         self.logic.currentVolumeNode = slicer.mrmlScene.GetNodeByID(selectedNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_croppedVolume"))
@@ -1059,13 +1059,20 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
         self.logic.setSliceViewer()
 
   def onSaveData(self):
-    #caseDirectory = qt.QFileDialog.getExistingDirectory(self.parent.window(), "Select Case Directory", self.scriptDirectory)
-    ioManager = slicer.app.ioManager()
-
-    if not ioManager.openSaveDataDialog():
-      return
-    #caseSubDirectoryName = "Results" + str(qt.QDate().currentDate()) + "-" + qt.QTime().currentTime().toString().replace(":", "")
-    #slicer.util.saveScene(os.path.join(caseDirectory, caseSubDirectoryName))
+    outputDir = os.path.join(self.slicerCaseWidget.currentCaseDirectory, "Results")
+    self.logic.savePlanningDataToDirectory(self.logic.baseVolumeNode, outputDir)
+    nodeAttributes=["rel_ventricleVolume", "rel_model","rel_nasion","rel_sagittalPoint","rel_target","rel_distal",\
+                    "rel_cannula","rel_skullNorm","rel_cannulaModel","rel_sagittalReferenceModel","rel_coronalReferenceModel",\
+                    "rel_sagittalPlanningModel","rel_coronalPlanningModel","rel_grayScaleModel","rel_vesselnessVolume"]
+    for attribute in nodeAttributes:
+      nodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode."+attribute)
+      node = slicer.mrmlScene.GetNodeByID(nodeID)
+      self.logic.savePlanningDataToDirectory(node, outputDir)
+    JasonFile= os.path.join(outputDir, "results.json")
+    parameterNames = ["rel_sagittalLength","rel_coronalLength","rel_planningRadius"]
+    for parameterName in parameterNames:
+      value = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode."+parameterName)
+      self.logic.savePlanningParametersToJson(JasonFile, parameterName, value)
     pass
   
   def onDefineROI(self):
@@ -1546,33 +1553,18 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     ##Path Planning variables
     self.PercutaneousApproachAnalysisLogic = PercutaneousApproachAnalysisLogic()
     self.cylindarMiddlePointNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
-    self.pathCandidatesModel = slicer.vtkMRMLModelNode()
-    # Create display node
-    modelDisplay = slicer.vtkMRMLModelDisplayNode()
-    yellow = [1, 1, 0]
-    modelDisplay.SetColor(yellow[0], yellow[1], yellow[2])
-    modelDisplay.SetScene(slicer.mrmlScene)
-    modelDisplay.SetVisibility(0)
-    modelDisplay.SetSliceIntersectionVisibility(True)  # Show in slice view
-    slicer.mrmlScene.AddNode(modelDisplay)
-    self.pathCandidatesModel.SetAndObserveDisplayNodeID(modelDisplay.GetID())
-    slicer.mrmlScene.AddNode(self.pathCandidatesModel)
-    modelDisplay = slicer.vtkMRMLModelDisplayNode()
-    modelDisplay.SetColor(yellow[0], yellow[1], yellow[2])
-    modelDisplay.SetScene(slicer.mrmlScene)
-    modelDisplay.SetVisibility(0)
-    slicer.mrmlScene.AddNode(modelDisplay)
-    self.pathNavigationModel = slicer.vtkMRMLModelNode()
-    self.pathNavigationModel.SetAndObserveDisplayNodeID(modelDisplay.GetID())
-    slicer.mrmlScene.AddNode(self.pathNavigationModel)
+
     self.pathCandidatesPoly = vtk.vtkPolyData()
     self.pathNavigationPoly = vtk.vtkPolyData()
     ##
+    self.ROIListNode = None
+    self.pathCandidatesModel = None
+    self.pathNavigationModel = None
+    self.cylindarInteractor = None
+    self.trajectoryProjectedMarker = None
+    self.nasionProjectedMarker = None
+    self.enableAuxilaryNodes()
 
-    self.ROIListNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLAnnotationHierarchyNode")
-    self.ROIListNode.SetName("ROIListForAllCases")
-    self.ROIListNode.HideFromEditorsOff()
-    slicer.mrmlScene.AddNode(self.ROIListNode)
     self.currentVolumeNode = None
     self.baseVolumeNode = None
     self.ventricleVolume = None
@@ -1594,23 +1586,65 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     self.activeTrajectoryMarkup = 0
     self.cylindarRadius = 2.5 # unit mm
     self.entryRadius = 25.0
-    self.cylindarInteractor = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
-    self.cylindarInteractor.SetName("")
-    slicer.mrmlScene.AddNode(self.cylindarInteractor)
-    self.cylindarInteractor.AddObserver(slicer.vtkMRMLMarkupsNode().PointModifiedEvent, self.updateCylindarRadius)
-    displayNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsDisplayNode")
-    slicer.mrmlScene.AddNode(displayNode)
-    self.cylindarInteractor.SetAndObserveDisplayNodeID(displayNode.GetID())
-    self.trajectoryProjectedMarker = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
-    self.trajectoryProjectedMarker.SetName("trajectoryProject")
-    slicer.mrmlScene.AddNode(self.trajectoryProjectedMarker)
-    self.nasionProjectedMarker = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
-    self.nasionProjectedMarker.SetName("nasionProject")
-    slicer.mrmlScene.AddNode(self.nasionProjectedMarker)
 
     self.interactionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLInteractionNodeSingleton")
     self.interactionNode.AddObserver(self.interactionNode.EndPlacementEvent, self.endPlacement)
     self.interactionMode = "none"
+
+  def enableAuxilaryNodes(self):
+    # Create display node
+    self.ROIListNode = None
+    self.pathCandidatesModel = None
+    self.pathNavigationModel = None
+    self.cylindarInteractor = None
+    self.trajectoryProjectedMarker = None
+    self.nasionProjectedMarker = None
+    self.ROIListNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLAnnotationHierarchyNode")
+    self.ROIListNode.SetName("ROIListForAllCases")
+    self.ROIListNode.HideFromEditorsOff()
+    slicer.mrmlScene.AddNode(self.ROIListNode)
+    modelDisplay = slicer.vtkMRMLModelDisplayNode()
+    yellow = [1, 1, 0]
+    red = [1, 0, 0]
+    modelDisplay.SetColor(yellow[0], yellow[1], yellow[2])
+    modelDisplay.SetScene(slicer.mrmlScene)
+    modelDisplay.SetVisibility(0)
+    modelDisplay.SetSliceIntersectionVisibility(True)  # Show in slice view
+    slicer.mrmlScene.AddNode(modelDisplay)
+    self.pathCandidatesModel = slicer.vtkMRMLModelNode()
+    self.pathCandidatesModel.SetAndObserveDisplayNodeID(modelDisplay.GetID())
+    slicer.mrmlScene.AddNode(self.pathCandidatesModel)
+    self.pathCandidatesModel.SetAndObserveDisplayNodeID(modelDisplay.GetID())
+    modelDisplay2 = slicer.vtkMRMLModelDisplayNode()
+    modelDisplay2.SetColor(yellow[0], yellow[1], yellow[2])
+    modelDisplay2.SetScene(slicer.mrmlScene)
+    modelDisplay2.SetVisibility(0)
+    slicer.mrmlScene.AddNode(modelDisplay2)
+    self.pathNavigationModel = slicer.vtkMRMLModelNode()
+    self.pathNavigationModel.SetAndObserveDisplayNodeID(modelDisplay2.GetID())
+    slicer.mrmlScene.AddNode(self.pathNavigationModel)
+    displayNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsDisplayNode")
+    displayNode.SetColor(red[0], red[1], red[2])
+    displayNode.SetScene(slicer.mrmlScene)
+    displayNode.SetVisibility(0)
+    slicer.mrmlScene.AddNode(displayNode)
+    self.cylindarInteractor = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
+    self.cylindarInteractor.SetName("")
+    self.cylindarInteractor.AddObserver(slicer.vtkMRMLMarkupsNode().PointModifiedEvent, self.updateCylindarRadius)
+    slicer.mrmlScene.AddNode(self.cylindarInteractor)
+    self.cylindarInteractor.SetAndObserveDisplayNodeID(displayNode.GetID())
+    markupDisplay = slicer.vtkMRMLMarkupsDisplayNode()
+    markupDisplay.SetColor(red[0], red[1], red[2])
+    markupDisplay.SetScene(slicer.mrmlScene)
+    markupDisplay.SetVisibility(0)
+    slicer.mrmlScene.AddNode(markupDisplay)
+    self.trajectoryProjectedMarker = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
+    self.trajectoryProjectedMarker.SetName("trajectoryProject")
+    slicer.mrmlScene.AddNode(self.trajectoryProjectedMarker)
+    self.trajectoryProjectedMarker.SetAndObserveDisplayNodeID(markupDisplay.GetID())
+    self.nasionProjectedMarker = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
+    self.nasionProjectedMarker.SetName("nasionProject")
+    slicer.mrmlScene.AddNode(self.nasionProjectedMarker)
 
   def clear(self):
     if self.trajectoryProjectedMarker and self.trajectoryProjectedMarker.GetID():
@@ -1630,9 +1664,106 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     if self.trajectoryProjectedMarker and self.trajectoryProjectedMarker.GetID():
       slicer.mrmlScene.RemoveNode(self.trajectoryProjectedMarker)
       self.trajectoryProjectedMarker = None
-    if self.nasionProjectedMarker and self.nasionProjectedMarker.GetID():
-      slicer.mrmlScene.RemoveNode(self.nasionProjectedMarker)
-      self.nasionProjectedMarker = None
+
+  def savePlanningParametersToJson(self, JasonFile, parameterName, value):
+    with open(JasonFile, "r") as jsonFile:
+      data = json.load(jsonFile)
+      jsonFile.close()
+    data[parameterName] = value
+    with open(JasonFile, "w") as jsonFile:
+      json.dump(data, jsonFile)
+      jsonFile.close()
+    pass
+
+  def savePlanningDataToDirectory(self, node, outputDir):
+    nodeName = node.GetName()
+    characters = [": ", " ", ":", "/"]
+    for character in characters:
+      nodeName = nodeName.replace(character, "-")
+    data= {}
+    extension = ".nrrd"
+    baseNodeName = self.baseVolumeNode.GetName()
+    for character in characters:
+      baseNodeName = baseNodeName.replace(character, "-")
+    data["BaseVolume"] = os.path.join(outputDir, baseNodeName + extension)
+    jsonFile = open(os.path.join(outputDir, "results.json"), "w")
+    json.dump(data,jsonFile)
+    jsonFile.close()
+    with open(os.path.join(outputDir, "results.json"), "r") as jsonFile:
+      data = json.load(jsonFile)
+      jsonFile.close()
+    extension = ""
+    if self.baseVolumeNode.GetID() == node.GetID():
+      extension = ".nrrd"
+      data["BaseVolume"] = os.path.join(outputDir, nodeName + extension)
+    if self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_ventricleVolume") \
+        and self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_ventricleVolume") == node.GetID():
+      extension = ".nrrd"
+      data["rel_ventricleVolume"] = os.path.join(outputDir, nodeName + extension)
+    if self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_model") \
+        and self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_model") == node.GetID():
+      extension = ".vtk"
+      data["rel_model"] = os.path.join(outputDir, nodeName + extension)
+    if self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_nasion") \
+        and self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_nasion") == node.GetID():
+      extension = ".fcsv"
+      data["rel_nasion"] = os.path.join(outputDir, nodeName + extension)
+    if self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagittalPoint") \
+        and self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagittalPoint") == node.GetID():
+      extension = ".fcsv"
+      data["rel_sagittalPoint"] = os.path.join(outputDir, nodeName + extension)
+    if self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_target") \
+        and self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_target") == node.GetID():
+      extension = ".fcsv"
+      data["rel_target"] = os.path.join(outputDir, nodeName + extension)
+    if self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_distal") \
+        and self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_distal") == node.GetID():
+      extension = ".fcsv"
+      data["rel_distal"] = os.path.join(outputDir, nodeName + extension)
+    if self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_cannula") \
+        and self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_cannula") == node.GetID():
+      extension = ".fcsv"
+      data["rel_cannula"] = os.path.join(outputDir, nodeName + extension)
+    if self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_skullNorm") \
+        and self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_skullNorm") == node.GetID():
+      extension = ".fcsv"
+      data["rel_skullNorm"] = os.path.join(outputDir, nodeName + extension)
+    if self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_cannulaModel") \
+        and self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_cannulaModel") == node.GetID():
+      extension = ".vtk"
+      data["rel_cannulaModel"] = os.path.join(outputDir, nodeName + extension)
+    if self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagittalReferenceModel") \
+        and self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagittalReferenceModel") == node.GetID():
+      extension = ".vtk"
+      data["rel_sagittalReferenceModel"] = os.path.join(outputDir, nodeName + extension)
+    if self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_coronalReferenceModel") \
+        and self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_coronalReferenceModel") == node.GetID():
+      extension = ".vtk"
+      data["rel_coronalReferenceModel"] = os.path.join(outputDir, nodeName + extension)
+    if self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagittalPlanningModel") \
+        and self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagittalPlanningModel") == node.GetID():
+      extension = ".vtk"
+      data["rel_sagittalPlanningModel"] = os.path.join(outputDir, nodeName + extension)
+    if self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_coronalPlanningModel") \
+        and self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_coronalPlanningModel") == node.GetID():
+      extension = ".vtk"
+      data["rel_coronalPlanningModel"] = os.path.join(outputDir, nodeName + extension)
+    if self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_grayScaleModel") \
+        and self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_grayScaleModel") == node.GetID():
+      extension = ".vtk"
+      data["rel_grayScaleModel"] = os.path.join(outputDir, nodeName + extension)
+    if self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_vesselnessVolume") \
+        and self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_vesselnessVolume") == node.GetID():
+      extension = ".nrrd"
+      data["rel_vesselnessVolume"] = os.path.join(outputDir, nodeName + extension)
+    filename = os.path.join(outputDir, nodeName + extension)
+    with open(os.path.join(outputDir, "results.json"), "w") as jsonFile:
+      json.dump(data, jsonFile)
+      jsonFile.close()
+    if slicer.util.saveNode(node, filename):
+      return True
+    warningMSG = "Error in saving the %s" %(nodeName)
+    slicer.util.warningDisplay(warningMSG)
 
   def hasImageData(self,volumeNode):
     """This is an example logic method that
@@ -2595,19 +2726,20 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     if self.interactionMode == "nasion":
       self.createTrueSagittalPlane()
       self.createEntryPoint()
-      self.nasionProjectedMarker.GetMarkupsDisplayNode().SetVisibility(0)
+      if self.nasionProjectedMarker and self.nasionProjectedMarker.GetMarkupsDisplayNode():
+        self.nasionProjectedMarker.GetMarkupsDisplayNode().SetVisibility(0)
     elif self.interactionMode == "sagittalPoint":
       self.createTrueSagittalPlane()
       self.createEntryPoint()
     elif self.interactionMode == "target":
       self.endTargetSelectInteraction()
-      if self.trajectoryProjectedMarker:
+      if self.trajectoryProjectedMarker and self.trajectoryProjectedMarker.GetMarkupsDisplayNode():
         self.trajectoryProjectedMarker.GetMarkupsDisplayNode().SetVisibility(0)
       self.createVentricleCylindar()
       self.endModifiyCylindar()
     elif self.interactionMode == "distal":
       self.endDistalSelectInteraction()
-      if self.trajectoryProjectedMarker:
+      if self.trajectoryProjectedMarker and self.trajectoryProjectedMarker.GetMarkupsDisplayNode():
         self.trajectoryProjectedMarker.GetMarkupsDisplayNode().SetVisibility(1)
       self.createVentricleCylindar()
       self.endModifiyCylindar()
