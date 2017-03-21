@@ -19,7 +19,7 @@ import SlicerCaseManager
 from shutil import copyfile
 from os.path import basename
 from os import listdir
-
+from VentriculostomyPlanningUtils.UserEvents import VentriculostomyUserEvents
 #
 # VentriculostomyPlanning
 #
@@ -645,6 +645,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
 
      # Needle trajectory
     self.addCannulaTargetButton.connect('clicked(bool)', self.onEditPlanningTarget)
+    self.logic.interactionNode.AddObserver(VentriculostomyUserEvents.ResetButtonEvent, self.onResetButtons)
     #self.addCannulaDistalButton.connect('clicked(bool)', self.onEditPlanningDistal)
     self.generatePathButton.connect('clicked(bool)', self.onGeneratePath)
     self.clearTrajectoryButton.connect('clicked(bool)', self.onClearTrajectory)
@@ -849,7 +850,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       elif ("Ventricle" in volumeName) or ("ventricle" in volumeName) :
         self.logic.ventricleVolume = addedNode
         validNode = True
-      if self.logic.baseVolumeNode and self.logic.ventricleVolume and validNode:
+      if self.logic.baseVolumeNode and self.logic.ventricleVolume and validNode and (not self.inputVolumeSelector.currentNode()):
         self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_ventricleVolume", self.logic.ventricleVolume.GetID())
         self.caseNum = self.caseNum + 1
         self.onSaveDicomFiles()
@@ -1069,8 +1070,9 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
                     "rel_sagittalPlanningModel","rel_coronalPlanningModel","rel_grayScaleModel","rel_vesselnessVolume"]
     for attribute in nodeAttributes:
       nodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode."+attribute)
-      node = slicer.mrmlScene.GetNodeByID(nodeID)
-      self.logic.savePlanningDataToDirectory(node, outputDir)
+      if nodeID and slicer.mrmlScene.GetNodeByID(nodeID):
+        node = slicer.mrmlScene.GetNodeByID(nodeID)
+        self.logic.savePlanningDataToDirectory(node, outputDir)
     JasonFile= os.path.join(outputDir, "results.json")
     parameterNames = ["rel_sagittalLength","rel_coronalLength","rel_planningRadius"]
     for parameterName in parameterNames:
@@ -1198,7 +1200,14 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       self.logic.calculateGrayScaleWithMargin()
       self.logic.setSliceViewer()## the slice widgets are set to none after the  cli module calculation. reason unclear...
     pass
-  
+
+  def onResetButtons(self, caller = None, event = None):
+    if caller.GetID() == "vtkMRMLInteractionNodeSingleton":
+        self.addCannulaTargetButton.setChecked(False)
+        self.selectNasionButton.setChecked(False)
+        self.selectSagittalButton.setChecked(False)
+    pass
+
   # Event handlers for trajectory
   def onEditPlanningTarget(self):
     if self.addCannulaTargetButton.isChecked():
@@ -2738,9 +2747,11 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       self.createEntryPoint()
       if self.nasionProjectedMarker and self.nasionProjectedMarker.GetMarkupsDisplayNode():
         self.nasionProjectedMarker.GetMarkupsDisplayNode().SetVisibility(0)
+      self.interactionNode.InvokeEvent(VentriculostomyUserEvents.ResetButtonEvent)
     elif self.interactionMode == "sagittalPoint":
       self.createTrueSagittalPlane()
       self.createEntryPoint()
+      self.interactionNode.InvokeEvent(VentriculostomyUserEvents.ResetButtonEvent)
     elif self.interactionMode == "target":
       self.endTargetSelectInteraction()
       if self.trajectoryProjectedMarker and self.trajectoryProjectedMarker.GetMarkupsDisplayNode():
@@ -2753,6 +2764,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         self.trajectoryProjectedMarker.GetMarkupsDisplayNode().SetVisibility(1)
       self.createVentricleCylindar()
       self.endModifiyCylindar()
+      self.interactionNode.InvokeEvent(VentriculostomyUserEvents.ResetButtonEvent)
       #self.generatePath()
     pass
   

@@ -4,6 +4,8 @@ set(MODULE_NAME VentriculostomyPlanning)
 #-----------------------------------------------------------------------------
 set(MODULE_PYTHON_SCRIPTS
   ${MODULE_NAME}.py
+  ${MODULE_NAME}Utils/__init__.py
+  ${MODULE_NAME}Utils/UserEvents.py
   )
 
 set(MODULE_PYTHON_RESOURCES
