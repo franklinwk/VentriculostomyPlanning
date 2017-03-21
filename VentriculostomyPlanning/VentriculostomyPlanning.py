@@ -365,7 +365,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     inputVolumeLayout.setAlignment(qt.Qt.AlignLeft)
     self.inputVolumeBox.setLayout(inputVolumeLayout)
     self.layout.addWidget(self.inputVolumeBox)
-    inputVolumeLabel = qt.QLabel('Select Case: ')
+    inputVolumeLabel = qt.QLabel('Select Volume: ')
     inputVolumeLayout.addWidget(inputVolumeLabel)
     self.inputVolumeSelector = slicer.qMRMLNodeComboBox()
     self.inputVolumeSelector.nodeTypes = ["vtkMRMLScalarVolumeNode"]
@@ -440,6 +440,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.selectNasionBox.setLayout(selectNasionLayout)
     self.selectNasionBox.setStyleSheet('QGroupBox{border:0;}')
     self.selectNasionButton = qt.QPushButton("")
+    self.selectNasionButton.setCheckable(True)
     self.selectNasionButton.toolTip = "Add a point in the 3D window"
     self.selectNasionButton.enabled = True
     self.selectNasionButton.setMaximumHeight(buttonHeight)
@@ -456,6 +457,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.selectSagittalBox.setLayout(selectSagittalLayout)
     self.selectSagittalBox.setStyleSheet('QGroupBox{border:0;}')
     self.selectSagittalButton = qt.QPushButton("")
+    self.selectSagittalButton.setCheckable(True)
     self.selectSagittalButton.setMaximumHeight(buttonHeight)
     self.selectSagittalButton.setMaximumWidth(buttonWidth)
     self.selectSagittalButton.toolTip = "Add a point in the 3D window to identify the sagittal plane"
@@ -520,6 +522,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     addCannulaLayout.setAlignment(qt.Qt.AlignCenter)
     self.addCannulaBox.setLayout(addCannulaLayout)
     self.addCannulaTargetButton = qt.QPushButton("")
+    self.addCannulaTargetButton.setCheckable(True)
     self.addCannulaTargetButton.toolTip = ""
     self.addCannulaTargetButton.enabled = True
     addCannulaLabel = qt.QLabel('Add Cannula')
@@ -850,7 +853,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
         self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_ventricleVolume", self.logic.ventricleVolume.GetID())
         self.caseNum = self.caseNum + 1
         self.onSaveDicomFiles()
-        self.slicerCaseWidget.patientWatchBox.sourceFile = listdir(self.slicerCaseWidget.planningDICOMDataDirectory)[0]
         self.onSelect(self.logic.baseVolumeNode)
         self.inputVolumeSelector.setCurrentNode(self.logic.baseVolumeNode)
         # the setForegroundVolume will not work, because the slicerapp triggers the SetBackgroundVolume after the volume is loaded
@@ -865,6 +867,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
   def onSelect(self, selectedNode=None):
     if selectedNode:        
       self.initialFieldsValue()
+      self.slicerCaseWidget.patientWatchBox.sourceFile = os.path.join(self.slicerCaseWidget.planningDICOMDataDirectory,listdir(self.slicerCaseWidget.planningDICOMDataDirectory)[0])
       self.logic.baseVolumeNode = selectedNode
       ventricleVolumeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_ventricleVolume")
       if not ventricleVolumeID:
@@ -1198,14 +1201,20 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
   
   # Event handlers for trajectory
   def onEditPlanningTarget(self):
-    self.imageSlider.setValue(100.0)
-    self.lengthCannulaEdit.text = '--'
-    self.lengthSagittalPlanningLineEdit.text = '--'
-    self.lengthCoronalPlanningLineEdit.text = '--'
-    self.pitchAngleEdit.text = '--'
-    self.yawAngleEdit.text = '--'
-    self.logic.setSliceForCylindar()
-    self.logic.startEditPlanningTarget()
+    if self.addCannulaTargetButton.isChecked():
+      self.imageSlider.setValue(100.0)
+      self.lengthCannulaEdit.text = '--'
+      self.lengthSagittalPlanningLineEdit.text = '--'
+      self.lengthCoronalPlanningLineEdit.text = '--'
+      self.pitchAngleEdit.text = '--'
+      self.yawAngleEdit.text = '--'
+      self.logic.setSliceForCylindar()
+      self.logic.startEditPlanningTarget()
+    else:
+      self.imageSlider.setValue(0.0)
+      self.interactionMode = "none"
+      self.logic.interactionNode.SwitchToViewTransformMode()
+      self.logic.interactionNode.SetCurrentInteractionMode(slicer.vtkMRMLInteractionNode.ViewTransform)  
 
   # Event handlers for trajectory
   def onEditPlanningDistal(self):
@@ -1686,9 +1695,10 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     for character in characters:
       baseNodeName = baseNodeName.replace(character, "-")
     data["BaseVolume"] = os.path.join(outputDir, baseNodeName + extension)
-    jsonFile = open(os.path.join(outputDir, "results.json"), "w")
-    json.dump(data,jsonFile)
-    jsonFile.close()
+    if not os.path.isfile(os.path.join(outputDir, "results.json")):
+      jsonFile = open(os.path.join(outputDir, "results.json"), "w")
+      json.dump(data,jsonFile)
+      jsonFile.close()
     with open(os.path.join(outputDir, "results.json"), "r") as jsonFile:
       data = json.load(jsonFile)
       jsonFile.close()
