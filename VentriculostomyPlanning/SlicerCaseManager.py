@@ -3,6 +3,8 @@ import csv, re, numpy, json, ast, re
 import shutil, datetime, logging
 import ctk, vtk, qt, slicer
 from collections import OrderedDict
+from functools import wraps
+from VentriculostomyPlanningUtils.UserEvents import VentriculostomyUserEvents
 
 
 
@@ -11,6 +13,22 @@ from SlicerProstateUtils.helpers import WatchBoxAttribute, BasicInformationWatch
 from SlicerProstateUtils.mixins import ModuleWidgetMixin, ModuleLogicMixin, ParameterNodeObservationMixin
 from SlicerProstateUtils.constants import DICOMTAGS, COLOR, STYLE, FileExtension
 from SlicerProstateUtils.events import SlicerProstateEvents
+
+def onReturnProcessEvents(func):
+  @wraps(func)
+  def wrapper(*args, **kwargs):
+    func(*args, **kwargs)
+    slicer.app.processEvents()
+  return wrapper
+
+
+def beforeRunProcessEvents(func):
+  @wraps(func)
+  def wrapper(*args, **kwargs):
+    slicer.app.processEvents()
+    func(*args, **kwargs)
+  return wrapper
+
 
 class SlicerCaseManager(ScriptedLoadableModule):
   def __init__(self, parent):
@@ -93,7 +111,6 @@ class SlicerCaseManagerWidget(ModuleWidgetMixin, ScriptedLoadableModuleWidget):
       self.logic.createDirectory(path)
     exists = os.path.exists(path)
     self._generatedOutputDirectory = path if exists else ""
-    self.completeCaseButton.enabled = exists and not self.logic.caseCompleted
   
   @property
   def mainGUIGroupBox(self):
@@ -120,10 +137,8 @@ class SlicerCaseManagerWidget(ModuleWidgetMixin, ScriptedLoadableModuleWidget):
     self._mainGUIGroupBox.setLayout(self.mainGUIGroupBoxLayout)
     self.createNewCaseButton = self.createButton("New case")
     self.openCaseButton = self.createButton("Open case")
-    self.completeCaseButton = self.createButton('Case completed', enabled=True)
     self.mainGUIGroupBoxLayout.addWidget(self.createNewCaseButton, 1, 0)
     self.mainGUIGroupBoxLayout.addWidget(self.openCaseButton, 1, 1)
-    self.mainGUIGroupBoxLayout.addWidget(self.completeCaseButton, 1, 2)
     
     self.createPatientWatchBox()
     #self.createIntraopWatchBox()
@@ -175,7 +190,6 @@ class SlicerCaseManagerWidget(ModuleWidgetMixin, ScriptedLoadableModuleWidget):
     self.openCaseButton.clicked.connect(self.onOpenCaseButtonClicked)
     self.casesRootDirectoryButton.directoryChanged.connect(lambda: setattr(self, "caseRootDir",
                                                                            self.casesRootDirectoryButton.directory))
-    self.completeCaseButton.clicked.connect(self.onCompleteCaseButtonClicked)
 
   def updateCaseWatchBox(self):
     value = self.currentCaseDirectory
@@ -200,16 +214,11 @@ class SlicerCaseManagerWidget(ModuleWidgetMixin, ScriptedLoadableModuleWidget):
             os.mkdir(os.path.join(newCaseDirectory,fullPath))
       self.currentCaseDirectory = newCaseDirectory
   
-  def onCompleteCaseButtonClicked(self):
-    self.logic.caseCompleted = True
-    shutil.rmtree(os.path.join(self.currentCaseDirectory, "Results"))
-    slicer.util.saveScene(os.path.join(self.currentCaseDirectory, "Results"))
-    self.clearData()
-  
   def onOpenCaseButtonClicked(self):
     if not self.checkAndWarnUserIfCaseInProgress():
       return
     slicer.mrmlScene.Clear(0)
+    self.logic.update_observers(VentriculostomyUserEvents.CloseCaseEvent)
     path = qt.QFileDialog.getExistingDirectory(self.parent.window(), "Select Case Directory", self.caseRootDir)
     if not path:
       return
@@ -219,7 +228,9 @@ class SlicerCaseManagerWidget(ModuleWidgetMixin, ScriptedLoadableModuleWidget):
       self.clearData()
     else:
       #slicer.util.loadVolume(self.planningImagePath, returnNode=True)
-      slicer.util.loadScene(os.path.join(path, "Results","Results.mrml"))
+      sucess = slicer.util.loadScene(os.path.join(path, "Results","Results.mrml"))
+      #self.logic.update_observers(VentriculostomyUserEvents.LoadParametersToScene, self.currentCaseDirectory)
+
 
   def checkAndWarnUserIfCaseInProgress(self):
     proceed = True
@@ -243,8 +254,7 @@ class SlicerCaseManagerWidget(ModuleWidgetMixin, ScriptedLoadableModuleWidget):
     pass
 
 
-class SlicerCaseManagerLogic(ScriptedLoadableModuleLogic):
-  
+class SlicerCaseManagerLogic(ModuleLogicMixin, ScriptedLoadableModuleLogic):
   @property
   def caseCompleted(self):
     return self._caseCompleted
@@ -252,19 +262,37 @@ class SlicerCaseManagerLogic(ScriptedLoadableModuleLogic):
   @caseCompleted.setter
   def caseCompleted(self, value):
     self._caseCompleted = value
-    if value is True:
-      self.stopSmartDICOMReceiver()
   
   def __init__(self):
     ScriptedLoadableModuleLogic.__init__(self)
     self.caseCompleted = True
     self.DEFAULT_JSON_FILE_NAME = "results.json"
+    self.observers = []
+
+  def register(self, observer):
+    if not observer in self.observers:
+      self.observers.append(observer)
+
+
+  def unregister(self, observer):
+    if observer in self.observers:
+      self.observers.remove(observer)
+
+  def unregister_all(self):
+    if self.observers:
+      del self.observers[:]
+
+  @onReturnProcessEvents
+  def update_observers(self, *args, **kwargs):
+    for observer in self.observers:
+      observer.updateFromCaseManager(*args, **kwargs)
   
   def closeCase(self, directory):
     if os.path.exists(directory):
       self.caseCompleted = False
       if self.getDirectorySize(directory) == 0:
         shutil.rmtree(directory)
+      #self.update_observers(VentriculostomyUserEvents.CloseCaseEvent)
         
   def hasCaseBeenCompleted(self, directory):
     self.caseCompleted = False
