@@ -919,7 +919,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_grayScaleModel",caseName)
       self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_grayScaleModelWithMargin", caseName)
       self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_vesselnessVolume",caseName) # currently not used
-      self.logic.enableAuxilaryNodes()
       #Set the cropped image for processing
       if selectedNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_croppedVolume"):
         self.logic.currentVolumeNode = slicer.mrmlScene.GetNodeByID(selectedNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_croppedVolume"))
@@ -939,10 +938,10 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       self.logic.sagittalPlanningCurveManager._curveModel = slicer.mrmlScene.GetNodeByID(ReferenceModelID)
       ReferenceModelID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_coronalPlanningModel")
       self.logic.coronalPlanningCurveManager._curveModel = slicer.mrmlScene.GetNodeByID(ReferenceModelID)
-      self.logic.sagittalReferenceCurveManager.startEditLine()
-      self.logic.coronalReferenceCurveManager.startEditLine()
-      self.logic.sagittalPlanningCurveManager.startEditLine()
-      self.logic.coronalPlanningCurveManager.startEditLine()
+      #self.logic.sagittalReferenceCurveManager.startEditLine()
+      #self.logic.coronalReferenceCurveManager.startEditLine()
+      #self.logic.sagittalPlanningCurveManager.startEditLine()
+      #self.logic.coronalPlanningCurveManager.startEditLine()
       #self.logic.trajectoryManager.startEditLine()
       self.logic.createTrueSagittalPlane()
       self.logic.createEntryPoint()
@@ -1060,7 +1059,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       outputModelNodeID = self.inputVolumeSelector.currentNode().GetAttribute("vtkMRMLScalarVolumeNode.rel_model") 
       if outputModelNodeID:
         outputModelNode = slicer.mrmlScene.GetNodeByID(outputModelNodeID)
-        outputModelNode.SetAttribute("vtkMRMLModelNode.modelCreated","False")
+        #outputModelNode.SetAttribute("vtkMRMLModelNode.modelCreated","False")
         self.logic.createModel(outputModelNode, self.logic.threshold)
   
   def onSelectNasionPoint(self):
@@ -1342,7 +1341,17 @@ class CurveManager():
 
     # Slice is aligned to the first point (0) or last point (1)
     self.slicePosition = 0
-
+  
+  def clear(self):
+    if self._curveModel:
+      slicer.mrmlScene.RemoveNode(self._curveModel.GetDisplayNode())
+      slicer.mrmlScene.RemoveNode(self._curveModel)
+    if self.curveFiducials:
+      slicer.mrmlScene.RemoveNode(self.curveFiducials.GetDisplayNode())
+      slicer.mrmlScene.RemoveNode(self.curveFiducials)
+    self.curveFiducials = None
+    self._curveModel = None
+  
   def setName(self, name):
     self.curveName = name
     self.curveModelName = "%s-Model" % (name)
@@ -1639,7 +1648,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     self.ROIListNode.SetName("ROIListForAllCases")
     self.ROIListNode.HideFromEditorsOff()
     slicer.mrmlScene.AddNode(self.ROIListNode)
-    modelDisplay = slicer.vtkMRMLModelDisplayNode()
+    modelDisplay = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelDisplayNode")
     yellow = [1, 1, 0]
     red = [1, 0, 0]
     modelDisplay.SetColor(yellow[0], yellow[1], yellow[2])
@@ -1647,18 +1656,17 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     modelDisplay.SetVisibility(0)
     modelDisplay.SetSliceIntersectionVisibility(True)  # Show in slice view
     slicer.mrmlScene.AddNode(modelDisplay)
-    self.pathCandidatesModel = slicer.vtkMRMLModelNode()
-    self.pathCandidatesModel.SetAndObserveDisplayNodeID(modelDisplay.GetID())
+    self.pathCandidatesModel = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
     slicer.mrmlScene.AddNode(self.pathCandidatesModel)
     self.pathCandidatesModel.SetAndObserveDisplayNodeID(modelDisplay.GetID())
-    modelDisplay2 = slicer.vtkMRMLModelDisplayNode()
+    modelDisplay2 = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelDisplayNode")
     modelDisplay2.SetColor(yellow[0], yellow[1], yellow[2])
     modelDisplay2.SetScene(slicer.mrmlScene)
     modelDisplay2.SetVisibility(0)
     slicer.mrmlScene.AddNode(modelDisplay2)
-    self.pathNavigationModel = slicer.vtkMRMLModelNode()
-    self.pathNavigationModel.SetAndObserveDisplayNodeID(modelDisplay2.GetID())
+    self.pathNavigationModel = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
     slicer.mrmlScene.AddNode(self.pathNavigationModel)
+    self.pathNavigationModel.SetAndObserveDisplayNodeID(modelDisplay2.GetID())
     displayNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsDisplayNode")
     displayNode.SetColor(red[0], red[1], red[2])
     displayNode.SetScene(slicer.mrmlScene)
@@ -1684,10 +1692,12 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
 
   def clear(self):
     if self.trajectoryProjectedMarker and self.trajectoryProjectedMarker.GetID():
-      slicer.mrmlScene.RemoveNode(slicer.mrmlScene.GetNodeByID(self.trajectoryProjectedMarker.GetID()))
+      slicer.mrmlScene.RemoveNode(self.trajectoryProjectedMarker.GetDisplayNode())
+      slicer.mrmlScene.RemoveNode(self.trajectoryProjectedMarker)
       self.trajectoryProjectedMarker = None
     if self.nasionProjectedMarker and self.nasionProjectedMarker.GetID():
-      slicer.mrmlScene.RemoveNode(slicer.mrmlScene.GetNodeByID(self.nasionProjectedMarker.GetID()))
+      slicer.mrmlScene.RemoveNode(self.nasionProjectedMarker.GetDisplayNode())
+      slicer.mrmlScene.RemoveNode(self.nasionProjectedMarker)
       self.nasionProjectedMarker = None
     if self.pathCandidatesModel and self.pathCandidatesModel.GetID():
       slicer.mrmlScene.RemoveNode(self.pathCandidatesModel.GetDisplayNode())
@@ -1698,33 +1708,29 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       slicer.mrmlScene.RemoveNode(self.pathNavigationModel)
       self.pathNavigationModel = None
     if self.trajectoryProjectedMarker and self.trajectoryProjectedMarker.GetID():
+      slicer.mrmlScene.RemoveNode(self.trajectoryProjectedMarker.GetDisplayNode())
       slicer.mrmlScene.RemoveNode(self.trajectoryProjectedMarker)
       self.trajectoryProjectedMarker = None
-    if self.trajectoryManager and self.trajectoryManager._curveModel:
-      slicer.mrmlScene.RemoveNode(self.trajectoryManager._curveModel)
-      slicer.mrmlScene.RemoveNode(self.trajectoryManager.curveFiducials)
+    if self.trajectoryManager:
+      self.trajectoryManager.clear()
       self.trajectoryManager = None
-    if self.cannulaManager and self.cannulaManager._curveModel:
-      slicer.mrmlScene.RemoveNode(self.cannulaManager._curveModel)
-      slicer.mrmlScene.RemoveNode(self.cannulaManager.curveFiducials)
+    if self.cannulaManager:
+      self.cannulaManager.clear()
       self.cannulaManager = None
-    if self.coronalPlanningCurveManager and self.coronalPlanningCurveManager._curveModel:
-      slicer.mrmlScene.RemoveNode(self.coronalPlanningCurveManager._curveModel)
-      slicer.mrmlScene.RemoveNode(self.coronalPlanningCurveManager.curveFiducials)
+    if self.coronalPlanningCurveManager:
+      self.coronalPlanningCurveManager.clear()
       self.coronalPlanningCurveManager = None
-    if self.coronalReferenceCurveManager and self.coronalReferenceCurveManager._curveModel:
-      slicer.mrmlScene.RemoveNode(self.coronalReferenceCurveManager._curveModel)
-      slicer.mrmlScene.RemoveNode(self.coronalReferenceCurveManager.curveFiducials)
+    if self.coronalReferenceCurveManager:
+      self.coronalReferenceCurveManager.clear()
       self.coronalReferenceCurveManager = None
-    if self.sagittalReferenceCurveManager and self.sagittalReferenceCurveManager._curveModel:
-      slicer.mrmlScene.RemoveNode(self.sagittalReferenceCurveManager._curveModel)
-      slicer.mrmlScene.RemoveNode(self.sagittalReferenceCurveManager.curveFiducials)
+    if self.sagittalReferenceCurveManager:
+      self.sagittalReferenceCurveManager.clear()
       self.sagittalReferenceCurveManager = None
-    if self.sagittalPlanningCurveManager and self.sagittalPlanningCurveManager._curveModel:
-      slicer.mrmlScene.RemoveNode(self.sagittalPlanningCurveManager._curveModel)
-      slicer.mrmlScene.RemoveNode(self.sagittalPlanningCurveManager.curveFiducials)
+    if self.sagittalPlanningCurveManager:
+      self.sagittalPlanningCurveManager.clear()
       self.sagittalPlanningCurveManager = None
-    if self.ROIListNode and self.ROIListNode.GetID():
+    if self.ROIListNode:
+      slicer.mrmlScene.RemoveNode(self.ROIListNode.GetDisplayNode())
       slicer.mrmlScene.RemoveNode(self.ROIListNode)
       self.ROIListNode = None
 
