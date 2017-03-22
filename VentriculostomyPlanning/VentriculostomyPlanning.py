@@ -16,6 +16,7 @@ from PercutaneousApproachAnalysis import *
 from numpy import linalg
 from code import interact
 import SlicerCaseManager
+from SlicerCaseManager import onReturnProcessEvents, beforeRunProcessEvents
 from shutil import copyfile
 from os.path import basename
 from os import listdir
@@ -244,6 +245,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     ScriptedLoadableModuleWidget.setup(self)
 
     self.logic = VentriculostomyPlanningLogic()
+    self.logic.register(self)
     self.dicomWidget = DICOMWidget()
     self.dicomWidget.parent.close()
     self.caseNum = 0
@@ -844,6 +846,11 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     """
     pass
 
+  @abstractmethod
+  def updateFromLogic(self, *args, **kwargs):
+    if args[0] == VentriculostomyUserEvents.ResetButtonEvent:
+      self.onResetButtons()
+
   def initialFieldsValue(self):
     self.lengthSagittalPlanningLineEdit.text = '--'
     self.lengthCoronalPlanningLineEdit.text = '--'
@@ -892,7 +899,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       self.initialFieldsValue()
       self.logic.clear()
       self.logic = VentriculostomyPlanningLogic()
-      self.logic.interactionNode.AddObserver(VentriculostomyUserEvents.ResetButtonEvent, self.onResetButtons)
+      self.logic.register(self)
       self.slicerCaseWidget.patientWatchBox.sourceFile = os.path.join(self.slicerCaseWidget.planningDICOMDataDirectory,listdir(self.slicerCaseWidget.planningDICOMDataDirectory)[0])
       self.logic.baseVolumeNode = selectedNode
       ventricleVolumeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_ventricleVolume")
@@ -1063,28 +1070,36 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
         self.logic.createModel(outputModelNode, self.logic.threshold)
   
   def onSelectNasionPoint(self):
-    if not self.inputVolumeSelector.currentNode():
-      slicer.util.warningDisplay("No case is selceted, please select the case in the combox", windowTitle="")
+    if self.selectNasionButton.isChecked():
+      if not self.inputVolumeSelector.currentNode():
+        slicer.util.warningDisplay("No case is selceted, please select the case in the combox", windowTitle="")
+      else:
+        outputModelNodeID = self.inputVolumeSelector.currentNode().GetAttribute("vtkMRMLScalarVolumeNode.rel_model")
+        if outputModelNodeID:
+          outputModelNode = slicer.mrmlScene.GetNodeByID(outputModelNodeID)
+          if (not outputModelNode) or outputModelNode.GetAttribute("vtkMRMLModelNode.modelCreated") == "False":
+              self.logic.createModel(outputModelNode, self.logic.threshold)
+          self.logic.selectNasionPointNode(outputModelNode) # when the model is not available, the model will be created, so nodeAdded signal should be disconnected
+          self.logic.setSliceViewer()
     else:
-      outputModelNodeID = self.inputVolumeSelector.currentNode().GetAttribute("vtkMRMLScalarVolumeNode.rel_model")
-      if outputModelNodeID:
-        outputModelNode = slicer.mrmlScene.GetNodeByID(outputModelNodeID)
-        if (not outputModelNode) or outputModelNode.GetAttribute("vtkMRMLModelNode.modelCreated") == "False":
-            self.logic.createModel(outputModelNode, self.logic.threshold)
-        self.logic.selectNasionPointNode(outputModelNode) # when the model is not available, the model will be created, so nodeAdded signal should be disconnected
-        self.logic.setSliceViewer()
+      self.interactionMode = "none"
+      self.logic.placeWidget.setPlaceModeEnabled(False)
 
   def onSelectSagittalPoint(self):
-    if not self.inputVolumeSelector.currentNode():
-      slicer.util.warningDisplay("No case is selceted, please select the case in the combox", windowTitle="")
+    if self.selectSagittalButton.isChecked():
+      if not self.inputVolumeSelector.currentNode():
+        slicer.util.warningDisplay("No case is selceted, please select the case in the combox", windowTitle="")
+      else:
+        outputModelNodeID = self.inputVolumeSelector.currentNode().GetAttribute("vtkMRMLScalarVolumeNode.rel_model")
+        if outputModelNodeID:
+          outputModelNode = slicer.mrmlScene.GetNodeByID(outputModelNodeID)
+          if (not outputModelNode) or outputModelNode.GetAttribute("vtkMRMLModelNode.modelCreated") == "False":
+              self.logic.createModel(outputModelNode, self.logic.threshold)
+          self.logic.selectSagittalPointNode(outputModelNode) # when the model is not available, the model will be created, so nodeAdded signal should be disconnected
+          self.logic.setSliceViewer()
     else:
-      outputModelNodeID = self.inputVolumeSelector.currentNode().GetAttribute("vtkMRMLScalarVolumeNode.rel_model")
-      if outputModelNodeID:
-        outputModelNode = slicer.mrmlScene.GetNodeByID(outputModelNodeID)
-        if (not outputModelNode) or outputModelNode.GetAttribute("vtkMRMLModelNode.modelCreated") == "False":
-            self.logic.createModel(outputModelNode, self.logic.threshold)
-        self.logic.selectSagittalPointNode(outputModelNode) # when the model is not available, the model will be created, so nodeAdded signal should be disconnected
-        self.logic.setSliceViewer()
+      self.interactionMode = "none"
+      self.logic.placeWidget.setPlaceModeEnabled(False)
 
   def onSaveData(self):
     outputDir = os.path.join(self.slicerCaseWidget.currentCaseDirectory, "Results")
@@ -1228,10 +1243,9 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     pass
 
   def onResetButtons(self, caller = None, event = None):
-    if caller.GetID() == "vtkMRMLInteractionNodeSingleton":
-        self.addCannulaTargetButton.setChecked(False)
-        self.selectNasionButton.setChecked(False)
-        self.selectSagittalButton.setChecked(False)
+    self.addCannulaTargetButton.setChecked(False)
+    self.selectNasionButton.setChecked(False)
+    self.selectSagittalButton.setChecked(False)
     pass
 
   # Event handlers for trajectory
@@ -1243,8 +1257,9 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       self.logic.startEditPlanningTarget()
     else:
       self.interactionMode = "none"
-      self.logic.interactionNode.SwitchToViewTransformMode()
-      self.logic.interactionNode.SetCurrentInteractionMode(slicer.vtkMRMLInteractionNode.ViewTransform)  
+      self.logic.placeWidget.setPlaceModeEnabled(False)
+      #self.logic.interactionNode.SwitchToViewTransformMode()
+      #self.logic.interactionNode.SetCurrentInteractionMode(slicer.vtkMRMLInteractionNode.Select)
 
   # Event handlers for trajectory
   def onEditPlanningDistal(self):
@@ -1316,6 +1331,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     slicer.mrmlScene.Clear(0)
     globals()[moduleName] = slicer.util.reloadScriptedModule(moduleName)
     self.logic = VentriculostomyPlanningLogic()
+    self.logic.register(self)
     
 class CurveManager():
 
@@ -1556,8 +1572,27 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
   Uses ScriptedLoadableModuleLogic base class, available at:
   https://github.com/Slicer/Slicer/blob/master/Base/Python/slicer/ScriptedLoadableModule.py
   """
+  def register(self, observer):
+    if not observer in self.observers:
+      self.observers.append(observer)
+
+
+  def unregister(self, observer):
+    if observer in self.observers:
+      self.observers.remove(observer)
+
+  def unregister_all(self):
+    if self.observers:
+      del self.observers[:]
+
+  @onReturnProcessEvents
+  def update_observers(self, *args, **kwargs):
+    for observer in self.observers:
+      observer.updateFromLogic(*args, **kwargs)
 
   def __init__(self):
+    self.observers = []
+    self.unregister_all()
     self.sagittalReferenceCurveManager = CurveManager()
     self.sagittalReferenceCurveManager.setName("SR1")
     self.sagittalReferenceCurveManager.setSliceID("vtkMRMLSliceNodeYellow")
@@ -1632,8 +1667,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     self.cylindarRadius = 2.5 # unit mm
     self.entryRadius = 25.0
 
-    self.interactionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLInteractionNodeSingleton")
-    self.interactionNode.AddObserver(self.interactionNode.EndPlacementEvent, self.endPlacement)
+    self.placeWidget = slicer.qSlicerMarkupsPlaceWidget()
     self.interactionMode = "none"
 
   def enableAuxilaryNodes(self):
@@ -1977,20 +2011,14 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         targetNode = slicer.mrmlScene.GetNodeByID(
           self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_target"))
         targetNode.RemoveAllMarkups()
-        #targetNode.SetLocked(True)
-        selectionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSelectionNodeSingleton")
-        # interactionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLInteractionNodeSingleton")
-        if (selectionNode == None) or (self.interactionNode == None):
-          return
-        
-        #self.initialSlicesOrientation()
-        selectionNode.SetReferenceActivePlaceNodeClassName("vtkMRMLMarkupsFiducialNode")
-        selectionNode.SetActivePlaceNodeID(targetNode.GetID())
         self.interactionMode = "target"
-        self.interactionNode.SwitchToSinglePlaceMode()
-        self.interactionNode.SetCurrentInteractionMode(slicer.vtkMRMLInteractionNode.Place)
-        targetNode.AddObserver(slicer.vtkMRMLMarkupsNode().PointModifiedEvent, self.createVentricleCylindar)
-        targetNode.AddObserver(slicer.vtkMRMLMarkupsNode().PointEndInteractionEvent, self.endModifiyCylindar)
+        #self.interactionNode.SwitchToSinglePlaceMode()
+        #self.interactionNode.SetCurrentInteractionMode(slicer.vtkMRMLInteractionNode.Place)
+        self.placeWidget.setMRMLScene(slicer.mrmlScene)
+        self.placeWidget.setCurrentNode(targetNode)
+        self.placeWidget.setPlaceModeEnabled(True)
+        #targetNode.AddObserver(slicer.vtkMRMLMarkupsNode().PointModifiedEvent, self.createVentricleCylindar)
+        #targetNode.AddObserver(slicer.vtkMRMLMarkupsNode().PointEndInteractionEvent, self.endModifiyCylindar)
 
 
   def endTargetSelectInteraction(self, targetNode = None, event=None):
@@ -2017,15 +2045,15 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
 
         selectionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSelectionNodeSingleton")
         # interactionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLInteractionNodeSingleton")
-        if (selectionNode == None) or (self.interactionNode == None):
-          return
+        #if (selectionNode == None) or (self.interactionNode == None):
+        #  return
         #self.initialSlicesOrientation()
-        selectionNode.SetReferenceActivePlaceNodeClassName("vtkMRMLMarkupsFiducialNode")
-        selectionNode.SetActivePlaceNodeID(distalNode.GetID())
+        #selectionNode.SetReferenceActivePlaceNodeClassName("vtkMRMLMarkupsFiducialNode")
+        #selectionNode.SetActivePlaceNodeID(distalNode.GetID())
         # self.interactionNode.SetAttribute("vtkMRMLInteractionNode.rel_marker", "sagittalPoint")
         self.interactionMode = "distal"
-        self.interactionNode.SwitchToSinglePlaceMode()
-        self.interactionNode.SetCurrentInteractionMode(slicer.vtkMRMLInteractionNode.Place)
+        #self.interactionNode.SwitchToSinglePlaceMode()
+        #self.interactionNode.SetCurrentInteractionMode(slicer.vtkMRMLInteractionNode.Place)
         distalNode.AddObserver(slicer.vtkMRMLMarkupsNode().PointModifiedEvent, self.createVentricleCylindar)
         distalNode.AddObserver(slicer.vtkMRMLMarkupsNode().PointEndInteractionEvent, self.endModifiyCylindar)
 
@@ -2570,6 +2598,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         slicer.mrmlScene.AddNode(nasionNode)
         nasionNode.SetAndObserveDisplayNodeID(displayNode.GetID())
         nasionNode.SetLocked(True)
+        nasionNode.AddObserver(slicer.vtkMRMLMarkupsNode.MarkupAddedEvent, self.endPlacement)
         self.baseVolumeNode.SetAttribute(attribute, nasionNode.GetID())
       if attribute == "vtkMRMLScalarVolumeNode.rel_sagittalPoint":
         sagittalPointNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
@@ -2579,6 +2608,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         slicer.mrmlScene.AddNode(sagittalPointNode)
         sagittalPointNode.SetAndObserveDisplayNodeID(displayNode.GetID())
         sagittalPointNode.SetLocked(True)
+        sagittalPointNode.AddObserver(slicer.vtkMRMLMarkupsNode.MarkupAddedEvent, self.endPlacement)
         self.baseVolumeNode.SetAttribute(attribute, sagittalPointNode.GetID())
       elif attribute == "vtkMRMLScalarVolumeNode.rel_target":
         targetNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
@@ -2587,6 +2617,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         slicer.mrmlScene.AddNode(displayNode)
         slicer.mrmlScene.AddNode(targetNode)
         targetNode.SetAndObserveDisplayNodeID(displayNode.GetID())
+        targetNode.AddObserver(slicer.vtkMRMLMarkupsNode.MarkupAddedEvent, self.endPlacement)
         self.baseVolumeNode.SetAttribute(attribute, targetNode.GetID())
       elif attribute == "vtkMRMLScalarVolumeNode.rel_distal":
         distalNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
@@ -2596,6 +2627,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         slicer.mrmlScene.AddNode(distalNode)
         distalNode.SetAndObserveDisplayNodeID(displayNode.GetID())
         self.baseVolumeNode.SetAttribute(attribute, distalNode.GetID())
+        distalNode.AddObserver(slicer.vtkMRMLMarkupsNode.MarkupAddedEvent, self.endPlacement)
       elif attribute == "vtkMRMLScalarVolumeNode.rel_cylindarRadius":
         self.baseVolumeNode.SetAttribute(attribute, str(self.cylindarRadius))  
       elif attribute == "vtkMRMLScalarVolumeNode.rel_skullNorm":
@@ -2826,17 +2858,17 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
   def endPlacement(self, interactionNode, event):
     ## when place a new trajectory point, the UpdatePosition is called, the projectedMarker will be visiable.
     ## set the projected marker to invisiable here
-    self.interactionNode.SetCurrentInteractionMode(slicer.vtkMRMLInteractionNode.ViewTransform)
+    #self.interactionNode.SetCurrentInteractionMode(slicer.vtkMRMLInteractionNode.ViewTransform)
     if self.interactionMode == "nasion":
       self.createTrueSagittalPlane()
       self.createEntryPoint()
       if self.nasionProjectedMarker and self.nasionProjectedMarker.GetMarkupsDisplayNode():
         self.nasionProjectedMarker.GetMarkupsDisplayNode().SetVisibility(0)
-      self.interactionNode.InvokeEvent(VentriculostomyUserEvents.ResetButtonEvent)
+      self.update_observers(VentriculostomyUserEvents.ResetButtonEvent)
     elif self.interactionMode == "sagittalPoint":
       self.createTrueSagittalPlane()
       self.createEntryPoint()
-      self.interactionNode.InvokeEvent(VentriculostomyUserEvents.ResetButtonEvent)
+      self.update_observers(VentriculostomyUserEvents.ResetButtonEvent)
     elif self.interactionMode == "target":
       self.endTargetSelectInteraction()
       if self.trajectoryProjectedMarker and self.trajectoryProjectedMarker.GetMarkupsDisplayNode():
@@ -2849,8 +2881,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         self.trajectoryProjectedMarker.GetMarkupsDisplayNode().SetVisibility(1)
       self.createVentricleCylindar()
       self.endModifiyCylindar()
-      self.interactionNode.InvokeEvent(VentriculostomyUserEvents.ResetButtonEvent)
-      #self.generatePath()
+      self.update_observers(VentriculostomyUserEvents.ResetButtonEvent)
     pass
   
   def endNasionInteraction(self, nasionNode, event):
@@ -2879,21 +2910,24 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
           rgbColor = [1.0, 0.0, 1.0]
           dnode.SetSelectedColor(rgbColor)
           dnode.SetVisibility(0)
-        selectionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSelectionNodeSingleton")
+        #selectionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSelectionNodeSingleton")
         #interactionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLInteractionNodeSingleton")
-        if (selectionNode == None) or (self.interactionNode == None):
-          return
+        #if (selectionNode == None) or (self.interactionNode == None):
+        #  return
 
-        selectionNode.SetReferenceActivePlaceNodeClassName("vtkMRMLMarkupsFiducialNode")
-        selectionNode.SetActivePlaceNodeID(nasionNode.GetID())
+        #selectionNode.SetReferenceActivePlaceNodeClassName("vtkMRMLMarkupsFiducialNode")
+        #selectionNode.SetActivePlaceNodeID(nasionNode.GetID())
         #interactionNode.RemoveObserver(interactionNode.EndPlacementEvent, self.endPlacement)
         #self.interactionNode.SetAttribute("vtkMRMLInteractionNode.rel_marker", "nasion")
         self.interactionMode = "nasion"
-        self.interactionNode.SwitchToSinglePlaceMode ()
-        self.interactionNode.SetCurrentInteractionMode(slicer.vtkMRMLInteractionNode.Place)
+        self.placeWidget.setMRMLScene(slicer.mrmlScene)
+        self.placeWidget.setCurrentNode(nasionNode)
+        self.placeWidget.setPlaceModeEnabled(True)
+        #self.interactionNode.SwitchToSinglePlaceMode ()
+        #self.interactionNode.SetCurrentInteractionMode(slicer.vtkMRMLInteractionNode.Place)
         #interactionNode.AddObserver(interactionNode.EndPlacementEvent, self.endPlacement)
-        nasionNode.AddObserver(nasionNode.PointModifiedEvent, self.updateNasionPosition)
-        nasionNode.AddObserver(nasionNode.PointEndInteractionEvent, self.endNasionInteraction)
+        #nasionNode.AddObserver(nasionNode.PointModifiedEvent, self.updateNasionPosition)
+        #nasionNode.AddObserver(nasionNode.PointEndInteractionEvent, self.endNasionInteraction)
 
   def selectSagittalPointNode(self, modelNode):
     if self.baseVolumeNode:
@@ -2905,17 +2939,20 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         # slicer.mrmlScene.AddNode(nasionNode)
         sagittalPointNode.SetLocked(True)
 
-        selectionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSelectionNodeSingleton")
+        #selectionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSelectionNodeSingleton")
         #interactionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLInteractionNodeSingleton")
-        if (selectionNode == None) or (self.interactionNode == None):
-          return
+        #if (selectionNode == None) or (self.interactionNode == None):
+        #  return
 
-        selectionNode.SetReferenceActivePlaceNodeClassName("vtkMRMLMarkupsFiducialNode")
-        selectionNode.SetActivePlaceNodeID(sagittalPointNode.GetID())
+        #selectionNode.SetReferenceActivePlaceNodeClassName("vtkMRMLMarkupsFiducialNode")
+        #selectionNode.SetActivePlaceNodeID(sagittalPointNode.GetID())
         #self.interactionNode.SetAttribute("vtkMRMLInteractionNode.rel_marker", "sagittalPoint")
         self.interactionMode = "sagittalPoint"
-        self.interactionNode.SwitchToSinglePlaceMode()
-        self.interactionNode.SetCurrentInteractionMode(slicer.vtkMRMLInteractionNode.Place)
+        self.placeWidget.setMRMLScene(slicer.mrmlScene)
+        self.placeWidget.setCurrentNode(sagittalPointNode)
+        self.placeWidget.setPlaceModeEnabled(True)
+        #self.interactionNode.SwitchToSinglePlaceMode()
+        #self.interactionNode.SetCurrentInteractionMode(slicer.vtkMRMLInteractionNode.Place)
         
   def endModifiyCylindar(self,  caller = None, eventID = None):
     targetNodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_target")
