@@ -2045,9 +2045,11 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     self.trajectoryManager.endEditLine()
   
   def calculateGrayScaleWithMargin(self):
-    grayScaleModelWithMarginNode = None
     nodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_grayScaleModelWithMargin")
     node = slicer.mrmlScene.GetNodeByID(nodeID)
+    if not node:
+      node = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
+      slicer.mrmlScene.AddNode(node)
     if node and (node.GetAttribute("vtkMRMLModelNode.modelCreated") == "False"):
       distanceMapFilter = sitk.ApproximateSignedDistanceMapImageFilter()
       originImage = sitk.Cast(sitkUtils.PullFromSlicer(self.currentVolumeNode.GetID()), sitk.sitkInt16)
@@ -2057,22 +2059,17 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       imageCollection = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLScalarVolumeNode", "distanceMap")
       if imageCollection:
         distanceMapNode = imageCollection.GetItemAsObject(0)
-        grayScaleModelWithMarginNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
-        slicer.mrmlScene.AddNode(grayScaleModelWithMarginNode)
         parameters = {}
         parameters["InputVolume"] = distanceMapNode.GetID()
-        parameters["OutputGeometry"] = grayScaleModelWithMarginNode.GetID()
+        parameters["OutputGeometry"] = node.GetID()
         parameters["Threshold"] = -10.0
         grayMaker = slicer.modules.grayscalemodelmaker
         self.cliNode = slicer.cli.run(grayMaker, None, parameters, wait_for_completion=True)
-        self.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_grayScaleModelWithMargin", grayScaleModelWithMarginNode.GetID())
+        self.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_grayScaleModelWithMargin", node.GetID())
         node.SetAttribute("vtkMRMLModelNode.modelCreated", "True")
       self.setSliceViewer()
-    else:
-      grayScaleModelWithMarginNodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_grayScaleModelWithMargin")
-      grayScaleModelWithMarginNode = slicer.mrmlScene.GetNodeByID(grayScaleModelWithMarginNodeID)
-    grayScaleModelWithMarginNode.SetDisplayVisibility(0)  
-    return grayScaleModelWithMarginNode
+    node.SetDisplayVisibility(0)  
+    return node
   
   
   def generatePath(self):
