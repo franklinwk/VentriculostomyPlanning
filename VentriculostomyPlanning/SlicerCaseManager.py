@@ -249,6 +249,7 @@ class SlicerCaseManagerWidget(ModuleWidgetMixin, ScriptedLoadableModuleWidget):
       self.logic.closeCase(self.currentCaseDirectory)
       self.currentCaseDirectory = None
     slicer.mrmlScene.Clear(0)
+    self.logic.update_observers(VentriculostomyUserEvents.CloseCaseEvent)
     self.patientWatchBox.sourceFile = None
     self.caseWatchBox.sourceFile = None
     pass

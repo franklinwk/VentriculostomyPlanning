@@ -1239,11 +1239,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
   def onEditPlanningTarget(self):
     if self.addCannulaTargetButton.isChecked():
       self.imageSlider.setValue(100.0)
-      self.lengthCannulaEdit.text = '--'
-      self.lengthSagittalPlanningLineEdit.text = '--'
-      self.lengthCoronalPlanningLineEdit.text = '--'
-      self.pitchAngleEdit.text = '--'
-      self.yawAngleEdit.text = '--'
+      self.initialFieldsValue()
       self.logic.setSliceForCylindar()
       self.logic.startEditPlanningTarget()
     else:
@@ -1254,11 +1250,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
   # Event handlers for trajectory
   def onEditPlanningDistal(self):
     self.imageSlider.setValue(100.0)
-    self.lengthCannulaEdit.text = '--'
-    self.lengthSagittalPlanningLineEdit.text = '--'
-    self.lengthCoronalPlanningLineEdit.text = '--'
-    self.pitchAngleEdit.text = '--'
-    self.yawAngleEdit.text = '--'
+    self.initialFieldsValue()
     self.logic.startEditPlanningDistal()
 
   def onGeneratePath(self):
