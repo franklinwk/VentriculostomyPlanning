@@ -5,3 +5,4 @@ class VentriculostomyUserEvents(object):
   CloseCaseEvent = vtk.vtkCommand.UserEvent + 101
   LoadCaseCompletedEvent = vtk.vtkCommand.UserEvent + 102
   LoadParametersToScene = vtk.vtkCommand.UserEvent + 103
+  TriggerDistalSelectionEvent = vtk.vtkCommand.UserEvent + 104
