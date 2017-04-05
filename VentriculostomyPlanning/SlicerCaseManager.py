@@ -415,7 +415,7 @@ class SlicerCaseManagerWidget(ModuleWidgetMixin, ScriptedLoadableModuleWidget):
     else:
       #slicer.util.loadVolume(self.planningImagePath, returnNode=True)
       sucess = slicer.util.loadScene(os.path.join(path, "Results","Results.mrml"))
-      #self.logic.update_observers(VentriculostomyUserEvents.LoadParametersToScene, self.currentCaseDirectory)
+      self.logic.update_observers(VentriculostomyUserEvents.LoadParametersToScene, self.currentCaseDirectory)
 
 
   def checkAndWarnUserIfCaseInProgress(self):
@@ -502,6 +502,7 @@ class NewCaseSelectionNameWidget(qt.QMessageBox, ModuleWidgetMixin):
   def __init__(self, destination, parent=None):
     super(NewCaseSelectionNameWidget, self).__init__(parent)
     if not os.path.exists(destination):
+      slicer.util.warningDisplay("Root directory is not set, please set the root in the 'Case Directory Settings' panel ", windowTitle="")
       raise
     self.destinationRoot = destination
     self.newCaseDirectory = None

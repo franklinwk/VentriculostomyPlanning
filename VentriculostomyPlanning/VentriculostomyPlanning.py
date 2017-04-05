@@ -472,9 +472,10 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     #
     # Mid-sagittalReference line
     #
-    planningSagittalLineLayout = qt.QHBoxLayout()
+
 
     #-- Curve length
+    planningSagittalLineLayout = qt.QHBoxLayout()
     lengthSagittalPlanningLineLabel = qt.QLabel('Sagittal Length:  ')
     planningSagittalLineLayout.addWidget(lengthSagittalPlanningLineLabel)
     self.lengthSagittalPlanningLineEdit = qt.QLineEdit()
@@ -501,6 +502,20 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     planningCoronalLineLayout.addWidget(self.lengthCoronalPlanningLineEdit)
     lengthCoronalPlanningLineUnitLabel = qt.QLabel('mm  ')
     planningCoronalLineLayout.addWidget(lengthCoronalPlanningLineUnitLabel)
+
+    planningDistanceKocherLayout = qt.QHBoxLayout()
+    distanceKocherPointLabel = qt.QLabel("Distance to Kocher's point:  ")
+    planningDistanceKocherLayout.addWidget(distanceKocherPointLabel)
+    self.distanceKocherPointEdit = qt.QLineEdit()
+    self.distanceKocherPointEdit.text = '--'
+    self.distanceKocherPointEdit.setMaxLength(5)
+    self.distanceKocherPointEdit.readOnly = True
+    self.distanceKocherPointEdit.frame = True
+    self.distanceKocherPointEdit.styleSheet = "QLineEdit { background:transparent; }"
+    self.distanceKocherPointEdit.cursor = qt.QCursor(qt.Qt.IBeamCursor)
+    planningSagittalLineLayout.addWidget(self.distanceKocherPointEdit)
+    distanceKocherPointUnitLabel = qt.QLabel('mm  ')
+    planningDistanceKocherLayout.addWidget(distanceKocherPointUnitLabel)
 
     planningPitchAngleLayout = qt.QHBoxLayout()
     #-- Curve length
@@ -590,6 +605,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
 
     self.infoGroupBoxLayout.addLayout(planningSagittalLineLayout)
     self.infoGroupBoxLayout.addLayout(planningCoronalLineLayout)
+    self.infoGroupBoxLayout.addLayout(planningDistanceKocherLayout)
     self.infoGroupBoxLayout.addLayout(planningPitchAngleLayout)
     self.infoGroupBoxLayout.addLayout(planningYawAngleLayout)
     self.infoGroupBoxLayout.addLayout(planningSkullNormToSagittalAngleLayout)
@@ -646,18 +662,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     elif args[0] == VentriculostomyUserEvents.LoadCaseCompletedEvent:
       self.inputVolumeSelector.setCurrentNode(self.logic.baseVolumeNode)
       self.onSelect(self.logic.baseVolumeNode)
-    """
-    elif args[0] == VentriculostomyUserEvents.LoadParametersToScene:
-      JSONFile = os.path.join(args[1], "Results", "results.json")
-      parameterNames = ["rel_sagittalLength", "rel_coronalLength", "rel_planningRadius"]
-      data ={}
-      with open(JSONFile, "r") as jsonFile:
-        data = json.load(jsonFile)
-        jsonFile.close()
-      if self.logic.baseVolumeNode:
-        for parameterName in parameterNames:
-          self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode." + parameterName, data[parameterName])
-    """
     pass
 
   @abstractmethod
@@ -668,6 +672,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
   def initialFieldsValue(self):
     self.lengthSagittalPlanningLineEdit.text = '--'
     self.lengthCoronalPlanningLineEdit.text = '--'
+    self.distanceKocherPointEdit.text = '--'
     self.lengthCannulaEdit.text = '--'
     self.pitchAngleEdit.text = '--'
     self.yawAngleEdit.text = '--'
@@ -774,7 +779,8 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       self.logic.cannulaManager.curveFiducials = slicer.mrmlScene.GetNodeByID(cannulaFiducialsID)
       self.logic.cannulaManager.curveFiducials.AddObserver(slicer.vtkMRMLMarkupsNode().PointStartInteractionEvent, self.logic.updateSelectedMarker)
       self.logic.cannulaManager.curveFiducials.AddObserver(slicer.vtkMRMLMarkupsNode().PointModifiedEvent, self.logic.updateCannulaPosition)
-      self.logic.cannulaManager.curveFiducials.AddObserver(slicer.vtkMRMLMarkupsNode().PointEndInteractionEvent, self.logic.endTrajectoryInteraction)
+      self.logic.cannulaManager.curveFiducials.AddObserver(slicer.vtkMRMLMarkupsNode().PointEndInteractionEvent, self.logic.endCannulaInteraction)
+      self.logic.cannulaManager.curveFiducials.AddObserver(VentriculostomyUserEvents.UpdateCannulaTargetPoint, self.logic.updateCannulaTargetPoint)
       self.logic.cannulaManager.setModifiedEventHandler(self.onCannulaModified)
       self.logic.cannulaManager.startEditLine()
       self.logic.createVentricleCylindar()
@@ -799,8 +805,10 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.logic.pathCandidatesModel.SetDisplayVisibility(0)
     if self.logic.createPlanningLine():
       self.logic.calcPitchYawAngles()
+      self.logic.calculateDistanceToKocher()
       self.lengthSagittalPlanningLineEdit.text = '%.1f' % self.logic.getSagittalPlanningLineLength()
       self.lengthCoronalPlanningLineEdit.text = '%.1f' % self.logic.getCoronalPlanningLineLength()
+      self.distanceKocherPointEdit.text = '%.1f' % self.logic.kocherDistance
       self.pitchAngleEdit.text = '%.1f' % self.logic.pitchAngle
       self.yawAngleEdit.text = '%.1f' % (-self.logic.yawAngle)
       if self.logic.calcCannulaAngles():
@@ -818,6 +826,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.lengthCannulaEdit.text = '--'
     self.lengthSagittalPlanningLineEdit.text = '--'
     self.lengthCoronalPlanningLineEdit.text = '--'
+    self.distanceKocherPointEdit.text = '--'
     self.pitchAngleEdit.text = '--'
     self.yawAngleEdit.text = '--'
     self.cannulaToCoronalAngleEdit.text = '--'
@@ -1474,6 +1483,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     self.minimalVentricleLen = 10.0 # in mm
     self.yawAngle = 0.0
     self.pitchAngle = 0.0
+    self.kocherDistance = 0.0
     self.cannulaToNormAngle = 0.0
     self.cannulaToCoronalAngle = 0.0
     self.skullNormToCoronalAngle = 0.0
@@ -1973,32 +1983,16 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
           obbTree.SetDataSet(grayScaleModelWithMarginNode.GetPolyData())
           obbTree.BuildLocator()
           pointsVTKintersection = vtk.vtkPoints()
-          hasIntersection = obbTree.IntersectWithLine(posEntry, posTarget, pointsVTKintersection, None)
           self.cannulaManager.clearLine()
           self.cannulaManager.curveFiducials.RemoveAllMarkups()
           self.cannulaManager.startEditLine() # initialize the tube model
-          if hasIntersection > 0:
-            if self.nPathReceived>0:
-              if slicer.util.confirmYesNoDisplay("The cannula is within the safty margin of the venous, use location optimization?",
-                                                 windowTitle=""):
-                self.relocateCannula(self.pathReceived, 1)
-              else:
-                self.cannulaManager.curveFiducials.AddFiducialFromArray(posTarget)
-                self.cannulaManager.curveFiducials.AddFiducialFromArray(posEntry + 0.005*cannulaDirection)
-            else:
-              slicer.util.warningDisplay(
-                "No any cannula candidate exists here, considering redefine the ventricle area?")
-              distalNode.SetLocked(False)
-              targetNode.SetLocked(False)
+          if self.nPathReceived>0:
+            self.relocateCannula(self.pathReceived, 1)
           else:
-            if slicer.util.confirmYesNoDisplay("The current cannula is fine, however, would you like to make it closer to the kocher's point?",
-                                                 windowTitle=""):
-              self.relocateCannula(self.pathReceived, 1)
-            else:
-              self.cannulaManager.curveFiducials.AddFiducialFromArray(posTarget)
-              self.cannulaManager.curveFiducials.AddFiducialFromArray(posEntry + 0.005*cannulaDirection)
-
-
+            slicer.util.warningDisplay(
+              "No any cannula candidate exists here, considering redefine the ventricle area?")
+            distalNode.SetLocked(False)
+            targetNode.SetLocked(False)
 
       #slicer.mrmlScene.RemoveNode(distanceMapNode)
   def makePath(self, path, approachablePoints, visibilityParam, modelName, polyData, modelNode):
@@ -2581,7 +2575,8 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
           hasIntersection = locator.IntersectWithLine( posSecond + 1e6*direction, posFirst -  1e6*direction, 1e-2, t, x, pcoords, subId)
           if hasIntersection>0:
             self.trajectoryProjectedMarker.SetNthFiducialPositionFromArray(0,x)
-            self.trajectoryProjectedMarker.SetNthFiducialLabel(0,"")  
+            self.trajectoryProjectedMarker.SetNthFiducialLabel(0,"")
+            fiducicalMarkerNode.InvokeEvent(VentriculostomyUserEvents.UpdateCannulaTargetPoint)
           else:
             self.trajectoryProjectedMarker.SetNthFiducialLabel(0,"invalid")
         else:
@@ -2590,9 +2585,26 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
           #self.trajectoryProjectedMarker.SetNthFiducialVisibility(0,False)
     self.cannulaManager.onLineSourceUpdated()
     self.updateSlicePosition(fiducicalMarkerNode,self.activeTrajectoryMarkup)
-    #self.calcPitchYawAngles()
-  
-  def endTrajectoryInteraction(self, fiducialNode, event=None):
+
+  def updateCannulaTargetPoint(self, fiducialNode, eventID = None):
+    posTarget = numpy.array([0.0] * 3)
+    self.trajectoryManager.getFirstPoint(posTarget)
+    posDistal = numpy.array([0.0] * 3)
+    self.trajectoryManager.getLastPoint(posDistal)
+    posProjected = [0.0,0.0,0.0]
+    self.trajectoryProjectedMarker.GetNthFiducialPositionFromArray(0, posProjected)
+
+    posMiddle = (posTarget + posDistal) / 2
+    direction1Norm = (posDistal - posTarget) / numpy.linalg.norm(posTarget - posDistal)
+    direction2 = numpy.array(posProjected) - numpy.array(posMiddle)
+    direction2Norm = direction2 / numpy.linalg.norm(direction2)
+    angleCalc = math.acos(numpy.dot(direction1Norm, direction2Norm))
+    posBottom = posMiddle + numpy.linalg.norm(posMiddle - posDistal) / math.cos(angleCalc) * (
+    posMiddle - posProjected) / numpy.linalg.norm(posMiddle - posProjected)
+    self.cannulaManager.curveFiducials.SetNthFiducialPositionFromArray(0, posBottom)
+    pass
+
+  def endCannulaInteraction(self, fiducialNode, event=None):
     posEntry = [0.0, 0.0, 0.0]
     if not self.trajectoryProjectedMarker.GetNthFiducialLabel(0) == "invalid":
       self.trajectoryProjectedMarker.GetNthFiducialPosition(0, posEntry)
@@ -3198,13 +3210,22 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
           self.constructCurveReference(self.coronalReferenceCurveManager, coronalPoints, coronalReferenceLength)  
     self.lockReferenceLine()        
     pass
-   
+
+  def calculateDistanceToKocher(self):
+    numOfRef = self.coronalReferenceCurveManager.curveFiducials.GetNumberOfFiducials()
+    numOfCannulaPoints = self.cannulaManager.curveFiducials.GetNumberOfFiducials()
+    if numOfRef >= 1 and numOfCannulaPoints>=2:
+      posRef = [0.0, 0.0, 0.0]
+      posEntry = [0.0, 0.0, 0.0]
+      self.coronalReferenceCurveManager.getLastPoint(posRef)
+      self.cannulaManager.getLastPoint(posEntry)
+      self.kocherDistance = numpy.linalg.norm(numpy.array(posRef)-numpy.array(posEntry))
+    pass
+
   def createPlanningLine(self):
     ###All calculation is based on the RAS coordinates system
     inputModelNode = None
     nasionNode = None
-    sagittalPlanningLength = None
-    coronalPlanningLength = None
     inputModelNodeID =  self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_model")
     if inputModelNodeID:
       inputModelNode = slicer.mrmlScene.GetNodeByID(inputModelNodeID) 
