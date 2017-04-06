@@ -243,6 +243,7 @@ class SlicerCaseManagerWidget(ModuleWidgetMixin, ScriptedLoadableModuleWidget):
     self.setSetting('CasesRootLocation', path if exists else None)
     self.casesRootDirectoryButton.text = self.truncatePath(path) if exists else "Choose output directory"
     self.casesRootDirectoryButton.toolTip = path
+    self.rootDirectoryLabel.setText(str(self.caseRootDir))
     self.openCaseButton.enabled = exists
     self.createNewCaseButton.enabled = exists
   
@@ -361,8 +362,10 @@ class SlicerCaseManagerWidget(ModuleWidgetMixin, ScriptedLoadableModuleWidget):
     self._collapsibleDirectoryConfigurationArea.collapsed = True
     self._collapsibleDirectoryConfigurationArea.text = "Case Directory Settings"
     self.directoryConfigurationLayout = qt.QGridLayout(self._collapsibleDirectoryConfigurationArea)
-    self.directoryConfigurationLayout.addWidget(qt.QLabel("Cases Root Directory"), 1, 0, 1, 1)
-    self.directoryConfigurationLayout.addWidget(self.casesRootDirectoryButton, 1, 1, 1, 1)
+    self.directoryConfigurationLayout.addWidget(qt.QLabel("Cases Root Directory:"), 1, 0, 1, 1)
+    self.rootDirectoryLabel = qt.QLabel('')
+    self.directoryConfigurationLayout.addWidget(self.rootDirectoryLabel, 1, 1, 1, 1)
+    self.directoryConfigurationLayout.addWidget(self.casesRootDirectoryButton, 1, 2, 1, 1)
     self.directoryConfigurationLayout.addWidget(self.caseWatchBox, 2, 0, 1, qt.QSizePolicy.ExpandFlag)
     self.layout.addWidget(self._collapsibleDirectoryConfigurationArea)
 
