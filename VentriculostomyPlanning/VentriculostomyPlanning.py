@@ -780,7 +780,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       self.logic.cannulaManager.curveFiducials.AddObserver(slicer.vtkMRMLMarkupsNode().PointStartInteractionEvent, self.logic.updateSelectedMarker)
       self.logic.cannulaManager.curveFiducials.AddObserver(slicer.vtkMRMLMarkupsNode().PointModifiedEvent, self.logic.updateCannulaPosition)
       self.logic.cannulaManager.curveFiducials.AddObserver(slicer.vtkMRMLMarkupsNode().PointEndInteractionEvent, self.logic.endCannulaInteraction)
-      self.logic.cannulaManager.curveFiducials.AddObserver(VentriculostomyUserEvents.UpdateCannulaTargetPoint, self.logic.updateCannulaTargetPoint)
+      #self.logic.cannulaManager.curveFiducials.AddObserver(VentriculostomyUserEvents.UpdateCannulaTargetPoint, self.logic.updateCannulaTargetPoint)
       self.logic.cannulaManager.setModifiedEventHandler(self.onCannulaModified)
       self.logic.cannulaManager.startEditLine()
       self.logic.createVentricleCylindar()
@@ -1930,7 +1930,9 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         direction = (numpy.array(posDistal) - numpy.array(posTarget))/numpy.linalg.norm(numpy.array(posDistal) - numpy.array(posTarget))
         if self.trajectoryProjectedMarker.GetNumberOfFiducials() == 0:
           self.trajectoryProjectedMarker.AddFiducial(0,0,0)
-        self.calculateLineModelIntersect(modelID, posDistal+1e6*direction, posTarget-1e6*direction, self.trajectoryProjectedMarker)
+        inputModelNode = slicer.mrmlScene.GetNodeByID(modelID)
+        polyData = inputModelNode.GetPolyData()  
+        self.calculateLineModelIntersect(polyData, posDistal+1e6*direction, posTarget-1e6*direction, self.trajectoryProjectedMarker)
         posEntry = numpy.array([0.0, 0.0, 0.0])
         self.trajectoryProjectedMarker.GetNthFiducialPosition(1,posEntry)
         self.trajectoryProjectedMarker.RemoveAllMarkups()
@@ -2576,7 +2578,8 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
           if hasIntersection>0:
             self.trajectoryProjectedMarker.SetNthFiducialPositionFromArray(0,x)
             self.trajectoryProjectedMarker.SetNthFiducialLabel(0,"")
-            fiducicalMarkerNode.InvokeEvent(VentriculostomyUserEvents.UpdateCannulaTargetPoint)
+            #self.updateCannulaTargetPoint(fiducicalMarkerNode)
+            #fiducicalMarkerNode.InvokeEvent(VentriculostomyUserEvents.UpdateCannulaTargetPoint)
           else:
             self.trajectoryProjectedMarker.SetNthFiducialLabel(0,"invalid")
         else:
@@ -2585,15 +2588,14 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
           #self.trajectoryProjectedMarker.SetNthFiducialVisibility(0,False)
     self.cannulaManager.onLineSourceUpdated()
     self.updateSlicePosition(fiducicalMarkerNode,self.activeTrajectoryMarkup)
-
+  '''
   def updateCannulaTargetPoint(self, fiducialNode, eventID = None):
     posTarget = numpy.array([0.0] * 3)
     self.trajectoryManager.getFirstPoint(posTarget)
     posDistal = numpy.array([0.0] * 3)
     self.trajectoryManager.getLastPoint(posDistal)
     posProjected = [0.0,0.0,0.0]
-    self.trajectoryProjectedMarker.GetNthFiducialPositionFromArray(0, posProjected)
-
+    self.trajectoryProjectedMarker.GetNthFiducialPosition(0, posProjected)
     posMiddle = (posTarget + posDistal) / 2
     direction1Norm = (posDistal - posTarget) / numpy.linalg.norm(posTarget - posDistal)
     direction2 = numpy.array(posProjected) - numpy.array(posMiddle)
@@ -2601,9 +2603,11 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     angleCalc = math.acos(numpy.dot(direction1Norm, direction2Norm))
     posBottom = posMiddle + numpy.linalg.norm(posMiddle - posDistal) / math.cos(angleCalc) * (
     posMiddle - posProjected) / numpy.linalg.norm(posMiddle - posProjected)
+    self.activeTrajectoryMarkup = 0
     self.cannulaManager.curveFiducials.SetNthFiducialPositionFromArray(0, posBottom)
     pass
-
+  '''
+    
   def endCannulaInteraction(self, fiducialNode, event=None):
     posEntry = [0.0, 0.0, 0.0]
     if not self.trajectoryProjectedMarker.GetNthFiducialLabel(0) == "invalid":
@@ -2618,35 +2622,61 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     fiducialNode.GetNthFiducialPosition(0,posTarget)
     posEntry = [0.0,0.0,0.0]
     fiducialNode.GetNthFiducialPosition(1,posEntry)
-    inputVesselModelNodeID =  self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_grayScaleModel")
-    if inputVesselModelNodeID:
-      self.calculateLineModelIntersect(inputVesselModelNodeID, posEntry, posTarget, self.trajectoryProjectedMarker)
+    inputVesselMarginModelNodeID =  self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_grayScaleModelWithMargin")
+    if inputVesselMarginModelNodeID:
+      inputModelNode = slicer.mrmlScene.GetNodeByID(inputVesselMarginModelNodeID)
+      polyData = inputModelNode.GetPolyData()  
+      self.calculateLineModelIntersect(polyData, posEntry, posTarget, self.trajectoryProjectedMarker)
+      if self.trajectoryProjectedMarker.GetNumberOfFiducials()>1: # The intersection is not only the projected skull point
+        slicer.util.warningDisplay("Within the margin area of the vessel") 
+    source = vtk.vtkCylinderSource()
+    distalNodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_distal")
+    distalNode = slicer.mrmlScene.GetNodeByID(distalNodeID)
+    posDistal = numpy.array([0.0, 0.0, 0.0])
+    distalNode.GetNthFiducialPosition(0, posDistal)
+    source.SetCenter(posDistal)
+    source.SetRadius(self.cylindarRadius)
+    source.SetHeight(0.001)
+    source.SetResolution(200)
+    intersectNumber1 = selfcalculateLineModelIntersect(source, posEntry,posTarget)
+    ventriculCylinder = self.trajectoryManager._curveModel.GetPolyData()
+    intersectNumber2 = selfcalculateLineModelIntersect(ventriculCylinder, posEntry,posTarget)
+    if intersectNumber2==2 and intersectNumber1 == 0:
+      slicer.util.warningDisplay("Both entry and target points are out of the ventricle cylinder")   
+    elif intersectNumber2==2 and intersectNumber1 == 1:
+      slicer.util.warningDisplay("target point is out of the ventricle cylinder") 
+    elif intersectNumber2==1 and intersectNumber1 == 0:
+      slicer.util.warningDisplay("Entry point is out of the ventricle cylinder")    
     pass
 
-  def calculateLineModelIntersect(self, modelID, posFirst, posSecond, intersectionNode):
-    inputModelNode = slicer.mrmlScene.GetNodeByID(modelID)
-    obbTree = vtk.vtkOBBTree()
-    obbTree.SetDataSet(inputModelNode.GetPolyData())
-    obbTree.BuildLocator()
-    pointsVTKintersection = vtk.vtkPoints()
-    hasIntersection = obbTree.IntersectWithLine(posFirst, posSecond, pointsVTKintersection, None)
-    if hasIntersection>0:
-      pointsVTKIntersectionData = pointsVTKintersection.GetData()
-      numPointsVTKIntersection = pointsVTKIntersectionData.GetNumberOfTuples()
-      validPosIndex = 1
-      for idx in range(numPointsVTKIntersection):
-        posTuple = pointsVTKIntersectionData.GetTuple3(idx)
-        if ((posTuple[0]-posFirst[0])*(posSecond[0]-posFirst[0])>0) and abs(posTuple[0]-posFirst[0])<abs(posSecond[0]-posFirst[0]):
-          # check if the intersection if within the posFist and posSecond
-          intersectionNode.AddFiducial(0,0,0)
-          intersectionNode.SetNthFiducialPositionFromArray(validPosIndex,posTuple)
-          intersectionNode.SetNthFiducialLabel(validPosIndex,"")
-          intersectionNode.SetNthFiducialVisibility(validPosIndex,True)
-          validPosIndex = validPosIndex + 1
-    else:
-      numOfFiducial = intersectionNode.GetNumberOfFiducials()
-      for idx in range(1, numOfFiducial):
-        intersectionNode.SetNthFiducialLabel(idx,"invalid")
+  def calculateLineModelIntersect(self, polyData, posFirst, posSecond, intersectionNode=None):
+    if polyData:
+      obbTree = vtk.vtkOBBTree()
+      obbTree.SetDataSet(polyData)
+      obbTree.BuildLocator()
+      pointsVTKintersection = vtk.vtkPoints()
+      hasIntersection = obbTree.IntersectWithLine(posFirst, posSecond, pointsVTKintersection, None)
+      if hasIntersection>0:
+        pointsVTKIntersectionData = pointsVTKintersection.GetData()
+        numPointsVTKIntersection = pointsVTKIntersectionData.GetNumberOfTuples()
+        if intersectionNode:
+          validPosIndex = 1
+          for idx in range(numPointsVTKIntersection):
+            posTuple = pointsVTKIntersectionData.GetTuple3(idx)
+            if ((posTuple[0]-posFirst[0])*(posSecond[0]-posFirst[0])>0) and abs(posTuple[0]-posFirst[0])<abs(posSecond[0]-posFirst[0]):
+              # check if the intersection if within the posFist and posSecond
+              intersectionNode.AddFiducial(0,0,0)
+              intersectionNode.SetNthFiducialPositionFromArray(validPosIndex,posTuple)
+              intersectionNode.SetNthFiducialLabel(validPosIndex,"")
+              intersectionNode.SetNthFiducialVisibility(validPosIndex,True)
+              validPosIndex = validPosIndex + 1
+        return numPointsVTKIntersection    
+      else:
+        if intersectionNode:
+          numOfFiducial = intersectionNode.GetNumberOfFiducials()
+          for idx in range(1, numOfFiducial):
+            intersectionNode.SetNthFiducialLabel(idx,"invalid")  
+    return 0  
 
   def updateNasionPosition(self, fiducicalMarkerNode, eventID):
     inputModelNodeID =  self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_model")
