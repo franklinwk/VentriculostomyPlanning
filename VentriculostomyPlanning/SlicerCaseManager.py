@@ -232,7 +232,7 @@ class SlicerCaseManager(ScriptedLoadableModule):
 class SlicerCaseManagerWidget(ModuleWidgetMixin, ScriptedLoadableModuleWidget):
   @property
   def caseRootDir(self):
-    return self.casesRootDirectoryButton.directory
+    return self._caseRootDir
 
   @caseRootDir.setter
   def caseRootDir(self, path):
@@ -240,10 +240,11 @@ class SlicerCaseManagerWidget(ModuleWidgetMixin, ScriptedLoadableModuleWidget):
       exists = os.path.exists(path)
     except TypeError:
       exists = False
+    self._caseRootDir = path
     self.setSetting('CasesRootLocation', path if exists else None)
     self.casesRootDirectoryButton.text = self.truncatePath(path) if exists else "Choose output directory"
     self.casesRootDirectoryButton.toolTip = path
-    self.rootDirectoryLabel.setText(str(self.caseRootDir))
+    self.rootDirectoryLabel.setText(str(self._caseRootDir))
     self.openCaseButton.enabled = exists
     self.createNewCaseButton.enabled = exists
   
@@ -311,9 +312,11 @@ class SlicerCaseManagerWidget(ModuleWidgetMixin, ScriptedLoadableModuleWidget):
     ScriptedLoadableModuleWidget.__init__(self, parent)
     self.logic = SlicerCaseManagerLogic()
     self.modulePath = os.path.dirname(slicer.util.modulePath(self.moduleName))
+    self._caseRootDir = self.getSetting('CasesRootLocation')
     self._currentCaseDirectory = None
     self._caseDirectoryList = {}
     self.caseDirectoryList = {"DICOM/Planning", "Results"}
+    self.setup()
 
   def setup(self):
     #ScriptedLoadableModuleWidget.setup(self)
@@ -364,9 +367,11 @@ class SlicerCaseManagerWidget(ModuleWidgetMixin, ScriptedLoadableModuleWidget):
     self.directoryConfigurationLayout = qt.QGridLayout(self._collapsibleDirectoryConfigurationArea)
     self.directoryConfigurationLayout.addWidget(qt.QLabel("Cases Root Directory:"), 1, 0, 1, 1)
     self.rootDirectoryLabel = qt.QLabel('')
+    if self.getSetting('CasesRootLocation'):
+      self.rootDirectoryLabel = qt.QLabel(self.getSetting('CasesRootLocation'))
     self.directoryConfigurationLayout.addWidget(self.rootDirectoryLabel, 1, 1, 1, 1)
     self.directoryConfigurationLayout.addWidget(self.casesRootDirectoryButton, 1, 2, 1, 1)
-    self.directoryConfigurationLayout.addWidget(self.caseWatchBox, 2, 0, 1, qt.QSizePolicy.ExpandFlag)
+    self.directoryConfigurationLayout.addWidget(self.caseWatchBox, 2, 0, 1, 3)
     self.layout.addWidget(self._collapsibleDirectoryConfigurationArea)
 
   def createCaseWatchBox(self):
@@ -377,7 +382,7 @@ class SlicerCaseManagerWidget(ModuleWidgetMixin, ScriptedLoadableModuleWidget):
   def setupConnections(self):
     self.createNewCaseButton.clicked.connect(self.onCreateNewCaseButtonClicked)
     self.openCaseButton.clicked.connect(self.onOpenCaseButtonClicked)
-    self.casesRootDirectoryButton.directoryChanged.connect(lambda: setattr(self, "caseRootDir",
+    self.casesRootDirectoryButton.directorySelected.connect(lambda: setattr(self, "caseRootDir",
                                                                            self.casesRootDirectoryButton.directory))
 
   def updateCaseWatchBox(self):
@@ -416,7 +421,6 @@ class SlicerCaseManagerWidget(ModuleWidgetMixin, ScriptedLoadableModuleWidget):
       slicer.util.warningDisplay("The selected case directory seems not to be valid", windowTitle="")
       self.clearData()
     else:
-      #slicer.util.loadVolume(self.planningImagePath, returnNode=True)
       sucess = slicer.util.loadScene(os.path.join(path, "Results","Results.mrml"))
       self.logic.update_observers(VentriculostomyUserEvents.LoadParametersToScene, self.currentCaseDirectory)
 
