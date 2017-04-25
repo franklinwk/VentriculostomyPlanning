@@ -335,8 +335,19 @@ class SlicerCaseManagerWidget(ModuleWidgetMixin, ScriptedLoadableModuleWidget):
     self.createCaseInformationArea()
     self.setupConnections()
     self.layout.addWidget(self._mainGUIGroupBox)
+    slicer.mrmlScene.AddObserver(slicer.vtkMRMLScene.StartImportEvent, self.StartCaseImportCallback)
+    slicer.mrmlScene.AddObserver(slicer.vtkMRMLScene.EndImportEvent, self.LoadCaseCompletedCallback)
 
-  
+  @vtk.calldata_type(vtk.VTK_OBJECT)
+  def StartCaseImportCallback(self, caller, eventId, callData):
+    print("loading case")
+    self.logic.update_observers(VentriculostomyUserEvents.StartCaseImportEvent, self.currentCaseDirectory)
+
+  @vtk.calldata_type(vtk.VTK_OBJECT)
+  def LoadCaseCompletedCallback(self, caller, eventId, callData):
+    print("case loaded")
+    self.logic.update_observers(VentriculostomyUserEvents.LoadCaseCompletedEvent, self.currentCaseDirectory)
+
   def updateOutputFolder(self):
     if os.path.exists(self.generatedOutputDirectory):
       return
@@ -422,7 +433,6 @@ class SlicerCaseManagerWidget(ModuleWidgetMixin, ScriptedLoadableModuleWidget):
       self.clearData()
     else:
       sucess = slicer.util.loadScene(os.path.join(path, "Results","Results.mrml"))
-      self.logic.update_observers(VentriculostomyUserEvents.LoadParametersToScene, self.currentCaseDirectory)
 
 
   def checkAndWarnUserIfCaseInProgress(self):
