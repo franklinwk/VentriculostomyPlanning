@@ -16,7 +16,8 @@ from PercutaneousApproachAnalysis import *
 from numpy import linalg
 from code import interact
 import SlicerCaseManager
-from SlicerCaseManager import onReturnProcessEvents, beforeRunProcessEvents, WindowLevelEffectsButton
+from SlicerCaseManager import onReturnProcessEvents, beforeRunProcessEvents
+from SlicerDevelopmentToolboxUtils.buttons import WindowLevelEffectsButton
 from shutil import copyfile
 from os.path import basename
 from os import listdir
@@ -649,6 +650,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       self.logic.clear()
       self.initialFieldsValue()
       self.volumeSelected = False
+      self.inputVolumeNameLabel.text = ""
     elif args[0] == VentriculostomyUserEvents.LoadCaseCompletedEvent:
       self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_ventricleVolume",
                                              self.logic.ventricleVolume.GetID())
@@ -659,6 +661,9 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       self.onSelect(self.logic.baseVolumeNode)
     elif args[0] == VentriculostomyUserEvents.StartCaseImportEvent:
       self.volumeSelected = True
+      self.red_cn.SetDoPropagateVolumeSelection(False) # make sure the compositenode doesn't get updated,
+      self.green_cn.SetDoPropagateVolumeSelection(False) # so that the background and foreground volumes are not messed up
+      self.yellow_cn.SetDoPropagateVolumeSelection(False)
     pass
 
   @abstractmethod
@@ -691,13 +696,10 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
   def onAddedNode(self, addedNode):
     if addedNode.IsA("vtkMRMLVolumeNode"):
       volumeName = addedNode.GetName()
-      validNode = False
       if ("Venous" in volumeName) or ("venous" in volumeName) :
         self.logic.baseVolumeNode = addedNode
-        validNode = True
       elif ("Ventricle" in volumeName) or ("ventricle" in volumeName) :
         self.logic.ventricleVolume = addedNode
-        validNode = True
       if self.logic.baseVolumeNode and self.logic.ventricleVolume and (not self.volumeSelected):
         self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_ventricleVolume", self.logic.ventricleVolume.GetID())
         self.caseNum = self.caseNum + 1
@@ -718,6 +720,9 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
   def onSelect(self, selectedNode=None):
     if selectedNode:
       slicer.app.processEvents()
+      self.red_cn.SetDoPropagateVolumeSelection(False)  # make sure the compositenode doesn't get updated,
+      self.green_cn.SetDoPropagateVolumeSelection(False)  # so that the background and foreground volumes are not messed up
+      self.yellow_cn.SetDoPropagateVolumeSelection(False)
       self.initialFieldsValue()
       self.logic.clear()
       self.logic = VentriculostomyPlanningLogic()
@@ -1918,10 +1923,11 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         if self.trajectoryProjectedMarker.GetNumberOfFiducials() == 0:
           self.trajectoryProjectedMarker.AddFiducial(0,0,0)
         inputModelNode = slicer.mrmlScene.GetNodeByID(modelID)
-        polyData = inputModelNode.GetPolyData()  
-        self.calculateLineModelIntersect(polyData, posDistal+1e6*direction, posTarget-1e6*direction, self.trajectoryProjectedMarker)
+        polyData = inputModelNode.GetPolyData()
+        FiducialPointAlongVentricle = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
+        self.calculateLineModelIntersect(polyData, posDistal+1e6*direction, posTarget-1e6*direction, FiducialPointAlongVentricle)
         posEntry = numpy.array([0.0, 0.0, 0.0])
-        self.trajectoryProjectedMarker.GetNthFiducialPosition(1,posEntry)
+        FiducialPointAlongVentricle.GetNthFiducialPosition(0,posEntry)
         self.cylinderMiddlePointNode.RemoveAllMarkups()
         self.cylinderMiddlePointNode.AddFiducial((posTarget[0]+posDistal[0])/2.0, (posTarget[1]+posDistal[1])/2.0, (posTarget[2]+posDistal[2])/2.0)
         grayScaleModelNodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_grayScaleModel")
@@ -2074,6 +2080,9 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
                   if distanceMin > numpy.linalg.norm(numpy.array(posRef)-numpy.array(x)):
                     distanceMin = numpy.linalg.norm(numpy.array(posRef)-numpy.array(x))
                     minIndex = pointIndex
+              self.cannulaManager.curveFiducials.RemoveAllMarkups()
+              self.cannulaManager.curveFiducials.AddFiducial(0, 0, 0)
+              self.cannulaManager.curveFiducials.AddFiducial(0, 0, 0)
               self.cannulaManager.curveFiducials.SetNthFiducialPositionFromArray(0, pathReceived[minIndex-1])
               self.cannulaManager.curveFiducials.SetNthFiducialPositionFromArray(1, pathReceived[minIndex])
               direction2 = numpy.array(pathReceived[minIndex]) - numpy.array(pathReceived[minIndex-1])
@@ -2087,7 +2096,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       posBottom = posMiddle+numpy.linalg.norm(posMiddle - posDistal)/math.cos(angleCalc)*(posMiddle-posProject)/numpy.linalg.norm(posMiddle - posProject)
       self.cannulaManager.curveFiducials.SetNthFiducialPositionFromArray(0, posBottom)
       self.cannulaManager.curveFiducials.SetNthFiducialPositionFromArray(1, posProject)
-      self.trajectoryProjectedMarker.RemoveAllMarkups()        
+      self.trajectoryProjectedMarker.RemoveAllMarkups()
     pass
 
   def clearTrajectory(self):
@@ -2630,7 +2639,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     cylinderTop = vtk.vtkCylinderSource()
     cylinderTop.SetCenter(numpy.array([0.0, 0.0, 0.0]))
     cylinderTop.SetRadius(self.cylinderRadius)
-    cylinderTop.SetHeight(0.001)
+    cylinderTop.SetHeight(0.05)
     cylinderTop.SetResolution(200)
     cylinderTop.Update()
     self.calculateCannulaTransform()
@@ -2661,8 +2670,8 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     """
     ventriculCylinder = self.cylinderManager._curveModel.GetPolyData()
     posTargetBoundary = list(posTarget+(numpy.array(posEntry)-numpy.array(posTarget))/2000.0)
-    intersectNumber2 = self.calculateLineModelIntersect(ventriculCylinder, posEntry,posTargetBoundary)
-    intersectNumber1 = self.calculateLineModelIntersect(transformFilter.GetOutput(), posEntry, posTargetBoundary)
+    intersectNumber2 = self.calculateLineModelIntersect(ventriculCylinder, posEntry,posTargetBoundary, self.trajectoryProjectedMarker)
+    intersectNumber1 = self.calculateLineModelIntersect(transformFilter.GetOutput(), posEntry, posTargetBoundary, self.trajectoryProjectedMarker)
     if (intersectNumber2 == 2 or intersectNumber2 == 0) and intersectNumber1 == 0:
       slicer.util.warningDisplay("Both entry and target points are out of the ventricle cylinder")   
     elif intersectNumber2 == 2 and intersectNumber1 == 2:
@@ -2682,7 +2691,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         pointsVTKIntersectionData = pointsVTKintersection.GetData()
         numPointsVTKIntersection = pointsVTKIntersectionData.GetNumberOfTuples()
         if intersectionNode:
-          validPosIndex = 1
+          validPosIndex = intersectionNode.GetNumberOfFiducials()
           for idx in range(numPointsVTKIntersection):
             posTuple = pointsVTKIntersectionData.GetTuple3(idx)
             if ((posTuple[0]-posFirst[0])*(posSecond[0]-posFirst[0])>0) and abs(posTuple[0]-posFirst[0])<abs(posSecond[0]-posFirst[0]):
@@ -3115,7 +3124,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       nasionNode = slicer.mrmlScene.GetNodeByID(nasionNodeID)
       sagittalPointNode = slicer.mrmlScene.GetNodeByID(sagittalPointNodeID)
       posNasion = numpy.array([0.0, 0.0, 0.0])
-      if nasionNode:
+      if nasionNode and sagittalPointNode:
         # create a sagital plane when nasion point is exist, if sagittal doesn't exist, use  [0,0,0] As default sagittal point, which might not be correct
         if nasionNode.GetNumberOfFiducials():
           nasionNode.GetNthFiducialPosition(0, posNasion)
