@@ -23,6 +23,7 @@ from os.path import basename
 from os import listdir
 from VentriculostomyPlanningUtils.UserEvents import VentriculostomyUserEvents
 from abc import ABCMeta, abstractmethod
+import datetime
 #
 # VentriculostomyPlanning
 
@@ -67,6 +68,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.cameraPos = [0.0]*3
     self.camera = None
     self.volumeSelected = False
+    self.jsonFile = ""
     layoutManager = slicer.app.layoutManager()
     threeDView = layoutManager.threeDWidget(0).threeDView()
     displayManagers = vtk.vtkCollection()
@@ -706,8 +708,12 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
         self.volumeSelected = True
         self.onSaveDicomFiles()
         self.inputVolumeNameLabel.text = self.logic.baseVolumeNode.GetName()
+        outputDir = os.path.join(self.slicerCaseWidget.currentCaseDirectory, "Results")
+        self.jsonFile = os.path.join(outputDir, "PlanningTimeStamp.json")
+        self.logic.appendPlanningTimeStampToJson(jsonFile, "EndDicomFileImport", datetime.datetime.now().time().isoformat())
         self.onSelect(self.logic.baseVolumeNode)
-
+        self.logic.appendPlanningTimeStampToJson(jsonFile, "EndPreprocessing",
+                                                 datetime.datetime.now().time().isoformat())
         #the setForegroundVolume will not work, because the slicerapp triggers the SetBackgroundVolume after the volume is loaded
   
   def onSaveDicomFiles(self):
@@ -957,11 +963,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       if nodeID and slicer.mrmlScene.GetNodeByID(nodeID):
         node = slicer.mrmlScene.GetNodeByID(nodeID)
         self.logic.savePlanningDataToDirectory(node, outputDir)
-    jsonFile= os.path.join(outputDir, "results.json")
-    parameterNames = ["rel_sagittalLength","rel_coronalLength","rel_planningRadius"]
-    for parameterName in parameterNames:
-      value = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode."+parameterName)
-      self.logic.savePlanningParametersToJson(jsonFile, parameterName, value)
     slicer.util.saveScene(os.path.join(self.slicerCaseWidget.currentCaseDirectory, "Results", "Results.mrml"))
     pass
       
@@ -1604,7 +1605,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       self.sagittalPlanningCurveManager.clear()
       self.sagittalPlanningCurveManager = None
 
-  def savePlanningParametersToJson(self, JSONFile, parameterName, value):
+  def appendPlanningTimeStampToJson(self, JSONFile, parameterName, value):
     with open(JSONFile, "r") as jsonFile:
       data = json.load(jsonFile)
       jsonFile.close()
@@ -1619,91 +1620,11 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     characters = [": ", " ", ":", "/"]
     for character in characters:
       nodeName = nodeName.replace(character, "-")
-    data= {}
     extension = ".nrrd"
     baseNodeName = self.baseVolumeNode.GetName()
     for character in characters:
       baseNodeName = baseNodeName.replace(character, "-")
-    data["BaseVolume"] = os.path.join(outputDir, baseNodeName + extension)
-    if not os.path.isfile(os.path.join(outputDir, "results.json")):
-      jsonFile = open(os.path.join(outputDir, "results.json"), "w")
-      json.dump(data,jsonFile)
-      jsonFile.close()
-    with open(os.path.join(outputDir, "results.json"), "r") as jsonFile:
-      data = json.load(jsonFile)
-      jsonFile.close()
-    extension = ""
-    if self.baseVolumeNode.GetID() == node.GetID():
-      extension = ".nrrd"
-      data["BaseVolume"] = os.path.join(outputDir, nodeName + extension)
-    if self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_ventricleVolume") \
-        and self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_ventricleVolume") == node.GetID():
-      extension = ".nrrd"
-      data["rel_ventricleVolume"] = os.path.join(outputDir, nodeName + extension)
-    if self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_model") \
-        and self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_model") == node.GetID():
-      extension = ".vtk"
-      data["rel_model"] = os.path.join(outputDir, nodeName + extension)
-    if self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_nasion") \
-        and self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_nasion") == node.GetID():
-      extension = ".fcsv"
-      data["rel_nasion"] = os.path.join(outputDir, nodeName + extension)
-    if self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagittalPoint") \
-        and self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagittalPoint") == node.GetID():
-      extension = ".fcsv"
-      data["rel_sagittalPoint"] = os.path.join(outputDir, nodeName + extension)
-    if self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_target") \
-        and self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_target") == node.GetID():
-      extension = ".fcsv"
-      data["rel_target"] = os.path.join(outputDir, nodeName + extension)
-    if self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_distal") \
-        and self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_distal") == node.GetID():
-      extension = ".fcsv"
-      data["rel_distal"] = os.path.join(outputDir, nodeName + extension)
-    if self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_cannula") \
-        and self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_cannula") == node.GetID():
-      extension = ".fcsv"
-      data["rel_cannula"] = os.path.join(outputDir, nodeName + extension)
-    if self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_skullNorm") \
-        and self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_skullNorm") == node.GetID():
-      extension = ".fcsv"
-      data["rel_skullNorm"] = os.path.join(outputDir, nodeName + extension)
-    if self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_cannulaModel") \
-        and self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_cannulaModel") == node.GetID():
-      extension = ".vtk"
-      data["rel_cannulaModel"] = os.path.join(outputDir, nodeName + extension)
-    if self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagittalReferenceModel") \
-        and self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagittalReferenceModel") == node.GetID():
-      extension = ".vtk"
-      data["rel_sagittalReferenceModel"] = os.path.join(outputDir, nodeName + extension)
-    if self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_coronalReferenceModel") \
-        and self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_coronalReferenceModel") == node.GetID():
-      extension = ".vtk"
-      data["rel_coronalReferenceModel"] = os.path.join(outputDir, nodeName + extension)
-    if self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagittalPlanningModel") \
-        and self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagittalPlanningModel") == node.GetID():
-      extension = ".vtk"
-      data["rel_sagittalPlanningModel"] = os.path.join(outputDir, nodeName + extension)
-    if self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_coronalPlanningModel") \
-        and self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_coronalPlanningModel") == node.GetID():
-      extension = ".vtk"
-      data["rel_coronalPlanningModel"] = os.path.join(outputDir, nodeName + extension)
-    if self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_grayScaleModel") \
-        and self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_grayScaleModel") == node.GetID():
-      extension = ".vtk"
-      data["rel_grayScaleModel"] = os.path.join(outputDir, nodeName + extension)
-    if self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_grayScaleModelWithMargin") \
-        and self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_grayScaleModelWithMargin") == node.GetID():
-      extension = ".vtk"
-      data["rel_grayScaleModelWithMargin"] = os.path.join(outputDir, nodeName + extension)
-    if self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_vesselnessVolume") \
-        and self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_vesselnessVolume") == node.GetID():
-      extension = ".nrrd"
-      data["rel_vesselnessVolume"] = os.path.join(outputDir, nodeName + extension)
     filename = os.path.join(outputDir, nodeName + extension)
-    with open(os.path.join(outputDir, "results.json"), "w") as jsonFile:
-      json.dump(data, jsonFile)
-      jsonFile.close()
     if slicer.util.saveNode(node, filename):
       return True
     warningMSG = "Error in saving the %s" %(nodeName)
