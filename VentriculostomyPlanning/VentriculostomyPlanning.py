@@ -710,9 +710,9 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
         self.inputVolumeNameLabel.text = self.logic.baseVolumeNode.GetName()
         outputDir = os.path.join(self.slicerCaseWidget.currentCaseDirectory, "Results")
         self.jsonFile = os.path.join(outputDir, "PlanningTimeStamp.json")
-        self.logic.appendPlanningTimeStampToJson(jsonFile, "EndDicomFileImport", datetime.datetime.now().time().isoformat())
+        self.logic.appendPlanningTimeStampToJson(self.jsonFile, "EndDicomFileImport", datetime.datetime.now().time().isoformat())
         self.onSelect(self.logic.baseVolumeNode)
-        self.logic.appendPlanningTimeStampToJson(jsonFile, "EndPreprocessing",
+        self.logic.appendPlanningTimeStampToJson(self.jsonFile, "EndPreprocessing",
                                                  datetime.datetime.now().time().isoformat())
         #the setForegroundVolume will not work, because the slicerapp triggers the SetBackgroundVolume after the volume is loaded
   
@@ -964,6 +964,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
         node = slicer.mrmlScene.GetNodeByID(nodeID)
         self.logic.savePlanningDataToDirectory(node, outputDir)
     slicer.util.saveScene(os.path.join(self.slicerCaseWidget.currentCaseDirectory, "Results", "Results.mrml"))
+    self.logic.appendPlanningTimeStampToJson(self.jsonFile, "CaseSavedTime", datetime.datetime.now().time().isoformat())
     pass
       
   def onModifyMeasureLength(self):
@@ -1606,14 +1607,21 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       self.sagittalPlanningCurveManager = None
 
   def appendPlanningTimeStampToJson(self, JSONFile, parameterName, value):
-    with open(JSONFile, "r") as jsonFile:
-      data = json.load(jsonFile)
-      jsonFile.close()
-    data[parameterName] = value
-    with open(JSONFile, "w") as jsonFile:
-      json.dump(data, jsonFile)
-      jsonFile.close()
-    pass
+    data = {}
+    if not os.path.isfile(JSONFile):
+      data[parameterName] = value
+      with open(JSONFile, "w") as jsonFile:
+        json.dump(data, jsonFile)
+        jsonFile.close()
+    else:
+      with open(JSONFile, "r") as jsonFile:
+        data = json.load(jsonFile)
+        jsonFile.close()
+      data[parameterName] = value  
+      with open(JSONFile, "w") as jsonFile:
+        json.dump(data, jsonFile)
+        jsonFile.close()
+  pass
 
   def savePlanningDataToDirectory(self, node, outputDir):
     nodeName = node.GetName()
