@@ -17,6 +17,7 @@ from numpy import linalg
 from code import interact
 import SlicerCaseManager
 from SlicerCaseManager import onReturnProcessEvents, beforeRunProcessEvents
+from VentriculostomyPlanningUtils.PopUpMessageBox import SerialAssignMessageBox
 from SlicerDevelopmentToolboxUtils.buttons import WindowLevelEffectsButton
 from shutil import copyfile
 from os.path import basename
@@ -64,7 +65,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.logic.register(self)
     self.dicomWidget = DICOMWidget()
     self.dicomWidget.parent.close()
-    self.caseNum = 0
+    self.SerialAssignBox = SerialAssignMessageBox()
     self.cameraPos = [0.0]*3
     self.camera = None
     self.volumeSelected = False
@@ -192,22 +193,49 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
 
     self.inputVolumeBox = qt.QGroupBox()
     inputVolumeLayout = qt.QHBoxLayout()
-    inputVolumeLayout.setAlignment(qt.Qt.AlignLeft)
+    inputVolumeLayout.setAlignment(qt.Qt.AlignCenter)
     self.inputVolumeBox.setLayout(inputVolumeLayout)
     self.layout.addWidget(self.inputVolumeBox)
-    inputVolumeLabel = qt.QLabel('Select Volume: ')
-    self.inputVolumeNameLabel = qt.QLabel('')
-    inputVolumeLayout.addWidget(inputVolumeLabel)
-    inputVolumeLayout.addWidget(self.inputVolumeNameLabel)
+    venousVolumeLabel = qt.QLabel('Venous Volume: ')
+    self.venousVolumeNameLabel = qt.QLineEdit()
+    self.venousVolumeNameLabel.text = '--'
+    self.venousVolumeNameLabel.setMaxLength(50)
+    self.venousVolumeNameLabel.readOnly = True
+    self.venousVolumeNameLabel.frame = True
+    self.venousVolumeNameLabel.styleSheet = "QLineEdit { background:transparent; }"
+    inputVolumeLayout.addWidget(venousVolumeLabel)
+    inputVolumeLayout.addWidget(self.venousVolumeNameLabel)
+    ventricleVolumeLabel = qt.QLabel('Ventricle Volume: ')
+    self.ventricleVolumeNameLabel = qt.QLineEdit()
+    self.ventricleVolumeNameLabel.text = '--'
+    self.ventricleVolumeNameLabel.setMaxLength(50)
+    self.ventricleVolumeNameLabel.readOnly = True
+    self.ventricleVolumeNameLabel.frame = True
+    self.ventricleVolumeNameLabel.styleSheet = "QLineEdit { background:transparent; }"
+    inputVolumeLayout.addWidget(ventricleVolumeLabel)
+    inputVolumeLayout.addWidget(self.ventricleVolumeNameLabel)
+    self.showVolumeTable = qt.QPushButton("Show Volumes Table")
+    self.showVolumeTable.toolTip = "Show the table of volumes for assignment."
+    self.showVolumeTable.enabled = True
+    self.showVolumeTable.connect('clicked(bool)', self.onShowVolumeTable)
+    inputVolumeLayout.addWidget(self.showVolumeTable)
     self.inputVolumeSelector = slicer.qMRMLNodeComboBox()
     self.inputVolumeSelector.nodeTypes = ["vtkMRMLScalarVolumeNode"]
     self.inputVolumeSelector.setMRMLScene( slicer.mrmlScene )
+    self.inputVolumeSelector.editEnabled = False
+    self.inputVolumeSelector.addEnabled = False
+    self.inputVolumeSelector.removeEnabled = False
+    self.inputVolumeSelector.selectNodeUponCreation = False
     #self.inputVolumeSelector.sortFilterProxyModel().setFilterRegExp("(Venous)")
     #self.inputVolumeSelector.sortFilterProxyModel().setFilterRegExp("^((?!NotShownEntity31415).)*$" )
-    self.inputVolumeSelector.connect("nodeAdded(vtkMRMLNode*)", self.onAddedNode)
+    #self.inputVolumeSelector.connect("nodeAdded(vtkMRMLNode*)", self.onAddedNode)
+    #self.inputVolumeSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
     #inputVolumeLayout.addWidget(self.inputVolumeSelector)
     self.layout.addWidget(self.inputVolumeBox)
     self.layout.addWidget(self.mainGUIGroupBox)
+    self.importedNodeIDs= []
+
+    self.nodeAddedEventObserverID = slicer.mrmlScene.AddObserver(slicer.mrmlScene.NodeAddedEvent, self.onVolumeAddedNode)
     #
     # Create Model Button
     #
@@ -644,6 +672,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.onSetSliceViewer()
 
   def cleanup(self):
+    self.importedNodeIDs = []
     pass
 
   @abstractmethod
@@ -652,14 +681,16 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       self.logic.clear()
       self.initialFieldsValue()
       self.volumeSelected = False
-      self.inputVolumeNameLabel.text = ""
+      self.venousVolumeNameLabel.text = ""
+      self.ventricleVolumeNameLabel.text = ""
     elif args[0] == VentriculostomyUserEvents.LoadCaseCompletedEvent:
       self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_ventricleVolume",
                                              self.logic.ventricleVolume.GetID())
       self.caseNum = self.caseNum + 1
       self.volumeSelected = True
       self.onSaveDicomFiles()
-      self.inputVolumeNameLabel.text = self.logic.baseVolumeNode.GetName()
+      self.venousVolumeNameLabel.text = self.logic.baseVolumeNode.GetName()
+      self.ventricleVolumeNameLabel.text = self.logic.ventricleVolume.GetName()
       self.onSelect(self.logic.baseVolumeNode)
     elif args[0] == VentriculostomyUserEvents.StartCaseImportEvent:
       self.volumeSelected = True
@@ -694,38 +725,56 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.dicomWidget.detailsPopup.open()  
     pass
 
-  @onReturnProcessEvents
-  def onAddedNode(self, addedNode):
-    if addedNode.IsA("vtkMRMLVolumeNode"):
-      volumeName = addedNode.GetName()
+  @vtk.calldata_type(vtk.VTK_OBJECT)
+  def onVolumeAddedNode(self, caller, eventId, callData):
+    if callData.IsA("vtkMRMLVolumeNode"):
+      volumeName = callData.GetName()
+      #self.importedNodeIDs.append(callData.GetID())
+      self.onSaveDicomFiles()
       if ("Venous" in volumeName) or ("venous" in volumeName) :
-        self.logic.baseVolumeNode = addedNode
+        self.logic.baseVolumeNode = callData
+        self.SerialAssignBox.volumesCheckedDict["Venous"] = callData
+        self.SerialAssignBox.AppendVolumeNode(callData)
+        
       elif ("Ventricle" in volumeName) or ("ventricle" in volumeName) :
-        self.logic.ventricleVolume = addedNode
+        self.logic.ventricleVolume = callData
+        self.SerialAssignBox.volumesCheckedDict["Ventricle"] = callData
+        self.SerialAssignBox.AppendVolumeNode(callData)
+      else:
+        self.SerialAssignBox.AppendVolumeNode(callData)
+        userAction = self.SerialAssignBox.exec_()
+        if userAction == 0:
+          if(self.SerialAssignBox.volumesCheckedDict.get("Venous")):
+            self.logic.baseVolumeNode = self.SerialAssignBox.volumesCheckedDict["Venous"]
+          if (self.SerialAssignBox.volumesCheckedDict.get("Ventricle")):
+            self.logic.ventricleVolume = self.SerialAssignBox.volumesCheckedDict["Ventricle"]
       if self.logic.baseVolumeNode and self.logic.ventricleVolume and (not self.volumeSelected):
         self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_ventricleVolume", self.logic.ventricleVolume.GetID())
-        self.caseNum = self.caseNum + 1
         self.volumeSelected = True
-        self.onSaveDicomFiles()
-        self.inputVolumeNameLabel.text = self.logic.baseVolumeNode.GetName()
+        self.venousVolumeNameLabel.text = self.logic.baseVolumeNode.GetName()
+        self.ventricleVolumeNameLabel.text = self.logic.ventricleVolume.GetName()
         outputDir = os.path.join(self.slicerCaseWidget.currentCaseDirectory, "Results")
         self.jsonFile = os.path.join(outputDir, "PlanningTimeStamp.json")
         self.logic.appendPlanningTimeStampToJson(self.jsonFile, "EndDicomFileImport", datetime.datetime.now().time().isoformat())
         self.onSelect(self.logic.baseVolumeNode)
         self.logic.appendPlanningTimeStampToJson(self.jsonFile, "EndPreprocessing",
                                                  datetime.datetime.now().time().isoformat())
+
+
         #the setForegroundVolume will not work, because the slicerapp triggers the SetBackgroundVolume after the volume is loaded
-  
+  def onShowVolumeTable(self):
+    self.SerialAssignBox.exec_()
+
   def onSaveDicomFiles(self):
     # use decoration to improve the method
     checkedFiles = self.dicomWidget.detailsPopup.fileLists
     for dicomseries in checkedFiles:
-      for dicom in dicomseries: 
+      for dicom in dicomseries:
         copyfile(dicom,os.path.join(self.slicerCaseWidget.planningDICOMDataDirectory,basename(dicom)))
-
+  
+  @beforeRunProcessEvents
   def onSelect(self, selectedNode=None):
     if selectedNode:
-      slicer.app.processEvents()
       self.red_cn.SetDoPropagateVolumeSelection(False)  # make sure the compositenode doesn't get updated,
       self.green_cn.SetDoPropagateVolumeSelection(False)  # so that the background and foreground volumes are not messed up
       self.yellow_cn.SetDoPropagateVolumeSelection(False)
@@ -733,89 +782,100 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       self.logic.clear()
       self.logic = VentriculostomyPlanningLogic()
       self.logic.register(self)
-      self.slicerCaseWidget.patientWatchBox.sourceFile = os.path.join(self.slicerCaseWidget.planningDICOMDataDirectory,listdir(self.slicerCaseWidget.planningDICOMDataDirectory)[0])
+      if self.slicerCaseWidget.planningDICOMDataDirectory and listdir(self.slicerCaseWidget.planningDICOMDataDirectory):
+        self.slicerCaseWidget.patientWatchBox.sourceFile = os.path.join(self.slicerCaseWidget.planningDICOMDataDirectory,listdir(self.slicerCaseWidget.planningDICOMDataDirectory)[0])
       self.logic.baseVolumeNode = selectedNode
+      if self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_ventricleVolume"):
+        self.logic.ventricleVolume = slicer.mrmlScene.GetNodeByID(self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_ventricleVolume"))
+      """
       ventricleVolumeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_ventricleVolume")
       if not ventricleVolumeID:
-        slicer.util.warningDisplay("This case doesn't have the venous image, please load the data into slicer", windowTitle="")
+        if len(self.importedNodeIDs) ==2:
+          slicer.util.warningDisplay("No ventricle volume defined, the other volume is selected as Ventricle volume.")
+          if self.logic.baseVolumeNode.GetID() == self.importedNodeIDs[0]:
+            self.logic.ventricleVolume = slicer.mrmlScene.GetNodeByID(self.importedNodeIDs[1])
+          else:
+            self.logic.ventricleVolume = slicer.mrmlScene.GetNodeByID(self.importedNodeIDs[0])  
+        else:    
+          slicer.util.warningDisplay("This case has a volume number other than two, please load the data correctly into slicer or define the images manually", windowTitle="")
       else:
         self.logic.ventricleVolume = slicer.mrmlScene.GetNodeByID(ventricleVolumeID)
-      caseName = ""
-      #if self.caseNum>1:
-      #  caseName = self.logic.baseVolumeNode.GetName()
-      self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_model",caseName)
-      self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_nasion",caseName)
-      self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_sagittalPoint", caseName)
-      self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_target",caseName)
-      self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_distal", caseName)
-      self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_cylinderRadius",caseName)
-      self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_cannula", caseName)
-      self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_skullNorm", caseName)
-      self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_cannulaModel",caseName)
-      self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_sagittalReferenceModel",caseName)
-      self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_coronalReferenceModel",caseName)
-      self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_sagittalPlanningModel",caseName)
-      self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_coronalPlanningModel",caseName)
-      self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_grayScaleModel",caseName)
-      self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_grayScaleModelWithMargin", caseName)
-      self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_vesselnessVolume",caseName) # currently not used
-      self.logic.enableEventObserver()
-      #Set the cropped image for processing
-      if selectedNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_croppedVolume"):
-        self.logic.currentVolumeNode = slicer.mrmlScene.GetNodeByID(selectedNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_croppedVolume"))
-      else:
-        self.logic.currentVolumeNode = selectedNode  
-      self.logic.updateMeasureLength(float(self.lengthSagittalReferenceLineEdit.text), float(self.lengthCoronalReferenceLineEdit.text))
-      self.logic.updatePathPlanningRadius(float(self.radiusPathPlanningEdit.text))
-      self.lengthSagittalReferenceLineEdit.text = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagittalLength")
-      self.lengthCoronalReferenceLineEdit.text = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_coronalLength")
-      self.radiusPathPlanningEdit.text = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_planningRadius")
-
-      ReferenceModelID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagittalReferenceModel")
-      self.logic.sagittalReferenceCurveManager._curveModel = slicer.mrmlScene.GetNodeByID(ReferenceModelID)
-      ReferenceModelID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_coronalReferenceModel")
-      self.logic.coronalReferenceCurveManager._curveModel = slicer.mrmlScene.GetNodeByID(ReferenceModelID)
-      ReferenceModelID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagittalPlanningModel")
-      self.logic.sagittalPlanningCurveManager._curveModel = slicer.mrmlScene.GetNodeByID(ReferenceModelID)
-      ReferenceModelID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_coronalPlanningModel")
-      self.logic.coronalPlanningCurveManager._curveModel = slicer.mrmlScene.GetNodeByID(ReferenceModelID)
-      #self.logic.sagittalReferenceCurveManager.startEditLine()
-      #self.logic.coronalReferenceCurveManager.startEditLine()
-      #self.logic.sagittalPlanningCurveManager.startEditLine()
-      #self.logic.coronalPlanningCurveManager.startEditLine()
-      #self.logic.cylinderManager.startEditLine()
-      self.logic.createTrueSagittalPlane()
-      self.logic.createEntryPoint()
-      cannulaModelID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_cannulaModel")
-      cannulaFiducialsID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_cannula")
-      self.logic.pathNavigationModel.SetDisplayVisibility(0)
-      self.logic.cannulaManager._curveModel = slicer.mrmlScene.GetNodeByID(cannulaModelID)
-      self.logic.cannulaManager.curveFiducials = slicer.mrmlScene.GetNodeByID(cannulaFiducialsID)
-      self.logic.cannulaManager.curveFiducials.AddObserver(slicer.vtkMRMLMarkupsNode().PointStartInteractionEvent, self.logic.updateSelectedMarker)
-      self.logic.cannulaManager.curveFiducials.AddObserver(slicer.vtkMRMLMarkupsNode().PointModifiedEvent, self.logic.updateCannulaPosition)
-      self.logic.cannulaManager.curveFiducials.AddObserver(slicer.vtkMRMLMarkupsNode().PointEndInteractionEvent, self.logic.endCannulaInteraction)
-      #self.logic.cannulaManager.curveFiducials.AddObserver(VentriculostomyUserEvents.UpdateCannulaTargetPoint, self.logic.updateCannulaTargetPoint)
-      self.logic.cannulaManager.setModifiedEventHandler(self.onCannulaModified)
-      self.logic.cannulaManager.startEditLine()
-      self.logic.createVentricleCylinder()
-      self.onCreatePlanningLine()
-      self.isReverseView = False
-      self.progressBar.show()
-      self.progressBar.labelText = 'Calculating Skull Surface'
-      slicer.app.processEvents()
-      self.onCreateModel()
-      self.progressBar.value = 25
-      self.progressBar.labelText = 'Calculating Vessel'
-      slicer.app.processEvents()
-      self.onVenousGrayScaleCalc()
-      self.progressBar.value = 100
-      self.progressBar.close()
-      self.logic.calculateCannulaTransform()
-      self.onSetSliceViewer()
-      layoutManager = slicer.app.layoutManager()
-      threeDView = layoutManager.threeDWidget(0).threeDView()
-      threeDView.resetFocalPoint()
-      threeDView.lookFromViewAxis(ctkAxesWidget.Anterior)
+      """
+      if self.logic.ventricleVolume and self.logic.baseVolumeNode:
+        caseName = ""
+        self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_model",caseName)
+        self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_nasion",caseName)
+        self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_sagittalPoint", caseName)
+        self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_target",caseName)
+        self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_distal", caseName)
+        self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_cylinderRadius",caseName)
+        self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_cannula", caseName)
+        self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_skullNorm", caseName)
+        self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_cannulaModel",caseName)
+        self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_sagittalReferenceModel",caseName)
+        self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_coronalReferenceModel",caseName)
+        self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_sagittalPlanningModel",caseName)
+        self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_coronalPlanningModel",caseName)
+        self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_grayScaleModel",caseName)
+        self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_grayScaleModelWithMargin", caseName)
+        self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_vesselnessVolume",caseName) # currently not used
+        self.logic.enableEventObserver()
+        #Set the cropped image for processing
+        if selectedNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_croppedVolume"):
+          self.logic.currentVolumeNode = slicer.mrmlScene.GetNodeByID(selectedNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_croppedVolume"))
+        else:
+          self.logic.currentVolumeNode = selectedNode  
+        self.logic.updateMeasureLength(float(self.lengthSagittalReferenceLineEdit.text), float(self.lengthCoronalReferenceLineEdit.text))
+        self.logic.updatePathPlanningRadius(float(self.radiusPathPlanningEdit.text))
+        self.lengthSagittalReferenceLineEdit.text = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagittalLength")
+        self.lengthCoronalReferenceLineEdit.text = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_coronalLength")
+        self.radiusPathPlanningEdit.text = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_planningRadius")
+  
+        ReferenceModelID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagittalReferenceModel")
+        self.logic.sagittalReferenceCurveManager._curveModel = slicer.mrmlScene.GetNodeByID(ReferenceModelID)
+        ReferenceModelID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_coronalReferenceModel")
+        self.logic.coronalReferenceCurveManager._curveModel = slicer.mrmlScene.GetNodeByID(ReferenceModelID)
+        ReferenceModelID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagittalPlanningModel")
+        self.logic.sagittalPlanningCurveManager._curveModel = slicer.mrmlScene.GetNodeByID(ReferenceModelID)
+        ReferenceModelID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_coronalPlanningModel")
+        self.logic.coronalPlanningCurveManager._curveModel = slicer.mrmlScene.GetNodeByID(ReferenceModelID)
+        #self.logic.sagittalReferenceCurveManager.startEditLine()
+        #self.logic.coronalReferenceCurveManager.startEditLine()
+        #self.logic.sagittalPlanningCurveManager.startEditLine()
+        #self.logic.coronalPlanningCurveManager.startEditLine()
+        #self.logic.cylinderManager.startEditLine()
+        self.logic.createTrueSagittalPlane()
+        self.logic.createEntryPoint()
+        cannulaModelID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_cannulaModel")
+        cannulaFiducialsID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_cannula")
+        self.logic.pathNavigationModel.SetDisplayVisibility(0)
+        self.logic.cannulaManager._curveModel = slicer.mrmlScene.GetNodeByID(cannulaModelID)
+        self.logic.cannulaManager.curveFiducials = slicer.mrmlScene.GetNodeByID(cannulaFiducialsID)
+        self.logic.cannulaManager.curveFiducials.AddObserver(slicer.vtkMRMLMarkupsNode().PointStartInteractionEvent, self.logic.updateSelectedMarker)
+        self.logic.cannulaManager.curveFiducials.AddObserver(slicer.vtkMRMLMarkupsNode().PointModifiedEvent, self.logic.updateCannulaPosition)
+        self.logic.cannulaManager.curveFiducials.AddObserver(slicer.vtkMRMLMarkupsNode().PointEndInteractionEvent, self.logic.endCannulaInteraction)
+        #self.logic.cannulaManager.curveFiducials.AddObserver(VentriculostomyUserEvents.UpdateCannulaTargetPoint, self.logic.updateCannulaTargetPoint)
+        self.logic.cannulaManager.setModifiedEventHandler(self.onCannulaModified)
+        self.logic.cannulaManager.startEditLine()
+        self.logic.createVentricleCylinder()
+        self.onCreatePlanningLine()
+        self.isReverseView = False
+        self.progressBar.show()
+        self.progressBar.labelText = 'Calculating Skull Surface'
+        slicer.app.processEvents()
+        self.onCreateModel()
+        self.progressBar.value = 25
+        self.progressBar.labelText = 'Calculating Vessel'
+        slicer.app.processEvents()
+        self.onVenousGrayScaleCalc()
+        self.progressBar.value = 100
+        self.progressBar.close()
+        self.logic.calculateCannulaTransform()
+        self.onSetSliceViewer()
+        layoutManager = slicer.app.layoutManager()
+        threeDView = layoutManager.threeDWidget(0).threeDView()
+        threeDView.resetFocalPoint()
+        threeDView.lookFromViewAxis(ctkAxesWidget.Anterior)
     pass
 
   def onCreatePlanningLine(self):
@@ -914,8 +974,11 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       if outputModelNodeID:
         outputModelNode = slicer.mrmlScene.GetNodeByID(outputModelNodeID)
         #outputModelNode.SetAttribute("vtkMRMLModelNode.modelCreated","False")
+        slicer.mrmlScene.RemoveObserver(self.nodeAddedEventObserverID)
         self.logic.createModel(outputModelNode, self.logic.threshold)
-  
+        self.nodeAddedEventObserverID = slicer.mrmlScene.AddObserver(slicer.mrmlScene.NodeAddedEvent,
+                                                                     self.onVolumeAddedNode)
+
   def onSelectNasionPoint(self):
     if self.selectNasionButton.isChecked():
       if not self.logic.baseVolumeNode:
@@ -1044,7 +1107,10 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
         grayScaleModelNode = slicer.mrmlScene.GetNodeByID(grayScaleModelNodeID)
         self.vesselnessCalcButton.setEnabled(0)
         self.grayScaleMakerButton.setEnabled(0)
+        slicer.mrmlScene.RemoveObserver(self.nodeAddedEventObserverID)
         self.logic.calculateVenousGrayScale(croppedVolumeNode, grayScaleModelNode)
+        self.nodeAddedEventObserverID = slicer.mrmlScene.AddObserver(slicer.mrmlScene.NodeAddedEvent,
+                                                                     self.onVolumeAddedNode)
         self.onCalculateVenousCompletion(self.logic.cliNode)
         #self.logic.cliNode.AddObserver('ModifiedEvent', self.onCalculateVenousCompletion)
         #self.logic.cliNode.InvokeEvent(self.logic.cliNode.ModifiedEvent)
@@ -1066,7 +1132,10 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
         vesselnessVolumeNode = slicer.mrmlScene.GetNodeByID(vesselnessVolumeNodeID)
         self.vesselnessCalcButton.setEnabled(0)
         self.grayScaleMakerButton.setEnabled(0)
+        slicer.mrmlScene.RemoveObserver(self.nodeAddedEventObserverID)
         self.logic.calculateVenousVesselness(croppedVolumeNode, vesselnessVolumeNode)
+        self.nodeAddedEventObserverID = slicer.mrmlScene.AddObserver(slicer.mrmlScene.NodeAddedEvent,
+                                                                     self.onVolumeAddedNode)
         self.onCalculateVenousCompletion(self.logic.cliNode)
         #self.logic.cliNode.AddObserver('ModifiedEvent', self.onCalculateVenousCompletion)
         #self.logic.cliNode.InvokeEvent(self.logic.cliNode.ModifiedEvent)
@@ -1082,7 +1151,10 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       slicer.app.processEvents()
       self.vesselnessCalcButton.setEnabled(1)
       self.grayScaleMakerButton.setEnabled(1)
+      slicer.mrmlScene.RemoveObserver(self.nodeAddedEventObserverID)
       self.logic.calculateGrayScaleWithMargin()
+      self.nodeAddedEventObserverID = slicer.mrmlScene.AddObserver(slicer.mrmlScene.NodeAddedEvent,
+                                                                   self.onVolumeAddedNode)
       self.onSetSliceViewer()## the slice widgets are set to none after the  cli module calculation. reason unclear...
     pass
 
@@ -1125,7 +1197,11 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.logic.startEditPlanningDistal()
 
   def onGeneratePath(self):
+    slicer.mrmlScene.RemoveObserver(self.nodeAddedEventObserverID)
     self.logic.generatePath()
+    self.nodeAddedEventObserverID = slicer.mrmlScene.AddObserver(slicer.mrmlScene.NodeAddedEvent,
+                                                                 self.onVolumeAddedNode)
+
     
   def onClearTrajectory(self):
     self.logic.clearTrajectory()
@@ -1499,7 +1575,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     self.cylinderInteractor = None
     self.trajectoryProjectedMarker = None
     self.enableAuxilaryNodes()
-
+  
     self.currentVolumeNode = None
     self.baseVolumeNode = None
     self.ventricleVolume = None
