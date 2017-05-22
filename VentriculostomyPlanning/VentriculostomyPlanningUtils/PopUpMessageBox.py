@@ -7,6 +7,7 @@ class SerialAssignMessageBox(qt.QMessageBox):
     #self.setGeometry (qt.QRect(0, 0, 560, 210))
     self.setWindowTitle ('SerialAssignTable')
     self.volumesCheckedDict = dict()
+    self.volumesCheckedDictPre = dict()  # Store the previous selected item. if the user click the cancel button. all value should be reset.
     #self.mainGUIBox = qt.QGroupBox(self)
     #self.mainGUIBox.setStyleSheet('QGroupBox{border:0;}')
     #self.mainGUIBox.setGeometry(qt.QRect(0, 0, 400, 200))
@@ -61,8 +62,8 @@ class SerialAssignMessageBox(qt.QMessageBox):
     #self.tableWidget.horizontalHeader().setStretchLastSection(True)
   def AppendVolumeNode(self, addedVolumeNode):
     self.volumes.append(addedVolumeNode)
-    self.setAddedVolumeNodes(self.volumes)
-  def setAddedVolumeNodes(self, addedVolumeNodes):
+    self.SetAssignTableWithVolumes(self.volumes)
+  def SetAssignTableWithVolumes(self, addedVolumeNodes):
     self.volumes = addedVolumeNodes
     if self.volumes:
       self.tableWidget.setColumnCount(2)
@@ -93,14 +94,15 @@ class SerialAssignMessageBox(qt.QMessageBox):
           if self.volumesCheckedDict.get("Venous") and volume.GetID() == self.volumesCheckedDict.get("Venous").GetID():
             tableItemVenous.setCheckState(True)
           if self.volumesCheckedDict.get("Ventricle") and volume.GetID() == self.volumesCheckedDict.get("Ventricle").GetID():
-            tableItemVentricle.setCheckState(True)  
+            tableItemVentricle.setCheckState(True)
           tableItemVenous.stateChanged.connect(lambda checked, i=counter: self.VenousStateChanged(checked, self.serialCheckboxVenous[i]))
           tableItemVentricle.stateChanged.connect(lambda checked, i=counter: self.VentricleStateChanged(checked, self.serialCheckboxVentricle[i]))
           self.tableWidget.setCellWidget(counter, 1, itemWidgetVentricle)
     self.tableWidget.setVerticalHeaderLabels(self.volumeNames)
-    self.ConfirmButtonCheck()
-  def ConfirmButtonCheck(self):
+    self.ConfirmButtonValid()
+  def ConfirmButtonValid(self):
     checkedNum = 0
+    self.volumesCheckedDict.clear()
     for count, box in enumerate(self.serialCheckboxVenous):
       if box.checkState():
         checkedNum = checkedNum + 1
@@ -115,11 +117,40 @@ class SerialAssignMessageBox(qt.QMessageBox):
       self.confirmButton.setEnabled(True)
     else:
       self.confirmButton.setEnabled(False)
-  def CheckBoxStatusChanged(self, checked, checkBox, workingSerialCheckbox, otherSerialCheckbox):
+  def ShowVolumeTable(self):
+    self.volumesCheckedDictPre = self.volumesCheckedDict.copy()
+    return self.exec_()
+  def CancelUserChanges(self):
+    self.volumesCheckedDict = self.volumesCheckedDictPre.copy()
+    self.SetCheckBoxAccordingToAssignment()
+  def ConfirmUserChanges(self):
+    self.volumesCheckedDictPre = self.volumesCheckedDict.copy()
+    #self.SetCheckBoxAccordingToAssignment()
+  def BlockCheckboxSignal(self):
     for box in self.serialCheckboxVenous:
       box.blockSignals(True)
     for box in self.serialCheckboxVentricle:
       box.blockSignals(True)
+  def UnblockCheckboxSignal(self):
+    for box in self.serialCheckboxVenous:
+      box.blockSignals(False)
+    for box in self.serialCheckboxVentricle:
+      box.blockSignals(False)
+  def SetCheckBoxAccordingToAssignment(self):
+    self.BlockCheckboxSignal()
+    ventricleVolume = self.volumesCheckedDict.get("Ventricle")
+    venousVolume = self.volumesCheckedDict.get("Venous")
+    for count, checkbox in enumerate(self.serialCheckboxVentricle):
+      checkbox.setCheckState(False)
+      if ventricleVolume and self.volumes[count].GetID() == ventricleVolume.GetID():
+        checkbox.setCheckState(True)
+    for count, checkbox in enumerate(self.serialCheckboxVenous):
+      checkbox.setCheckState(False)
+      if venousVolume and self.volumes[count].GetID() == venousVolume.GetID():
+        checkbox.setCheckState(True)
+    self.UnblockCheckboxSignal()
+  def CheckBoxStatusChanged(self, checked, checkBox, workingSerialCheckbox, otherSerialCheckbox):
+    self.BlockCheckboxSignal()
     if checkBox in workingSerialCheckbox:
       for count, box in enumerate(workingSerialCheckbox):
         if not box == checkBox:
@@ -127,11 +158,8 @@ class SerialAssignMessageBox(qt.QMessageBox):
         else:
           box.setCheckState(checked)
           otherSerialCheckbox[count].setCheckState(False)
-    self.ConfirmButtonCheck()
-    for box in self.serialCheckboxVenous:
-      box.blockSignals(False)
-    for box in self.serialCheckboxVentricle:
-      box.blockSignals(False)
+    self.ConfirmButtonValid()
+    self.UnblockCheckboxSignal()
   def VenousStateChanged(self, checked, checkBox):
     self.CheckBoxStatusChanged(checked, checkBox, self.serialCheckboxVenous, self.serialCheckboxVentricle)
   def VentricleStateChanged(self,checked, checkBox):
@@ -139,5 +167,5 @@ class SerialAssignMessageBox(qt.QMessageBox):
 
 #volumes = [slicer.mrmlScene.GetNodeByID("vtkMRMLScalarVolumeNode1"), slicer.mrmlScene.GetNodeByID("vtkMRMLScalarVolumeNode2")]
 #a = SerialAssignMessageBox()
-#a.setAddedVolumeNodes(volumes)
+#a.SetAssignTableWithVolumes(volumes)
 #a.exec_()

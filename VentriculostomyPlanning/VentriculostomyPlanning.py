@@ -214,7 +214,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.ventricleVolumeNameLabel.styleSheet = "QLineEdit { background:transparent; }"
     inputVolumeLayout.addWidget(ventricleVolumeLabel)
     inputVolumeLayout.addWidget(self.ventricleVolumeNameLabel)
-    self.showVolumeTable = qt.QPushButton("Show Volumes Table")
+    self.showVolumeTable = qt.QPushButton("Show Assignment Table")
     self.showVolumeTable.toolTip = "Show the table of volumes for assignment."
     self.showVolumeTable.enabled = True
     self.showVolumeTable.connect('clicked(bool)', self.onShowVolumeTable)
@@ -669,6 +669,11 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
 
     # Refresh Apply button state
     #self.onSelect(self.inputVolumeSelector.currentNode())
+    self.initialNodesIDList = []
+    allNodes = slicer.mrmlScene.GetNodes()
+    for nodeIndex in range(allNodes.GetNumberOfItems()):
+      node = allNodes.GetItemAsObject(nodeIndex)
+      self.initialNodesIDList.append(node.GetID())
     self.onSetSliceViewer()
 
   def cleanup(self):
@@ -731,17 +736,15 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       volumeName = callData.GetName()
       #self.importedNodeIDs.append(callData.GetID())
       self.onSaveDicomFiles()
+      self.SerialAssignBox.AppendVolumeNode(callData)
+      self.initialNodesIDList.append(callData.GetID())
       if ("Venous" in volumeName) or ("venous" in volumeName) :
         self.logic.baseVolumeNode = callData
         self.SerialAssignBox.volumesCheckedDict["Venous"] = callData
-        self.SerialAssignBox.AppendVolumeNode(callData)
-        
       elif ("Ventricle" in volumeName) or ("ventricle" in volumeName) :
         self.logic.ventricleVolume = callData
         self.SerialAssignBox.volumesCheckedDict["Ventricle"] = callData
-        self.SerialAssignBox.AppendVolumeNode(callData)
       else:
-        self.SerialAssignBox.AppendVolumeNode(callData)
         userAction = self.SerialAssignBox.exec_()
         if userAction == 0:
           if(self.SerialAssignBox.volumesCheckedDict.get("Venous")):
@@ -753,17 +756,41 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
         self.volumeSelected = True
         self.venousVolumeNameLabel.text = self.logic.baseVolumeNode.GetName()
         self.ventricleVolumeNameLabel.text = self.logic.ventricleVolume.GetName()
-        outputDir = os.path.join(self.slicerCaseWidget.currentCaseDirectory, "Results")
-        self.jsonFile = os.path.join(outputDir, "PlanningTimeStamp.json")
-        self.logic.appendPlanningTimeStampToJson(self.jsonFile, "EndDicomFileImport", datetime.datetime.now().time().isoformat())
         self.onSelect(self.logic.baseVolumeNode)
-        self.logic.appendPlanningTimeStampToJson(self.jsonFile, "EndPreprocessing",
-                                                 datetime.datetime.now().time().isoformat())
+
 
 
         #the setForegroundVolume will not work, because the slicerapp triggers the SetBackgroundVolume after the volume is loaded
   def onShowVolumeTable(self):
-    self.SerialAssignBox.exec_()
+    userAction = self.SerialAssignBox.ShowVolumeTable()
+    if userAction == 0:
+      if (not self.logic.baseVolumeNode == self.SerialAssignBox.volumesCheckedDict["Venous"]) or (not self.logic.ventricleVolume == self.SerialAssignBox.volumesCheckedDict.get("Ventricle")):
+        if slicer.util.confirmYesNoDisplay("Are you sure you want change the base image?",
+                                                 windowTitle=""):
+          self.SerialAssignBox.ConfirmUserChanges()
+          if (self.SerialAssignBox.volumesCheckedDict.get("Venous")):
+            self.logic.baseVolumeNode = self.SerialAssignBox.volumesCheckedDict["Venous"]
+          if (self.SerialAssignBox.volumesCheckedDict.get("Ventricle")):
+            self.logic.ventricleVolume = self.SerialAssignBox.volumesCheckedDict["Ventricle"]
+          self.venousVolumeNameLabel.text = self.logic.baseVolumeNode.GetName()
+          self.ventricleVolumeNameLabel.text = self.logic.ventricleVolume.GetName()
+          self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_ventricleVolume",
+                                                 self.logic.ventricleVolume.GetID())
+          allNodes = slicer.mrmlScene.GetNodes()
+          for nodeIndex in range(allNodes.GetNumberOfItems()):
+            node = allNodes.GetItemAsObject(nodeIndex)
+            if node and (not (node.GetID() in self.initialNodesIDList)):
+              slicer.mrmlScene.RemoveNode(node)
+          self.onSelect(self.logic.baseVolumeNode)
+          self.venousVolumeNameLabel.text = self.logic.baseVolumeNode.GetName()
+          self.ventricleVolumeNameLabel.text = self.logic.ventricleVolume.GetName()
+
+        else:
+          self.SerialAssignBox.CancelUserChanges()
+      else:
+        self.SerialAssignBox.CancelUserChanges()
+    else:
+      self.SerialAssignBox.CancelUserChanges()
 
   def onSaveDicomFiles(self):
     # use decoration to improve the method
@@ -802,6 +829,10 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
         self.logic.ventricleVolume = slicer.mrmlScene.GetNodeByID(ventricleVolumeID)
       """
       if self.logic.ventricleVolume and self.logic.baseVolumeNode:
+        outputDir = os.path.join(self.slicerCaseWidget.currentCaseDirectory, "Results")
+        self.jsonFile = os.path.join(outputDir, "PlanningTimeStamp.json")
+        self.logic.appendPlanningTimeStampToJson(self.jsonFile, "StartPreProcessing",
+                                                 datetime.datetime.now().time().isoformat())
         caseName = ""
         self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_model",caseName)
         self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_nasion",caseName)
@@ -876,6 +907,8 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
         threeDView = layoutManager.threeDWidget(0).threeDView()
         threeDView.resetFocalPoint()
         threeDView.lookFromViewAxis(ctkAxesWidget.Anterior)
+        self.logic.appendPlanningTimeStampToJson(self.jsonFile, "EndPreprocessing",
+                                                 datetime.datetime.now().time().isoformat())
     pass
 
   def onCreatePlanningLine(self):
@@ -975,8 +1008,13 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
         outputModelNode = slicer.mrmlScene.GetNodeByID(outputModelNodeID)
         #outputModelNode.SetAttribute("vtkMRMLModelNode.modelCreated","False")
         slicer.mrmlScene.RemoveObserver(self.nodeAddedEventObserverID)
-        self.logic.createModel(outputModelNode, self.logic.threshold)
-        self.nodeAddedEventObserverID = slicer.mrmlScene.AddObserver(slicer.mrmlScene.NodeAddedEvent,
+        try:
+          self.logic.createModel(outputModelNode, self.logic.threshold)
+        except ValueError:
+          slicer.util.warningDisplay(
+            "Skull surface calculation error, volumes might not be suitable for calculation")
+        finally:
+          self.nodeAddedEventObserverID = slicer.mrmlScene.AddObserver(slicer.mrmlScene.NodeAddedEvent,
                                                                      self.onVolumeAddedNode)
 
   def onSelectNasionPoint(self):
@@ -1108,10 +1146,15 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
         self.vesselnessCalcButton.setEnabled(0)
         self.grayScaleMakerButton.setEnabled(0)
         slicer.mrmlScene.RemoveObserver(self.nodeAddedEventObserverID)
-        self.logic.calculateVenousGrayScale(croppedVolumeNode, grayScaleModelNode)
-        self.nodeAddedEventObserverID = slicer.mrmlScene.AddObserver(slicer.mrmlScene.NodeAddedEvent,
-                                                                     self.onVolumeAddedNode)
-        self.onCalculateVenousCompletion(self.logic.cliNode)
+        try:
+          self.logic.calculateVenousGrayScale(croppedVolumeNode, grayScaleModelNode)
+        except ValueError:
+          slicer.util.warningDisplay(
+            "Venouse Calculation error, volumes might not be suitable for calculation")
+        finally:
+          self.nodeAddedEventObserverID = slicer.mrmlScene.AddObserver(slicer.mrmlScene.NodeAddedEvent,
+                                                                       self.onVolumeAddedNode)
+          self.onCalculateVenousCompletion(self.logic.cliNode)
         #self.logic.cliNode.AddObserver('ModifiedEvent', self.onCalculateVenousCompletion)
         #self.logic.cliNode.InvokeEvent(self.logic.cliNode.ModifiedEvent)
     pass
@@ -1133,10 +1176,15 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
         self.vesselnessCalcButton.setEnabled(0)
         self.grayScaleMakerButton.setEnabled(0)
         slicer.mrmlScene.RemoveObserver(self.nodeAddedEventObserverID)
-        self.logic.calculateVenousVesselness(croppedVolumeNode, vesselnessVolumeNode)
-        self.nodeAddedEventObserverID = slicer.mrmlScene.AddObserver(slicer.mrmlScene.NodeAddedEvent,
+        try:
+          self.logic.calculateVenousVesselness(croppedVolumeNode, vesselnessVolumeNode)
+        except ValueError:
+          slicer.util.warningDisplay(
+            "Vessel Margin Calculation error, volumes might not be suitable for calculation")
+        finally:
+          self.nodeAddedEventObserverID = slicer.mrmlScene.AddObserver(slicer.mrmlScene.NodeAddedEvent,
                                                                      self.onVolumeAddedNode)
-        self.onCalculateVenousCompletion(self.logic.cliNode)
+          self.onCalculateVenousCompletion(self.logic.cliNode)
         #self.logic.cliNode.AddObserver('ModifiedEvent', self.onCalculateVenousCompletion)
         #self.logic.cliNode.InvokeEvent(self.logic.cliNode.ModifiedEvent)
     pass
@@ -1152,10 +1200,15 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       self.vesselnessCalcButton.setEnabled(1)
       self.grayScaleMakerButton.setEnabled(1)
       slicer.mrmlScene.RemoveObserver(self.nodeAddedEventObserverID)
-      self.logic.calculateGrayScaleWithMargin()
-      self.nodeAddedEventObserverID = slicer.mrmlScene.AddObserver(slicer.mrmlScene.NodeAddedEvent,
+      try:
+        self.logic.calculateGrayScaleWithMargin()
+      except ValueError:
+        slicer.util.warningDisplay(
+          "Vessel Margin Calculation error, volumes might not be suitable for calculation")
+      finally:
+        self.nodeAddedEventObserverID = slicer.mrmlScene.AddObserver(slicer.mrmlScene.NodeAddedEvent,
                                                                    self.onVolumeAddedNode)
-      self.onSetSliceViewer()## the slice widgets are set to none after the  cli module calculation. reason unclear...
+        self.onSetSliceViewer()## the slice widgets are set to none after the  cli module calculation. reason unclear...
     pass
 
   def onResetButtons(self, caller = None, event = None):
@@ -1198,8 +1251,13 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
 
   def onGeneratePath(self):
     slicer.mrmlScene.RemoveObserver(self.nodeAddedEventObserverID)
-    self.logic.generatePath()
-    self.nodeAddedEventObserverID = slicer.mrmlScene.AddObserver(slicer.mrmlScene.NodeAddedEvent,
+    try:
+      self.logic.generatePath()
+    except ValueError:
+      slicer.util.warningDisplay(
+        "Vessel Margin Calculation error, volumes might not be suitable for calculation")
+    finally:
+      self.nodeAddedEventObserverID = slicer.mrmlScene.AddObserver(slicer.mrmlScene.NodeAddedEvent,
                                                                  self.onVolumeAddedNode)
 
     
