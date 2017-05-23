@@ -31,10 +31,11 @@ class SerialAssignMessageBox(qt.QMessageBox):
     buttonLayout.addWidget(self.confirmButton)
     buttonLayout.addWidget(self.cancelButton)
     self.mainGUILayout.addWidget(self.buttonBox,1,0,1,1)
+    self.tableHeight = 0
+    self.tableWidth = 0
   #Create TableWidget
   def addTableWidget (self) :
     self.tableWidgetBox = qt.QGroupBox()
-    self.mainGUILayout.addWidget(self.tableWidgetBox,0,0,1,3)
     layout = qt.QHBoxLayout()
     self.tableWidgetBox.setLayout(layout)
     self.tableWidgetBox.setStyleSheet('QGroupBox{border:0;}')
@@ -50,7 +51,7 @@ class SerialAssignMessageBox(qt.QMessageBox):
     #self.tableWidget.setMinimumHeight(200)
     #self.tableWidget.setMinimumWidth(300)
     self.tableWidget.setObjectName ('tableWidget')
-    self.tableWidget.setColumnCount(2)
+    self.tableWidget.setColumnCount(3)
     self.tableWidget.setRowCount(2)
     #self.tableWidget.resizeRowsToContents()
     #self.tableWidget.resizeColumnsToContents()
@@ -65,6 +66,7 @@ class SerialAssignMessageBox(qt.QMessageBox):
     if self.volumes:
       self.tableWidget.setColumnCount(2)
       self.tableWidget.setRowCount(len(self.volumes))
+      self.tableHeight = 0
       for counter, volume in enumerate(self.volumes):
         if not volume.GetID() in self.importedVolumeIDs:
           self.importedVolumeIDs.append(volume.GetID())
@@ -95,8 +97,11 @@ class SerialAssignMessageBox(qt.QMessageBox):
           tableItemVenous.stateChanged.connect(lambda checked, i=counter: self.VenousStateChanged(checked, self.serialCheckboxVenous[i]))
           tableItemVentricle.stateChanged.connect(lambda checked, i=counter: self.VentricleStateChanged(checked, self.serialCheckboxVentricle[i]))
           self.tableWidget.setCellWidget(counter, 1, itemWidgetVentricle)
+        self.tableHeight = self.tableHeight + self.tableWidget.cellWidget(counter, 1).geometry.height()
     self.tableWidget.setVerticalHeaderLabels(self.volumeNames)
-    self.tableWidget.setFixedSize(self.tableWidget.horizontalHeader().length() + 100, self.tableWidget.verticalHeader().length() + 30)
+    self.tableWidget.verticalHeader().setStretchLastSection(True)
+    self.tableWidget.setFixedSize(self.tableWidget.verticalHeader().width + self.tableWidth, self.tableWidget.horizontalHeader().height + self.tableHeight)
+    self.mainGUILayout.addWidget(self.tableWidgetBox, 0, 0, 1, 3)
     self.ConfirmButtonValid()
   def ConfirmButtonValid(self):
     checkedNum = 0
@@ -117,13 +122,14 @@ class SerialAssignMessageBox(qt.QMessageBox):
       self.confirmButton.setEnabled(False)
   def ShowVolumeTable(self):
     self.volumesCheckedDictPre = self.volumesCheckedDict.copy()
+    self.tableWidth = self.tableWidget.cellWidget(0,0).geometry.width() + self.tableWidget.cellWidget(0,1).geometry.width()
+    self.tableWidget.setFixedSize(self.tableWidget.verticalHeader().width + self.tableWidth+ 100, self.tableWidget.horizontalHeader().height + self.tableHeight)
     return self.exec_()
   def CancelUserChanges(self):
     self.volumesCheckedDict = self.volumesCheckedDictPre.copy()
     self.SetCheckBoxAccordingToAssignment()
   def ConfirmUserChanges(self):
     self.volumesCheckedDictPre = self.volumesCheckedDict.copy()
-    #self.SetCheckBoxAccordingToAssignment()
   def BlockCheckboxSignal(self):
     for box in self.serialCheckboxVenous:
       box.blockSignals(True)
@@ -163,7 +169,7 @@ class SerialAssignMessageBox(qt.QMessageBox):
   def VentricleStateChanged(self,checked, checkBox):
     self.CheckBoxStatusChanged(checked, checkBox, self.serialCheckboxVentricle,self.serialCheckboxVenous)
 
-#volumes = [slicer.mrmlScene.GetNodeByID("vtkMRMLScalarVolumeNode1"), slicer.mrmlScene.GetNodeByID("vtkMRMLScalarVolumeNode2")]
+#volumes = [slicer.mrmlScene.GetNodeByID("vtkMRMLScalarVolumeNode1")]
 #a = SerialAssignMessageBox()
 #a.SetAssignTableWithVolumes(volumes)
 #a.exec_()

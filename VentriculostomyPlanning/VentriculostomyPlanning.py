@@ -712,6 +712,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       self.onSetSliceViewer()
 
   def initialFieldsValue(self):
+    self.SerialAssignBox = SerialAssignMessageBox()
     self.lengthSagittalPlanningLineEdit.text = '--'
     self.lengthCoronalPlanningLineEdit.text = '--'
     self.distanceKocherPointEdit.text = '--'
