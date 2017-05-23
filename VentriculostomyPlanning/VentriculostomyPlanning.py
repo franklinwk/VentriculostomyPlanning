@@ -745,12 +745,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
         self.logic.ventricleVolume = callData
         self.SerialAssignBox.volumesCheckedDict["Ventricle"] = callData
       else:
-        userAction = self.SerialAssignBox.exec_()
-        if userAction == 0:
-          if(self.SerialAssignBox.volumesCheckedDict.get("Venous")):
-            self.logic.baseVolumeNode = self.SerialAssignBox.volumesCheckedDict["Venous"]
-          if (self.SerialAssignBox.volumesCheckedDict.get("Ventricle")):
-            self.logic.ventricleVolume = self.SerialAssignBox.volumesCheckedDict["Ventricle"]
+        self.onShowVolumeTable()
       if self.logic.baseVolumeNode and self.logic.ventricleVolume and (not self.volumeSelected):
         self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_ventricleVolume", self.logic.ventricleVolume.GetID())
         self.volumeSelected = True
@@ -764,27 +759,44 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
   def onShowVolumeTable(self):
     userAction = self.SerialAssignBox.ShowVolumeTable()
     if userAction == 0:
-      if (not self.logic.baseVolumeNode == self.SerialAssignBox.volumesCheckedDict["Venous"]) or (not self.logic.ventricleVolume == self.SerialAssignBox.volumesCheckedDict.get("Ventricle")):
-        if slicer.util.confirmYesNoDisplay("Are you sure you want change the base image?",
+      if (not self.logic.baseVolumeNode == self.SerialAssignBox.volumesCheckedDict.get("Venous")) or (not self.logic.ventricleVolume == self.SerialAssignBox.volumesCheckedDict.get("Ventricle")):
+        userSelectValid = False
+        if self.logic.baseVolumeNode == None or self.logic.ventricleVolume == None:
+          userSelectValid = True
+        else:   
+          if slicer.util.confirmYesNoDisplay("Are you sure you want set the base image?",
                                                  windowTitle=""):
+            userSelectValid = True
+        if userSelectValid:    
           self.SerialAssignBox.ConfirmUserChanges()
           if (self.SerialAssignBox.volumesCheckedDict.get("Venous")):
-            self.logic.baseVolumeNode = self.SerialAssignBox.volumesCheckedDict["Venous"]
+            self.logic.baseVolumeNode = self.SerialAssignBox.volumesCheckedDict.get("Venous")
           if (self.SerialAssignBox.volumesCheckedDict.get("Ventricle")):
-            self.logic.ventricleVolume = self.SerialAssignBox.volumesCheckedDict["Ventricle"]
-          self.venousVolumeNameLabel.text = self.logic.baseVolumeNode.GetName()
-          self.ventricleVolumeNameLabel.text = self.logic.ventricleVolume.GetName()
-          self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_ventricleVolume",
+            self.logic.ventricleVolume = self.SerialAssignBox.volumesCheckedDict.get("Ventricle")
+          if self.logic.baseVolumeNode:
+            self.venousVolumeNameLabel.text = self.logic.baseVolumeNode.GetName()
+          if self.logic.ventricleVolume:
+            self.ventricleVolumeNameLabel.text = self.logic.ventricleVolume.GetName()
+          if self.logic.baseVolumeNode and self.logic.ventricleVolume:
+            self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_ventricleVolume",
                                                  self.logic.ventricleVolume.GetID())
-          allNodes = slicer.mrmlScene.GetNodes()
-          for nodeIndex in range(allNodes.GetNumberOfItems()):
-            node = allNodes.GetItemAsObject(nodeIndex)
-            if node and (not (node.GetID() in self.initialNodesIDList)):
-              slicer.mrmlScene.RemoveNode(node)
-          self.onSelect(self.logic.baseVolumeNode)
-          self.venousVolumeNameLabel.text = self.logic.baseVolumeNode.GetName()
-          self.ventricleVolumeNameLabel.text = self.logic.ventricleVolume.GetName()
-
+            self.initialNodesIDList.append(self.logic.baseVolumeNode.GetDisplayNodeID()) 
+            self.initialNodesIDList.append(self.logic.baseVolumeNode.GetStorageNodeID()) 
+            self.initialNodesIDList.append(self.logic.ventricleVolume.GetDisplayNodeID())  
+            self.initialNodesIDList.append(self.logic.ventricleVolume.GetStorageNodeID())
+            allNodes = slicer.mrmlScene.GetNodes()
+            for nodeIndex in range(allNodes.GetNumberOfItems()):
+              node = allNodes.GetItemAsObject(nodeIndex)
+              if node and (not (node.GetID() in self.initialNodesIDList)):
+                if (not (node.GetClassName() == "vtkMRMLScriptedModuleNode")) and \
+                   (not node.IsA("vtkMRMLDisplayNode")) and (not node.IsA("vtkMRMLStorageNode"))\
+                   and (not (node.GetClassName() == "vtkMRMLCommandLineModuleNode")) and node.GetDisplayNode():
+                     slicer.mrmlScene.RemoveNode(node.GetDisplayNode())
+                slicer.mrmlScene.RemoveNode(node)
+            slicer.app.processEvents()    
+            self.onSelect(self.logic.baseVolumeNode)
+            self.venousVolumeNameLabel.text = self.logic.baseVolumeNode.GetName()
+            self.ventricleVolumeNameLabel.text = self.logic.ventricleVolume.GetName()
         else:
           self.SerialAssignBox.CancelUserChanges()
       else:
@@ -1230,6 +1242,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       self.red_cn.SetForegroundVolumeID(self.logic.ventricleVolume.GetID())
       self.yellow_cn.SetForegroundVolumeID(self.logic.ventricleVolume.GetID())
       self.green_cn.SetForegroundVolumeID(self.logic.ventricleVolume.GetID())
+      
     pass
 
   # Event handlers for trajectory
@@ -2460,7 +2473,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
   def enableAttribute(self, attribute, caseName = None):
     enabledAttributeID = self.baseVolumeNode.GetAttribute(attribute)
     invisableAttribute = ['vtkMRMLScalarVolumeNode.rel_grayScaleModelWithMargin']
-    if enabledAttributeID:
+    if enabledAttributeID and slicer.mrmlScene.GetNodeByID(enabledAttributeID):
       attributeNode = slicer.mrmlScene.GetNodeByID(enabledAttributeID)
       if attributeNode and attributeNode.GetDisplayNode() and (not (attribute in invisableAttribute)):
         attributeNode.GetDisplayNode().SetVisibility(1)
@@ -2530,6 +2543,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       elif attribute == "vtkMRMLScalarVolumeNode.rel_grayScaleModel":
         modelNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
         modelNode.SetAttribute("vtkMRMLModelNode.modelCreated", "False")
+        print "grayScaleModelRecreated"
         slicer.mrmlScene.AddNode(modelNode)
         modelDisplayNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelDisplayNode")
         ModelColor = [1.0, 0.0, 0.0]

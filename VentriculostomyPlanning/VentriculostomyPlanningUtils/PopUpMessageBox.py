@@ -4,25 +4,17 @@ class SerialAssignMessageBox(qt.QMessageBox):
   def __init__(self):
     qt.QMessageBox.__init__(self)
     #self.setSizeGripEnabled(True)
-    #self.setGeometry (qt.QRect(0, 0, 560, 210))
     self.setWindowTitle ('SerialAssignTable')
     self.volumesCheckedDict = dict()
     self.volumesCheckedDictPre = dict()  # Store the previous selected item. if the user click the cancel button. all value should be reset.
-    #self.mainGUIBox = qt.QGroupBox(self)
-    #self.mainGUIBox.setStyleSheet('QGroupBox{border:0;}')
-    #self.mainGUIBox.setGeometry(qt.QRect(0, 0, 400, 200))
     self.serialCheckboxVenous = []
     self.serialCheckboxVentricle = []
     self.volumeNames = []
     self.importedVolumeIDs = []
     self.volumes = []
-    mainGUILayout = self.layout()
-    #self.mainGUIBox.setLayout(mainGUILayout)
-    mainGUILayout.setAlignment(qt.Qt.AlignCenter)
-    mainGUILayout.setSizeConstraint(mainGUILayout.SetMinAndMaxSize)
-    mainGUILayout.setColumnMinimumWidth(0,350)
-    mainGUILayout.setRowMinimumHeight(0,100)
-    #mainGUILayout.setGeometry(qt.QRect(0, 0, 250, 100))
+    self.mainGUILayout = self.layout()
+    self.mainGUILayout.setAlignment(qt.Qt.AlignCenter)
+    
     self.addTableWidget ()
     #Create QPushButton in QMessageBox
     self.confirmButton = qt.QPushButton('Confirm')
@@ -30,7 +22,7 @@ class SerialAssignMessageBox(qt.QMessageBox):
     self.addButton(self.confirmButton, qt.QMessageBox.YesRole)
     self.addButton(self.cancelButton, qt.QMessageBox.RejectRole)
     self.confirmButton.setEnabled(False)
-    mainGUILayout.addWidget(self.tableWidget,0,0,1,3)
+    
     self.buttonBox = qt.QGroupBox()
     buttonLayout = qt.QHBoxLayout()
     buttonLayout.setSizeConstraint(buttonLayout.SetMinAndMaxSize)
@@ -38,17 +30,22 @@ class SerialAssignMessageBox(qt.QMessageBox):
     self.buttonBox.setStyleSheet('QGroupBox{border:0;}')
     buttonLayout.addWidget(self.confirmButton)
     buttonLayout.addWidget(self.cancelButton)
-    mainGUILayout.addWidget(self.buttonBox,1,0,1,1)
+    self.mainGUILayout.addWidget(self.buttonBox,1,0,1,1)
   #Create TableWidget
   def addTableWidget (self) :
+    self.tableWidgetBox = qt.QGroupBox()
+    self.mainGUILayout.addWidget(self.tableWidgetBox,0,0,1,3)
+    layout = qt.QHBoxLayout()
+    self.tableWidgetBox.setLayout(layout)
+    self.tableWidgetBox.setStyleSheet('QGroupBox{border:0;}')
     self.tableWidget = qt.QTableWidget()
     self.tableWidget.setStyleSheet('QGroupBox{border:0;}')
-    layout = qt.QGridLayout()
-    #layout.setSizeConstraint(layout.SetMinAndMaxSize)
-    layout.setColumnMinimumWidth(0,340)
-    layout.setRowMinimumHeight(0,100)
+    self.tableWidget.setHorizontalScrollBarPolicy(1)
+    self.tableWidget.setVerticalScrollBarPolicy(1)
+    #layout.setColumnMinimumWidth(0,340)
+    #layout.setRowMinimumHeight(0,100)
     #layout.setGeometry (qt.QRect(0, 0, 340, 100))
-    self.tableWidget.setLayout(layout)
+    layout.addWidget(self.tableWidget)
     #self.tableWidget.setGeometry (qt.QRect(0, 0, 400, 200))
     #self.tableWidget.setMinimumHeight(200)
     #self.tableWidget.setMinimumWidth(300)
@@ -99,6 +96,7 @@ class SerialAssignMessageBox(qt.QMessageBox):
           tableItemVentricle.stateChanged.connect(lambda checked, i=counter: self.VentricleStateChanged(checked, self.serialCheckboxVentricle[i]))
           self.tableWidget.setCellWidget(counter, 1, itemWidgetVentricle)
     self.tableWidget.setVerticalHeaderLabels(self.volumeNames)
+    self.tableWidget.setFixedSize(self.tableWidget.horizontalHeader().length() + 100, self.tableWidget.verticalHeader().length() + 30)
     self.ConfirmButtonValid()
   def ConfirmButtonValid(self):
     checkedNum = 0
