@@ -41,6 +41,7 @@ class SerialAssignMessageBox(qt.QMessageBox):
     self.tableWidgetBox.setStyleSheet('QGroupBox{border:0;}')
     self.tableWidget = qt.QTableWidget()
     self.tableWidget.setStyleSheet('QGroupBox{border:0;}')
+    self.tableWidget.horizontalScrollBar().setEnabled(True)
     self.tableWidget.setHorizontalScrollBarPolicy(1)
     self.tableWidget.setVerticalScrollBarPolicy(1)
     #layout.setColumnMinimumWidth(0,340)
@@ -58,6 +59,7 @@ class SerialAssignMessageBox(qt.QMessageBox):
     self.tableWidget.setHorizontalHeaderLabels("IsVenousType;IsVentricleType".split(";"))
     self.tableWidget.setVerticalHeaderLabels("Serial1;Serial2".split(";"))
     #self.tableWidget.horizontalHeader().setStretchLastSection(True)
+    #self.tableWidget.verticalHeader().setStretchLastSection(True)
   def AppendVolumeNode(self, addedVolumeNode):
     self.volumes.append(addedVolumeNode)
     self.SetAssignTableWithVolumes(self.volumes)
@@ -75,7 +77,7 @@ class SerialAssignMessageBox(qt.QMessageBox):
           tableItemVenous.setCheckState(False)
           tableItemVenous.setCheckable(True)
           itemWidgetVenous = qt.QWidget()
-          itemLayoutVenous = qt.QHBoxLayout()
+          itemLayoutVenous = qt.QVBoxLayout()
           itemLayoutVenous.setAlignment(qt.Qt.AlignCenter)
           itemWidgetVenous.setLayout(itemLayoutVenous)
           itemLayoutVenous.addWidget(tableItemVenous)
@@ -84,7 +86,7 @@ class SerialAssignMessageBox(qt.QMessageBox):
           tableItemVentricle.setCheckState(False)
           tableItemVentricle.setCheckable(True)
           itemWidgetVentricle = qt.QWidget()
-          itemLayoutVentricle = qt.QHBoxLayout()
+          itemLayoutVentricle = qt.QVBoxLayout()
           itemLayoutVentricle.setAlignment(qt.Qt.AlignCenter)
           itemWidgetVentricle.setLayout(itemLayoutVentricle)
           itemLayoutVentricle.addWidget(tableItemVentricle)
@@ -99,8 +101,7 @@ class SerialAssignMessageBox(qt.QMessageBox):
           self.tableWidget.setCellWidget(counter, 1, itemWidgetVentricle)
         self.tableHeight = self.tableHeight + self.tableWidget.cellWidget(counter, 1).geometry.height()
     self.tableWidget.setVerticalHeaderLabels(self.volumeNames)
-    self.tableWidget.verticalHeader().setStretchLastSection(True)
-    self.tableWidget.setFixedSize(self.tableWidget.verticalHeader().width + self.tableWidth, self.tableWidget.horizontalHeader().height + self.tableHeight)
+    #self.tableWidget.setFixedSize(self.tableWidget.verticalHeader().width + self.tableWidth, self.tableWidget.horizontalHeader().height + self.tableHeight)
     self.mainGUILayout.addWidget(self.tableWidgetBox, 0, 0, 1, 3)
     self.ConfirmButtonValid()
   def ConfirmButtonValid(self):
@@ -122,8 +123,11 @@ class SerialAssignMessageBox(qt.QMessageBox):
       self.confirmButton.setEnabled(False)
   def ShowVolumeTable(self):
     self.volumesCheckedDictPre = self.volumesCheckedDict.copy()
-    self.tableWidth = self.tableWidget.cellWidget(0,0).geometry.width() + self.tableWidget.cellWidget(0,1).geometry.width()
-    self.tableWidget.setFixedSize(self.tableWidget.verticalHeader().width + self.tableWidth+ 100, self.tableWidget.horizontalHeader().height + self.tableHeight)
+    self.show()
+    self.close() # show and close to get the width of the header
+    if self.tableWidget.cellWidget(0,0) and self.tableWidget.cellWidget(0,1):
+      self.tableWidth = self.tableWidget.cellWidget(0,0).geometry.width() + self.tableWidget.cellWidget(0,1).geometry.width()
+    self.tableWidget.setFixedSize(self.tableWidget.verticalHeader().width + self.tableWidth+6, self.tableWidget.horizontalHeader().height + self.tableHeight+6)
     return self.exec_()
   def CancelUserChanges(self):
     self.volumesCheckedDict = self.volumesCheckedDictPre.copy()
@@ -169,7 +173,7 @@ class SerialAssignMessageBox(qt.QMessageBox):
   def VentricleStateChanged(self,checked, checkBox):
     self.CheckBoxStatusChanged(checked, checkBox, self.serialCheckboxVentricle,self.serialCheckboxVenous)
 
-#volumes = [slicer.mrmlScene.GetNodeByID("vtkMRMLScalarVolumeNode1")]
+#volumes = [slicer.mrmlScene.GetNodeByID("vtkMRMLScalarVolumeNode1"), slicer.mrmlScene.GetNodeByID("vtkMRMLScalarVolumeNode2")]
 #a = SerialAssignMessageBox()
 #a.SetAssignTableWithVolumes(volumes)
-#a.exec_()
+#a.ShowVolumeTable()

@@ -130,6 +130,7 @@ class SlicerCaseManagerWidget(ModuleWidgetMixin, ScriptedLoadableModuleWidget):
     self._currentCaseDirectory = None
     self._caseDirectoryList = {}
     self.caseDirectoryList = {"DICOM/Planning", "Results"}
+    self.warningBox = qt.QMessageBox()
     self.setup()
 
   def setup(self):
@@ -217,6 +218,10 @@ class SlicerCaseManagerWidget(ModuleWidgetMixin, ScriptedLoadableModuleWidget):
   def onCreateNewCaseButtonClicked(self):
     if not self.checkAndWarnUserIfCaseInProgress():
       return
+    if not self.caseRootDir:
+      self.warningBox.setText("The root directory for cases is not set up yet.")
+      self.warningBox.exec_()
+      return
     self.clearData()
     self.caseDialog = NewCaseSelectionNameWidget(self.caseRootDir)
     selectedButton = self.caseDialog.exec_()
@@ -235,6 +240,10 @@ class SlicerCaseManagerWidget(ModuleWidgetMixin, ScriptedLoadableModuleWidget):
   
   def onOpenCaseButtonClicked(self):
     if not self.checkAndWarnUserIfCaseInProgress():
+      return
+    if not self.caseRootDir:
+      self.warningBox.setText("The root directory for cases is not set up yet.")
+      self.warningBox.exec_()
       return
     path = qt.QFileDialog.getExistingDirectory(self.parent.window(), "Select Case Directory", self.caseRootDir)
     if not path:
@@ -263,7 +272,7 @@ class SlicerCaseManagerWidget(ModuleWidgetMixin, ScriptedLoadableModuleWidget):
   def clearData(self):
     # To do: clear the flags
     if self.currentCaseDirectory:
-      self.logic.closeCase(self.currentCaseDirectory)
+      #self.logic.closeCase(self.currentCaseDirectory) #this function remove the whole case directory.
       self.currentCaseDirectory = None
     slicer.mrmlScene.Clear(0)
     self.logic.update_observers(VentriculostomyUserEvents.CloseCaseEvent)

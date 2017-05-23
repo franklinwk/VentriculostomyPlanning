@@ -97,12 +97,14 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     #
 
 
-    configurationCollapsibleButton = ctk.ctkCollapsibleButton()
-    configurationCollapsibleButton.text = "Configuration"
-    self.layout.addWidget(configurationCollapsibleButton)
-    configurationCollapsibleButton.setVisible(False)
+    settingCollapsibleButton = ctk.ctkCollapsibleButton()
+    settingCollapsibleButton.collapsed = True
+    settingCollapsibleButton.text = "Configuration"
+    self.layout.addWidget(settingCollapsibleButton)
+    settingCollapsibleButton.setVisible(True)
     # Layout within the dummy collapsible button
-    configurationFormLayout = qt.QFormLayout(configurationCollapsibleButton)
+    appSettingLayout = qt.QFormLayout(settingCollapsibleButton)
+
     #
     # Mid-sagittalReference line
     #
@@ -135,22 +137,110 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     referenceConfigLayout.addWidget(lengthCoronalReferenceLineUnitLabel)
 
     radiusPathPlanningLabel = qt.QLabel('Radius:  ')
-    referenceConfigLayout.addWidget(radiusPathPlanningLabel)
     self.radiusPathPlanningEdit = qt.QLineEdit()
     self.radiusPathPlanningEdit.text = '30.0'
     self.radiusPathPlanningEdit.readOnly = False
     self.radiusPathPlanningEdit.frame = True
     self.radiusPathPlanningEdit.styleSheet = "QLineEdit { background:transparent; }"
     self.radiusPathPlanningEdit.cursor = qt.QCursor(qt.Qt.IBeamCursor)
-    referenceConfigLayout.addWidget(self.radiusPathPlanningEdit)
     radiusPathPlanningUnitLabel = qt.QLabel('mm  ')
-    referenceConfigLayout.addWidget(radiusPathPlanningUnitLabel)
-    configurationFormLayout.addRow(referenceConfigLayout)
+    # referenceConfigLayout.addWidget(radiusPathPlanningLabel)
+    # referenceConfigLayout.addWidget(self.radiusPathPlanningEdit)
+    # referenceConfigLayout.addWidget(radiusPathPlanningUnitLabel)
+    appSettingLayout.addRow(referenceConfigLayout)
 
     self.reloadButton = qt.QPushButton("Reload")
     self.reloadButton.toolTip = "Reload this module."
     self.reloadButton.name = "VentriculostomyPlanning Reload"
     referenceConfigLayout.addWidget(self.reloadButton)
+
+    #
+    # Create Entry point Button
+    #
+
+    self.createModelButton = qt.QPushButton("Create Surface")
+    self.createModelButton.toolTip = "Create a surface model."
+    self.createModelButton.enabled = True
+    self.createModelButton.connect('clicked(bool)', self.onCreateModel)
+    #
+    # Venous Segmentation/Rendering
+    #
+
+    # Layout within the dummy collapsible button
+    createVesselHorizontalLayout = qt.QHBoxLayout()
+    self.venousCalcStatus = qt.QLabel('VenousCalcStatus')
+
+    self.detectVesselBox = qt.QGroupBox()
+    detectVesselLayout = qt.QVBoxLayout()
+    detectVesselLayout.setAlignment(qt.Qt.AlignCenter)
+    self.detectVesselBox.setLayout(detectVesselLayout)
+    self.grayScaleMakerButton = qt.QPushButton("Segment Venous")
+    self.grayScaleMakerButton.enabled = True
+    self.grayScaleMakerButton.toolTip = "Use the GrayScaleMaker module for vessel calculation "
+    detectVesselLabel = qt.QLabel('Detect Vessel')
+    # detectVesselLayout.addWidget(detectVesselLabel)
+    detectVesselLayout.addWidget(self.grayScaleMakerButton)
+    #self.grayScaleMakerButton.setIcon(qt.QIcon(qt.QPixmap(os.path.join(self.scriptDirectory, "vessel.png"))))
+    #self.grayScaleMakerButton.setIconSize(qt.QSize(self.grayScaleMakerButton.size))
+    self.detectVesselBox.setStyleSheet('QGroupBox{border:0;}')
+    # self.mainGUIGroupBoxLayout.addWidget(self.detectVesselBox, 2, 2)
+
+
+    self.grayScaleMakerButton.connect('clicked(bool)', self.onVenousGrayScaleCalc)
+    createVesselHorizontalLayout.addWidget(self.venousCalcStatus)
+    self.vesselnessCalcButton = qt.QPushButton("VesselnessCalc")
+    self.vesselnessCalcButton.toolTip = "Use Vesselness calculation "
+    self.vesselnessCalcButton.enabled = True
+    self.vesselnessCalcButton.connect('clicked(bool)', self.onVenousVesselnessCalc)
+
+    # -- Algorithm setting
+    surfaceModelConfigLayout = qt.QHBoxLayout()
+    surfaceModelThresholdLabel = qt.QLabel('Surface Model Intensity Threshold Setting:  ')
+    surfaceModelConfigLayout.addWidget(surfaceModelThresholdLabel)
+    self.surfaceModelThresholdEdit = qt.QLineEdit()
+    self.surfaceModelThresholdEdit.text = '-500'
+    self.surfaceModelThresholdEdit.toolTip = "set this value to the intensity of the skull, higher value means less segmented skull"
+    self.surfaceModelThresholdEdit.setMaxLength(6)
+    self.surfaceModelThresholdEdit.readOnly = False
+    self.surfaceModelThresholdEdit.frame = True
+    self.surfaceModelThresholdEdit.styleSheet = "QLineEdit { background:transparent; }"
+    self.surfaceModelThresholdEdit.cursor = qt.QCursor(qt.Qt.IBeamCursor)
+    surfaceModelConfigLayout.addWidget(self.surfaceModelThresholdEdit)
+    surfaceModelConfigLayout.addWidget(self.createModelButton)
+
+    distanceMapConfigLayout = qt.QHBoxLayout()
+    distanceMapThresholdLabel = qt.QLabel('Distance Map Intensity Threshold Setting:  ')
+    distanceMapConfigLayout.addWidget(distanceMapThresholdLabel)
+    self.distanceMapThresholdEdit = qt.QLineEdit()
+    self.distanceMapThresholdEdit.text = '100'
+    self.distanceMapThresholdEdit.toolTip = "Set the value to the intensity of venous. higher value means less venous"
+    self.distanceMapThresholdEdit.setMaxLength(6)
+    self.distanceMapThresholdEdit.readOnly = False
+    self.distanceMapThresholdEdit.frame = True
+    self.distanceMapThresholdEdit.styleSheet = "QLineEdit { background:transparent; }"
+    self.distanceMapThresholdEdit.cursor = qt.QCursor(qt.Qt.IBeamCursor)
+    distanceMapConfigLayout.addWidget(self.distanceMapThresholdEdit)
+
+    venousMarginLabel = qt.QLabel('Venous Safty Margin:  ')
+    distanceMapConfigLayout.addWidget(venousMarginLabel)
+    self.venousMarginEdit = qt.QLineEdit()
+    self.venousMarginEdit.text = '10.0'
+    self.venousMarginEdit.setMaxLength(6)
+    self.venousMarginEdit.readOnly = False
+    self.venousMarginEdit.frame = True
+    self.venousMarginEdit.styleSheet = "QLineEdit { background:transparent; }"
+    self.venousMarginEdit.cursor = qt.QCursor(qt.Qt.IBeamCursor)
+    distanceMapConfigLayout.addWidget(self.venousMarginEdit)
+    venousMarginUnitLabel = qt.QLabel('mm  ')
+    distanceMapConfigLayout.addWidget(venousMarginUnitLabel)
+    distanceMapConfigLayout.addWidget(self.grayScaleMakerButton)
+    appSettingLayout.addRow(surfaceModelConfigLayout)
+    appSettingLayout.addRow(distanceMapConfigLayout)
+
+    self.surfaceModelThresholdEdit.connect('textEdited(QString)', self.onModifySurfaceModel)
+    self.distanceMapThresholdEdit.connect('textEdited(QString)', self.onModifyVenousMargin)
+    self.venousMarginEdit.connect('textEdited(QString)', self.onModifyVenousMargin)
+
 
     self.reloadButton.connect('clicked()', self.onReload)
     self.lengthSagittalReferenceLineEdit.connect('textEdited(QString)', self.onModifyMeasureLength)
@@ -241,14 +331,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     #
     #self.mainGUIGroupBoxLayout.addWidget(self.inputVolumeSelector,1,0)
 
-    #
-    # Create Entry point Button
-    #
-    
-    self.createModelButton = qt.QPushButton("Create Model")
-    self.createModelButton.toolTip = "Create a surface model."
-    self.createModelButton.enabled = True
-    self.createModelButton.connect('clicked(bool)', self.onCreateModel)
 
     self.scriptDirectory = os.path.join(os.path.dirname(os.path.realpath(__file__)),"Resources", "icons")
 
@@ -316,39 +398,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.createEntryPointButton.connect('clicked(bool)', self.onCreateEntryPoint)
 
     
-    #
-    # Venous Segmentation/Rendering
-    #
-    
-    # Layout within the dummy collapsible button
-    createVesselHorizontalLayout = qt.QHBoxLayout()
-    self.venousCalcStatus = qt.QLabel('VenousCalcStatus')
 
-    self.detectVesselBox = qt.QGroupBox()
-    detectVesselLayout = qt.QVBoxLayout()
-    detectVesselLayout.setAlignment(qt.Qt.AlignCenter)
-    self.detectVesselBox.setLayout(detectVesselLayout)
-    self.grayScaleMakerButton = qt.QPushButton("")
-    self.grayScaleMakerButton.enabled = True
-    self.grayScaleMakerButton.toolTip = "Use the GrayScaleMaker module for vessel calculation "
-    detectVesselLabel = qt.QLabel('Detect Vessel')
-    #detectVesselLayout.addWidget(detectVesselLabel)
-    detectVesselLayout.addWidget(self.grayScaleMakerButton)
-    self.grayScaleMakerButton.setMaximumHeight(buttonHeight)
-    self.grayScaleMakerButton.setMaximumWidth(buttonWidth)
-    self.grayScaleMakerButton.setIcon(qt.QIcon(qt.QPixmap(os.path.join(self.scriptDirectory, "vessel.png"))))
-    self.grayScaleMakerButton.setIconSize(qt.QSize(self.grayScaleMakerButton.size))
-    self.detectVesselBox.setStyleSheet('QGroupBox{border:0;}')
-    #self.mainGUIGroupBoxLayout.addWidget(self.detectVesselBox, 2, 2)
-
-
-    self.grayScaleMakerButton.connect('clicked(bool)', self.onVenousGrayScaleCalc)
-    createVesselHorizontalLayout.addWidget(self.venousCalcStatus)
-    self.vesselnessCalcButton = qt.QPushButton("VesselnessCalc")
-    self.vesselnessCalcButton.toolTip = "Use Vesselness calculation "
-    self.vesselnessCalcButton.enabled = True
-    self.vesselnessCalcButton.connect('clicked(bool)', self.onVenousVesselnessCalc)
-    
     #
     # Trajectory
     #
@@ -684,6 +734,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
   def updateFromCaseManager(self, *args, **kwargs):
     if args[0] == VentriculostomyUserEvents.CloseCaseEvent:
       self.logic.clear()
+      self.SerialAssignBox = SerialAssignMessageBox()
       self.initialFieldsValue()
       self.volumeSelected = False
       self.venousVolumeNameLabel.text = ""
@@ -692,13 +743,11 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_ventricleVolume",
                                              self.logic.ventricleVolume.GetID())
       self.caseNum = self.caseNum + 1
-      self.volumeSelected = True
       self.onSaveDicomFiles()
       self.venousVolumeNameLabel.text = self.logic.baseVolumeNode.GetName()
       self.ventricleVolumeNameLabel.text = self.logic.ventricleVolume.GetName()
       self.onSelect(self.logic.baseVolumeNode)
     elif args[0] == VentriculostomyUserEvents.StartCaseImportEvent:
-      self.volumeSelected = True
       self.red_cn.SetDoPropagateVolumeSelection(False) # make sure the compositenode doesn't get updated,
       self.green_cn.SetDoPropagateVolumeSelection(False) # so that the background and foreground volumes are not messed up
       self.yellow_cn.SetDoPropagateVolumeSelection(False)
@@ -712,7 +761,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       self.onSetSliceViewer()
 
   def initialFieldsValue(self):
-    self.SerialAssignBox = SerialAssignMessageBox()
     self.lengthSagittalPlanningLineEdit.text = '--'
     self.lengthCoronalPlanningLineEdit.text = '--'
     self.distanceKocherPointEdit.text = '--'
@@ -736,23 +784,25 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     if callData.IsA("vtkMRMLVolumeNode"):
       volumeName = callData.GetName()
       #self.importedNodeIDs.append(callData.GetID())
-      self.onSaveDicomFiles()
-      self.SerialAssignBox.AppendVolumeNode(callData)
-      self.initialNodesIDList.append(callData.GetID())
-      if ("Venous" in volumeName) or ("venous" in volumeName) :
-        self.logic.baseVolumeNode = callData
-        self.SerialAssignBox.volumesCheckedDict["Venous"] = callData
-      elif ("Ventricle" in volumeName) or ("ventricle" in volumeName) :
-        self.logic.ventricleVolume = callData
-        self.SerialAssignBox.volumesCheckedDict["Ventricle"] = callData
-      else:
-        self.onShowVolumeTable()
-      if self.logic.baseVolumeNode and self.logic.ventricleVolume and (not self.volumeSelected):
-        self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_ventricleVolume", self.logic.ventricleVolume.GetID())
-        self.volumeSelected = True
-        self.venousVolumeNameLabel.text = self.logic.baseVolumeNode.GetName()
-        self.ventricleVolumeNameLabel.text = self.logic.ventricleVolume.GetName()
-        self.onSelect(self.logic.baseVolumeNode)
+      if self.onSaveDicomFiles():
+        self.SerialAssignBox.AppendVolumeNode(callData)
+        self.initialNodesIDList.append(callData.GetID())
+        if ("Venous" in volumeName) or ("venous" in volumeName) :
+          self.logic.baseVolumeNode = callData
+          self.SerialAssignBox.volumesCheckedDict["Venous"] = callData
+          self.SerialAssignBox.SetCheckBoxAccordingToAssignment()
+          self.venousVolumeNameLabel.text = self.logic.baseVolumeNode.GetName()
+        elif ("Ventricle" in volumeName) or ("ventricle" in volumeName) :
+          self.logic.ventricleVolume = callData
+          self.SerialAssignBox.volumesCheckedDict["Ventricle"] = callData
+          self.SerialAssignBox.SetCheckBoxAccordingToAssignment()
+          self.ventricleVolumeNameLabel.text = self.logic.ventricleVolume.GetName()
+        else:
+          self.onShowVolumeTable()
+        if self.logic.baseVolumeNode and self.logic.ventricleVolume and (not self.volumeSelected):
+          self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_ventricleVolume", self.logic.ventricleVolume.GetID())
+          self.volumeSelected = True
+          self.onSelect(self.logic.baseVolumeNode)
 
 
 
@@ -807,10 +857,14 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
 
   def onSaveDicomFiles(self):
     # use decoration to improve the method
+    if not os.path.exists(self.slicerCaseWidget.planningDICOMDataDirectory):
+      slicer.util.warningDisplay("No case is created, create a case first. The current serial is not saved.")
+      return False
     checkedFiles = self.dicomWidget.detailsPopup.fileLists
     for dicomseries in checkedFiles:
       for dicom in dicomseries:
         copyfile(dicom,os.path.join(self.slicerCaseWidget.planningDICOMDataDirectory,basename(dicom)))
+    return True
   
   @beforeRunProcessEvents
   def onSelect(self, selectedNode=None):
@@ -820,7 +874,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       self.yellow_cn.SetDoPropagateVolumeSelection(False)
       self.initialFieldsValue()
       self.logic.clear()
-      self.logic = VentriculostomyPlanningLogic()
+      self.logic.__init__()
       self.logic.register(self)
       if self.slicerCaseWidget.planningDICOMDataDirectory and listdir(self.slicerCaseWidget.planningDICOMDataDirectory):
         self.slicerCaseWidget.patientWatchBox.sourceFile = os.path.join(self.slicerCaseWidget.planningDICOMDataDirectory,listdir(self.slicerCaseWidget.planningDICOMDataDirectory)[0])
@@ -1022,8 +1076,8 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
         #outputModelNode.SetAttribute("vtkMRMLModelNode.modelCreated","False")
         slicer.mrmlScene.RemoveObserver(self.nodeAddedEventObserverID)
         try:
-          self.logic.createModel(outputModelNode, self.logic.threshold)
-        except ValueError:
+          self.logic.createModel(outputModelNode, self.logic.sufaceModelThreshold)
+        except:
           slicer.util.warningDisplay(
             "Skull surface calculation error, volumes might not be suitable for calculation")
         finally:
@@ -1039,7 +1093,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
         if outputModelNodeID:
           outputModelNode = slicer.mrmlScene.GetNodeByID(outputModelNodeID)
           if (not outputModelNode) or outputModelNode.GetAttribute("vtkMRMLModelNode.modelCreated") == "False":
-              self.logic.createModel(outputModelNode, self.logic.threshold)
+              self.logic.createModel(outputModelNode, self.logic.sufaceModelThreshold)
           self.logic.selectNasionPointNode(outputModelNode) # when the model is not available, the model will be created, so nodeAdded signal should be disconnected
           self.onSetSliceViewer()
     else:
@@ -1059,7 +1113,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
         if outputModelNodeID:
           outputModelNode = slicer.mrmlScene.GetNodeByID(outputModelNodeID)
           if (not outputModelNode) or outputModelNode.GetAttribute("vtkMRMLModelNode.modelCreated") == "False":
-              self.logic.createModel(outputModelNode, self.logic.threshold)
+              self.logic.createModel(outputModelNode, self.logic.sufaceModelThreshold)
           self.logic.selectSagittalPointNode(outputModelNode) # when the model is not available, the model will be created, so nodeAdded signal should be disconnected
           self.onSetSliceViewer()
     else:
@@ -1080,7 +1134,32 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     slicer.util.saveScene(os.path.join(self.slicerCaseWidget.currentCaseDirectory, "Results", "Results.mrml"))
     self.logic.appendPlanningTimeStampToJson(self.jsonFile, "CaseSavedTime", datetime.datetime.now().time().isoformat())
     pass
-      
+
+  def onModifyVenousMargin(self):
+    self.logic.venousMargin = float(self.venousMarginEdit.text)
+    self.logic.distanceMapThreshold = float(self.distanceMapThresholdEdit.text)
+    grayScaleModelNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_grayScaleModel")
+    grayScaleModelNode = slicer.mrmlScene.GetNodeByID(grayScaleModelNodeID)
+    if grayScaleModelNode:
+      grayScaleModelNode.SetAttribute("vtkMRMLModelNode.modelCreated","False")
+    nodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_grayScaleModelWithMargin")
+    node = slicer.mrmlScene.GetNodeByID(nodeID)
+    if not node:
+      node = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
+      slicer.mrmlScene.AddNode(node)
+    if node:
+      node.SetAttribute("vtkMRMLModelNode.modelCreated","False")
+    pass
+
+  def onModifySurfaceModel(self):
+    self.logic.sufaceModelThreshold = float(self.surfaceModelThresholdEdit.text)
+    outputModelNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_model")
+    if outputModelNodeID:
+      outputModelNode = slicer.mrmlScene.GetNodeByID(outputModelNodeID)
+      if outputModelNode:
+        outputModelNode.SetAttribute("vtkMRMLModelNode.modelCreated","False")
+    pass
+
   def onModifyMeasureLength(self):
     sagittalReferenceLength = float(self.lengthSagittalReferenceLineEdit.text)
     coronalReferenceLength = float(self.lengthCoronalReferenceLineEdit.text)
@@ -1161,7 +1240,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
         slicer.mrmlScene.RemoveObserver(self.nodeAddedEventObserverID)
         try:
           self.logic.calculateVenousGrayScale(croppedVolumeNode, grayScaleModelNode)
-        except ValueError:
+        except:
           slicer.util.warningDisplay(
             "Venouse Calculation error, volumes might not be suitable for calculation")
         finally:
@@ -1191,7 +1270,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
         slicer.mrmlScene.RemoveObserver(self.nodeAddedEventObserverID)
         try:
           self.logic.calculateVenousVesselness(croppedVolumeNode, vesselnessVolumeNode)
-        except ValueError:
+        except:
           slicer.util.warningDisplay(
             "Vessel Margin Calculation error, volumes might not be suitable for calculation")
         finally:
@@ -1215,13 +1294,15 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       slicer.mrmlScene.RemoveObserver(self.nodeAddedEventObserverID)
       try:
         self.logic.calculateGrayScaleWithMargin()
-      except ValueError:
+      except:
         slicer.util.warningDisplay(
           "Vessel Margin Calculation error, volumes might not be suitable for calculation")
       finally:
         self.nodeAddedEventObserverID = slicer.mrmlScene.AddObserver(slicer.mrmlScene.NodeAddedEvent,
                                                                    self.onVolumeAddedNode)
         self.onSetSliceViewer()## the slice widgets are set to none after the  cli module calculation. reason unclear...
+        self.progressBar.value = 100
+        self.progressBar.close()
     pass
 
   def onResetButtons(self, caller = None, event = None):
@@ -1251,7 +1332,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     if self.addCannulaTargetButton.isChecked():
       self.imageSlider.setValue(100.0)
       self.initialFieldsValue()
-      self.logic.setSliceForCylinder()
+      #self.logic.setSliceForCylinder()
       self.logic.startEditPlanningTarget()
     else:
       self.interactionMode = "none"
@@ -1267,7 +1348,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     slicer.mrmlScene.RemoveObserver(self.nodeAddedEventObserverID)
     try:
       self.logic.generatePath()
-    except ValueError:
+    except:
       slicer.util.warningDisplay(
         "Vessel Margin Calculation error, volumes might not be suitable for calculation")
     finally:
@@ -1335,6 +1416,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.logic.clear()
     slicer.mrmlScene.Clear(0)
     globals()[moduleName] = slicer.util.reloadScriptedModule(moduleName)
+    self.SerialAssignBox = SerialAssignMessageBox()
     self.logic = VentriculostomyPlanningLogic()
     self.logic.register(self)
     
@@ -1616,6 +1698,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     self.cylinderManager.setModelColor(0.0, 1.0, 1.0)
     self.cylinderManager.setDefaultSlicePositionToFirstPoint()
     self.cylinderManager.setModelOpacity(0.5)
+    self.cylinderManager.startEditLine()
 
     self.cannulaManager = CurveManager()
     self.cannulaManager.setName("Cannula")
@@ -1647,7 +1730,8 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     self.cylinderInteractor = None
     self.trajectoryProjectedMarker = None
     self.enableAuxilaryNodes()
-  
+
+    self.distanceMapFilter = sitk.ApproximateSignedDistanceMapImageFilter()
     self.currentVolumeNode = None
     self.baseVolumeNode = None
     self.ventricleVolume = None
@@ -1655,7 +1739,9 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     self.cliNode = None
     self.samplingFactor = 1
     self.topPoint = []
-    self.threshold = -500.0
+    self.sufaceModelThreshold = -500.0
+    self.distanceMapThreshold = 100
+    self.venousMargin = 10.0 #in mm
     self.minimalVentricleLen = 10.0 # in mm
     self.yawAngle = 0.0
     self.pitchAngle = 0.0
@@ -1776,11 +1862,14 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     characters = [": ", " ", ":", "/"]
     for character in characters:
       nodeName = nodeName.replace(character, "-")
-    extension = ".nrrd"
+    if not node.GetStorageNode():
+      node.AddDefaultStorageNode()
+    storageNode = node.GetStorageNode()
+    extension = storageNode.GetDefaultWriteFileExtension()
     baseNodeName = self.baseVolumeNode.GetName()
     for character in characters:
       baseNodeName = baseNodeName.replace(character, "-")
-    filename = os.path.join(outputDir, nodeName + extension)
+    filename = os.path.join(outputDir, nodeName +'.'+ extension)
     if slicer.util.saveNode(node, filename):
       return True
     warningMSG = "Error in saving the %s" %(nodeName)
@@ -1943,10 +2032,13 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       node = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
       slicer.mrmlScene.AddNode(node)
     if node and (node.GetAttribute("vtkMRMLModelNode.modelCreated") == "False"):
-      distanceMapFilter = sitk.ApproximateSignedDistanceMapImageFilter()
       originImage = sitk.Cast(sitkUtils.PullFromSlicer(self.currentVolumeNode.GetID()), sitk.sitkInt16)
-      threshold = 100
-      distanceMap = distanceMapFilter.Execute(originImage, threshold - 10, threshold )
+      try:
+        distanceMap = self.distanceMapFilter.Execute(originImage, self.distanceMapThreshold - 10, self.distanceMapThreshold )
+      except:
+        slicer.util.warningDisplay(
+          "distance map calucation failed, try use different settings")
+        return None
       sitkUtils.PushToSlicer(distanceMap, "distanceMap", 0, True)
       imageCollection = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLScalarVolumeNode", "distanceMap")
       if imageCollection:
@@ -1954,7 +2046,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         parameters = {}
         parameters["InputVolume"] = distanceMapNode.GetID()
         parameters["OutputGeometry"] = node.GetID()
-        parameters["Threshold"] = -10.0
+        parameters["Threshold"] = -self.venousMargin
         grayMaker = slicer.modules.grayscalemodelmaker
         self.cliNode = slicer.cli.run(grayMaker, None, parameters, wait_for_completion=True)
         self.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_grayScaleModelWithMargin", node.GetID())
