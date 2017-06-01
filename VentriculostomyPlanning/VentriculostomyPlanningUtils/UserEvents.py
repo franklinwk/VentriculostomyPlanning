@@ -9,3 +9,4 @@ class VentriculostomyUserEvents(object):
   UpdateCannulaTargetPoint = vtk.vtkCommand.UserEvent + 105
   SetSliceViewerEvent = vtk.vtkCommand.UserEvent + 106
   StartCaseImportEvent = vtk.vtkCommand.UserEvent + 107
+  SaveModifiedFiducialEvent = vtk.vtkCommand.UserEvent + 108
