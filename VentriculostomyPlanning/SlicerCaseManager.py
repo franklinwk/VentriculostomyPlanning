@@ -156,12 +156,12 @@ class SlicerCaseManagerWidget(ModuleWidgetMixin, ScriptedLoadableModuleWidget):
   @vtk.calldata_type(vtk.VTK_OBJECT)
   def StartCaseImportCallback(self, caller, eventId, callData):
     print("loading case")
-    self.logic.update_observers(VentriculostomyUserEvents.StartCaseImportEvent, self.currentCaseDirectory)
+    self.logic.update_observers(VentriculostomyUserEvents.StartCaseImportEvent)
 
   @vtk.calldata_type(vtk.VTK_OBJECT)
   def LoadCaseCompletedCallback(self, caller, eventId, callData):
     print("case loaded")
-    self.logic.update_observers(VentriculostomyUserEvents.LoadCaseCompletedEvent, self.currentCaseDirectory)
+    self.logic.update_observers(VentriculostomyUserEvents.LoadCaseCompletedEvent)
 
   def updateOutputFolder(self):
     if os.path.exists(self.generatedOutputDirectory):
@@ -255,8 +255,8 @@ class SlicerCaseManagerWidget(ModuleWidgetMixin, ScriptedLoadableModuleWidget):
       slicer.util.warningDisplay("The selected case directory seems not to be valid", windowTitle="")
       self.clearData()
     else:
+      # Here the both the slicer.vtkMRMLScene.StartImportEvent and slicer.vtkMRMLScene.EndImportEvent will be triggered
       sucess = slicer.util.loadScene(os.path.join(path, "Results","Results.mrml"))
-
 
   def checkAndWarnUserIfCaseInProgress(self):
     proceed = True
@@ -309,10 +309,10 @@ class SlicerCaseManagerLogic(ModuleLogicMixin, ScriptedLoadableModuleLogic):
     if self.observers:
       del self.observers[:]
 
-  @onReturnProcessEvents
-  def update_observers(self, *args, **kwargs):
+  @beforeRunProcessEvents
+  def update_observers(self, EventID):
     for observer in self.observers:
-      observer.updateFromCaseManager(*args, **kwargs)
+      observer.updateFromCaseManager(EventID)
   
   def closeCase(self, directory):
     if os.path.exists(directory):

@@ -71,6 +71,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.camera = None
     self.volumeSelected = False
     self.jsonFile = ""
+    self.isLoadingCase = False
     layoutManager = slicer.app.layoutManager()
     threeDView = layoutManager.threeDWidget(0).threeDView()
     displayManagers = vtk.vtkCollection()
@@ -729,16 +730,16 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.importedNodeIDs = []
     pass
 
-  @abstractmethod
-  def updateFromCaseManager(self, *args, **kwargs):
-    if args[0] == VentriculostomyUserEvents.CloseCaseEvent:
+  def updateFromCaseManager(self, EventID):
+    if EventID == VentriculostomyUserEvents.CloseCaseEvent:
       self.logic.clear()
       self.SerialAssignBox = SerialAssignMessageBox()
       self.initialFieldsValue()
       self.volumeSelected = False
       self.venousVolumeNameLabel.text = ""
       self.ventricleVolumeNameLabel.text = ""
-    elif args[0] == VentriculostomyUserEvents.LoadCaseCompletedEvent:
+      self.isLoadingCase = False
+    elif EventID == VentriculostomyUserEvents.LoadCaseCompletedEvent:
       allNodes = slicer.mrmlScene.GetNodes()
       for nodeIndex in range(allNodes.GetNumberOfItems()):
         node = allNodes.GetItemAsObject(nodeIndex)
@@ -755,20 +756,21 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
         slicer.util.warningDisplay("Case is not valid, no venous volume found")
       self.nodeAddedEventObserverID = slicer.mrmlScene.AddObserver(slicer.mrmlScene.NodeAddedEvent,
                                                                    self.onVolumeAddedNode)
-    elif args[0] == VentriculostomyUserEvents.StartCaseImportEvent:
+      self.isLoadingCase = False
+    elif EventID == VentriculostomyUserEvents.StartCaseImportEvent:
       self.red_cn.SetDoPropagateVolumeSelection(False) # make sure the compositenode doesn't get updated,
       self.green_cn.SetDoPropagateVolumeSelection(False) # so that the background and foreground volumes are not messed up
       self.yellow_cn.SetDoPropagateVolumeSelection(False)
+      self.isLoadingCase = True
       slicer.mrmlScene.RemoveObserver(self.nodeAddedEventObserverID)
     pass
 
-  @abstractmethod
-  def updateFromLogic(self, *args, **kwargs):
-    if args[0] == VentriculostomyUserEvents.ResetButtonEvent:
+  def updateFromLogic(self, EventID):
+    if EventID == VentriculostomyUserEvents.ResetButtonEvent:
       self.onResetButtons()
-    if args[0] == VentriculostomyUserEvents.SetSliceViewerEvent:
+    if EventID == VentriculostomyUserEvents.SetSliceViewerEvent:
       self.onSetSliceViewer()
-    if args[0] == VentriculostomyUserEvents.SaveModifiedFiducialEvent:
+    if EventID == VentriculostomyUserEvents.SaveModifiedFiducialEvent:
       self.onSaveData()
 
   def initialFieldsValue(self):
@@ -792,7 +794,9 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
 
   @vtk.calldata_type(vtk.VTK_OBJECT)
   def onVolumeAddedNode(self, caller, eventId, callData):
-    if callData.IsA("vtkMRMLVolumeNode"):
+    # When we are loading the cases, though the slicer.mrmlScene.NodeAddedEvent is removed, sometimes this function is still triggered.
+    # We use the flag isLoadingCase to make sure it is not called.
+    if callData.IsA("vtkMRMLVolumeNode") and (not self.isLoadingCase):
       volumeName = callData.GetName()
       #self.importedNodeIDs.append(callData.GetID())
       if self.onSaveDicomFiles():
@@ -1157,18 +1161,19 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       self.logic.placeWidget.setPlaceModeEnabled(False)
 
   def onSaveData(self):
-    outputDir = os.path.join(self.slicerCaseWidget.currentCaseDirectory, "Results")
-    nodeAttributes=["rel_model","rel_nasion","rel_sagittalPoint","rel_target","rel_distal",\
-                    "rel_cannula","rel_skullNorm","rel_cannulaModel","rel_sagittalReferenceModel","rel_coronalReferenceModel",\
-                    "rel_sagittalPlanningModel","rel_coronalPlanningModel","rel_grayScaleModel","rel_grayScaleModelWithMargin","rel_vesselnessVolume"]
-    for attribute in nodeAttributes:
-      nodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode."+attribute)
-      if nodeID and slicer.mrmlScene.GetNodeByID(nodeID):
-        node = slicer.mrmlScene.GetNodeByID(nodeID)
-        if node.GetModifiedSinceRead():
-          self.logic.savePlanningDataToDirectory(node, outputDir)
-    slicer.util.saveScene(os.path.join(outputDir, "Results.mrml"))
-    self.logic.appendPlanningTimeStampToJson(self.jsonFile, "CaseSavedTime", datetime.datetime.now().time().isoformat())
+    if not self.isLoadingCase:
+      outputDir = os.path.join(self.slicerCaseWidget.currentCaseDirectory, "Results")
+      nodeAttributes=["rel_model","rel_nasion","rel_sagittalPoint","rel_target","rel_distal",\
+                      "rel_cannula","rel_skullNorm","rel_cannulaModel","rel_sagittalReferenceModel","rel_coronalReferenceModel",\
+                      "rel_sagittalPlanningModel","rel_coronalPlanningModel","rel_grayScaleModel","rel_grayScaleModelWithMargin","rel_vesselnessVolume"]
+      for attribute in nodeAttributes:
+        nodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode."+attribute)
+        if nodeID and slicer.mrmlScene.GetNodeByID(nodeID):
+          node = slicer.mrmlScene.GetNodeByID(nodeID)
+          if node.GetModifiedSinceRead():
+            self.logic.savePlanningDataToDirectory(node, outputDir)
+      slicer.util.saveScene(os.path.join(outputDir, "Results.mrml"))
+      self.logic.appendPlanningTimeStampToJson(self.jsonFile, "CaseSavedTime", datetime.datetime.now().time().isoformat())
     pass
 
   def onModifyVenousMargin(self):
@@ -1724,7 +1729,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     if self.observers:
       del self.observers[:]
 
-  @onReturnProcessEvents
+  @beforeRunProcessEvents
   def update_observers(self, *args, **kwargs):
     for observer in self.observers:
       observer.updateFromLogic(*args, **kwargs)
