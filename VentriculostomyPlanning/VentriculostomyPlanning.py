@@ -101,7 +101,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     settingCollapsibleButton = ctk.ctkCollapsibleButton()
     settingCollapsibleButton.collapsed = True
     settingCollapsibleButton.text = "Configuration"
-    self.layout.addWidget(settingCollapsibleButton)
+    #self.layout.addWidget(settingCollapsibleButton)
     settingCollapsibleButton.setVisible(True)
     # Layout within the dummy collapsible button
     appSettingLayout = qt.QFormLayout(settingCollapsibleButton)
@@ -279,37 +279,36 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.mainGUIGroupBoxLayout = qt.QGridLayout()
     self.mainGUIGroupBox.setLayout(self.mainGUIGroupBoxLayout)
 
-    buttonWidth = 60
-    buttonHeight = 60
+    buttonWidth = 45
+    buttonHeight = 45
 
     self.inputVolumeBox = qt.QGroupBox()
-    inputVolumeLayout = qt.QHBoxLayout()
-    inputVolumeLayout.setAlignment(qt.Qt.AlignCenter)
+    inputVolumeLayout = qt.QGridLayout()
+    #inputVolumeLayout.setAlignment(qt.Qt.AlignHCenter)
     self.inputVolumeBox.setLayout(inputVolumeLayout)
-    self.layout.addWidget(self.inputVolumeBox)
-    venousVolumeLabel = qt.QLabel('Venous Volume: ')
+    venousVolumeLabel = qt.QLabel('Venous: ')
     self.venousVolumeNameLabel = qt.QLineEdit()
     self.venousVolumeNameLabel.text = '--'
     self.venousVolumeNameLabel.setMaxLength(50)
     self.venousVolumeNameLabel.readOnly = True
-    self.venousVolumeNameLabel.frame = True
+    #self.venousVolumeNameLabel.frame = True
     self.venousVolumeNameLabel.styleSheet = "QLineEdit { background:transparent; }"
-    inputVolumeLayout.addWidget(venousVolumeLabel)
-    inputVolumeLayout.addWidget(self.venousVolumeNameLabel)
-    ventricleVolumeLabel = qt.QLabel('Ventricle Volume: ')
+    inputVolumeLayout.addWidget(venousVolumeLabel,0,0)
+    inputVolumeLayout.addWidget(self.venousVolumeNameLabel,0,1)
+    ventricleVolumeLabel = qt.QLabel('Ventricle: ')
     self.ventricleVolumeNameLabel = qt.QLineEdit()
     self.ventricleVolumeNameLabel.text = '--'
     self.ventricleVolumeNameLabel.setMaxLength(50)
     self.ventricleVolumeNameLabel.readOnly = True
-    self.ventricleVolumeNameLabel.frame = True
+    #self.ventricleVolumeNameLabel.frame = True
     self.ventricleVolumeNameLabel.styleSheet = "QLineEdit { background:transparent; }"
-    inputVolumeLayout.addWidget(ventricleVolumeLabel)
-    inputVolumeLayout.addWidget(self.ventricleVolumeNameLabel)
-    self.showVolumeTable = qt.QPushButton("Show Assignment Table")
+    inputVolumeLayout.addWidget(ventricleVolumeLabel,0,2)
+    inputVolumeLayout.addWidget(self.ventricleVolumeNameLabel,0,3)
+    self.showVolumeTable = qt.QPushButton("Show Table")
     self.showVolumeTable.toolTip = "Show the table of volumes for assignment."
     self.showVolumeTable.enabled = True
     self.showVolumeTable.connect('clicked(bool)', self.onShowVolumeTable)
-    inputVolumeLayout.addWidget(self.showVolumeTable)
+    inputVolumeLayout.addWidget(self.showVolumeTable,0,4)
     self.inputVolumeSelector = slicer.qMRMLNodeComboBox()
     self.inputVolumeSelector.nodeTypes = ["vtkMRMLScalarVolumeNode"]
     self.inputVolumeSelector.setMRMLScene( slicer.mrmlScene )
@@ -435,6 +434,22 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     '''
     self.mainGUIGroupBoxLayout.addWidget(self.addCannulaTargetButton,2,3)
 
+    self.addVesselSeedBox = qt.QGroupBox()
+    addVesselSeedLayout = qt.QVBoxLayout()
+    addVesselSeedLayout.setAlignment(qt.Qt.AlignCenter)
+    self.addVesselSeedBox.setLayout(addVesselSeedLayout)
+    self.addVesselSeedButton = qt.QPushButton("")
+    self.addVesselSeedButton.setCheckable(True)
+    self.addVesselSeedButton.toolTip = ""
+    self.addVesselSeedButton.enabled = True
+    addVesselSeedLayout.addWidget(self.addVesselSeedButton)
+    self.addVesselSeedButton.setMaximumHeight(buttonHeight)
+    self.addVesselSeedButton.setMaximumWidth(buttonWidth)
+    self.addVesselSeedButton.setToolTip("place the seeds on the vessels")
+    self.addVesselSeedButton.setIcon(qt.QIcon(qt.QPixmap(os.path.join(self.scriptDirectory, "cannula.png"))))
+    self.addVesselSeedButton.setIconSize(qt.QSize(self.addVesselSeedButton.size))
+    self.mainGUIGroupBoxLayout.addWidget(self.addVesselSeedButton, 2, 4)
+
     self.generatePathBox = qt.QGroupBox()
     generatePathLayout = qt.QVBoxLayout()
     generatePathLayout.setAlignment(qt.Qt.AlignCenter)
@@ -451,7 +466,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.generatePathButton.setIcon(qt.QIcon(qt.QPixmap(os.path.join(self.scriptDirectory, "pathPlanning.png"))))
     self.generatePathButton.setIconSize(qt.QSize(self.generatePathButton.size))
     self.generatePathBox.setStyleSheet('QGroupBox{border:0;}')
-    self.mainGUIGroupBoxLayout.addWidget(self.generatePathButton, 2, 4)
+    self.mainGUIGroupBoxLayout.addWidget(self.generatePathButton, 2, 5)
 
     # end of GUI section
     #####################################
@@ -541,7 +556,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.createPlanningLineButton.setIcon(qt.QIcon(qt.QPixmap(os.path.join(self.scriptDirectory, "confirm.png"))))
     self.createPlanningLineButton.setIconSize(qt.QSize(self.createPlanningLineButton.size))
     self.confirmBox.setStyleSheet('QGroupBox{border:0;}')
-    self.mainGUIGroupBoxLayout.addWidget(self.createPlanningLineButton, 2, 5)
+    self.mainGUIGroupBoxLayout.addWidget(self.createPlanningLineButton, 2, 6)
 
     self.saveBox = qt.QGroupBox()
     saveLayout = qt.QVBoxLayout()
