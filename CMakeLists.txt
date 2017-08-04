@@ -10,7 +10,7 @@ set(EXTENSION_CONTRIBUTORS "Junichi Tokuda (BWH)")
 set(EXTENSION_DESCRIPTION "This is an extension to support Ventriculostomy planning.")
 set(EXTENSION_ICONURL "http://www.example.com/Slicer/Extensions/VentriculostomyPlanning.png")
 set(EXTENSION_SCREENSHOTURLS "http://www.example.com/Slicer/Extensions/VentriculostomyPlanning/Screenshots/1.png")
-set(EXTENSION_DEPENDS "NA") # Specified as a space separated string, a list or 'NA' if any
+set(EXTENSION_DEPENDS "SlicerDevelopmentToolbox") # Specified as a space separated string, a list or 'NA' if any
 
 #-----------------------------------------------------------------------------
 # Extension dependencies

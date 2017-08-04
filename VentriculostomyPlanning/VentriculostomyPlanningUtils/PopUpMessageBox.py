@@ -106,7 +106,6 @@ class SerialAssignMessageBox(qt.QMessageBox):
     self.ConfirmButtonValid()
   def ConfirmButtonValid(self):
     checkedNum = 0
-    self.volumesCheckedDict.clear()
     for count, box in enumerate(self.serialCheckboxVenous):
       if box.checkState():
         checkedNum = checkedNum + 1

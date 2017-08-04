@@ -15,8 +15,7 @@ import PercutaneousApproachAnalysis
 from PercutaneousApproachAnalysis import *
 from numpy import linalg
 from code import interact
-import SlicerCaseManager
-from SlicerCaseManager import onReturnProcessEvents, beforeRunProcessEvents
+from SlicerCaseManager import SlicerCaseManagerWidget, onReturnProcessEvents, beforeRunProcessEvents
 from VentriculostomyPlanningUtils.PopUpMessageBox import SerialAssignMessageBox
 from SlicerDevelopmentToolboxUtils.buttons import WindowLevelEffectsButton
 from shutil import copyfile
@@ -264,7 +263,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     slicerCaseWidgetParent = slicer.qMRMLWidget()
     slicerCaseWidgetParent.setLayout(qt.QVBoxLayout())
     slicerCaseWidgetParent.setMRMLScene(slicer.mrmlScene)
-    self.slicerCaseWidget = SlicerCaseManager.SlicerCaseManagerWidget(slicerCaseWidgetParent)
+    self.slicerCaseWidget = SlicerCaseManagerWidget(slicerCaseWidgetParent)
     self.slicerCaseWidget.logic.register(self)
     CaseManagerConfigLayout.addWidget(self.slicerCaseWidget.patientWatchBox)
     CaseManagerConfigLayout.addWidget(self.slicerCaseWidget.collapsibleDirectoryConfigurationArea)
@@ -751,6 +750,11 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
                                                self.logic.ventricleVolume.GetID())
         self.venousVolumeNameLabel.text = self.logic.baseVolumeNode.GetName()
         self.ventricleVolumeNameLabel.text = self.logic.ventricleVolume.GetName()
+        self.SerialAssignBox.volumesCheckedDict = { "Venous" : self.logic.baseVolumeNode,
+                                                    "Ventricle": self.logic.ventricleVolume,
+                                                  }
+        self.SerialAssignBox.AppendVolumeNode(self.logic.baseVolumeNode)
+        self.SerialAssignBox.AppendVolumeNode(self.logic.ventricleVolume)
         self.onSelect(self.logic.baseVolumeNode)
       else:
         slicer.util.warningDisplay("Case is not valid, no venous volume found")
