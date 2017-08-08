@@ -448,6 +448,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     self.addVesselSeedButton.setToolTip("place the seeds on the vessels")
     self.addVesselSeedButton.setIcon(qt.QIcon(qt.QPixmap(os.path.join(self.scriptDirectory, "cannula.png"))))
     self.addVesselSeedButton.setIconSize(qt.QSize(self.addVesselSeedButton.size))
+    self.addVesselSeedButton.connect('clicked(bool)', self.onPlaceVesselSeed)
     self.mainGUIGroupBoxLayout.addWidget(self.addVesselSeedButton, 2, 4)
 
     self.generatePathBox = qt.QGroupBox()
@@ -1121,6 +1122,23 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
     yellow_cn.SetForegroundOpacity(sliderValue/100.0)
     green_cn.SetForegroundOpacity(sliderValue/100.0)
     pass
+  
+  def onPlaceVesselSeed(self):
+    if self.addVesselSeedButton.isChecked():
+      if not self.logic.baseVolumeNode:
+        slicer.util.warningDisplay("No case is selected, please create a case", windowTitle="")
+      else:
+        targetNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_target")
+        distalNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_distal")
+        if targetNodeID and distalNodeID:
+          ventriculCylinder = self.cylinderManager._curveModel.GetPolyData()
+          if ventriculCylinder:
+            print "adding"
+            self.onSet3DViewer()
+          self.onSetSliceViewer()
+    else:
+      self.logic.placeWidget.setPlaceModeEnabled(False)
+    pass
     
   def onCreateModel(self):
     if self.logic.baseVolumeNode:
@@ -1144,7 +1162,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
   def onSelectNasionPoint(self):
     if self.selectNasionButton.isChecked():
       if not self.logic.baseVolumeNode:
-        slicer.util.warningDisplay("No case is selceted, please select the case in the combox", windowTitle="")
+        slicer.util.warningDisplay("No case is selected, please select the case in the combox", windowTitle="")
       else:
         outputModelNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_model")
         if outputModelNodeID:
@@ -1155,7 +1173,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
           self.logic.selectNasionPointNode(outputModelNode) # when the model is not available, the model will be created, so nodeAdded signal should be disconnected
           self.onSetSliceViewer()
     else:
-      self.interactionMode = "none"
       self.logic.placeWidget.setPlaceModeEnabled(False)
       nasionNode = slicer.mrmlScene.GetNodeByID(self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_nasion"))
       dnode = nasionNode.GetMarkupsDisplayNode()
@@ -1165,7 +1182,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
   def onSelectSagittalPoint(self):
     if self.selectSagittalButton.isChecked():
       if not self.logic.baseVolumeNode:
-        slicer.util.warningDisplay("No case is selceted, please select the case in the combox", windowTitle="")
+        slicer.util.warningDisplay("No case is selected, please select the case in the combox", windowTitle="")
       else:
         outputModelNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_model")
         if outputModelNodeID:
@@ -1176,7 +1193,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
           self.logic.selectSagittalPointNode(outputModelNode) # when the model is not available, the model will be created, so nodeAdded signal should be disconnected
           self.onSetSliceViewer()
     else:
-      self.interactionMode = "none"
       self.logic.placeWidget.setPlaceModeEnabled(False)
 
   def onSaveData(self):
@@ -1409,7 +1425,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
       #self.logic.setSliceForCylinder()
       self.logic.startEditPlanningTarget()
     else:
-      self.interactionMode = "none"
       self.logic.placeWidget.setPlaceModeEnabled(False)
 
   # Event handlers for trajectory
@@ -2995,6 +3010,8 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       self.endVentricleCylinderDefinition()
       self.endModifiyCylinder()
       self.update_observers(VentriculostomyUserEvents.ResetButtonEvent)
+    elif self.interactionMode == "vesselSeeds":
+      pass
     self.update_observers(VentriculostomyUserEvents.SaveModifiedFiducialEvent)
     pass
    
