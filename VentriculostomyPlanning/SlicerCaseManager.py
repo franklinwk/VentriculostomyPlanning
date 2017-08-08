@@ -84,7 +84,7 @@ class SlicerCaseManagerWidget(ModuleWidgetMixin, ScriptedLoadableModuleWidget):
 
   @property
   def planningDICOMDataDirectory(self):
-    return os.path.join(self.currentCaseDirectory, "DICOM", "Planning") if self.currentCaseDirectory else None
+    return os.path.join(self.currentCaseDirectory, "DICOM", "Planning") if os.path.exists(self.currentCaseDirectory) else None
 
   @property
   def outputDir(self):
