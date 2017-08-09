@@ -3,6 +3,7 @@ import json
 import unittest
 import vtk, qt, ctk, slicer
 from slicer.ScriptedLoadableModule import *
+from slicer.util import VTKObservationMixin
 from ctk import ctkAxesWidget
 import logging
 import tempfile
@@ -53,13 +54,14 @@ class VentriculostomyPlanning(ScriptedLoadableModule):
 # VentriculostomyPlanningWidget
 #
 
-class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
+class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
   """Uses ScriptedLoadableModuleWidget base class, available at:
   https://github.com/Slicer/Slicer/blob/master/Base/Python/slicer/ScriptedLoadableModule.py
   """
 
   def setup(self):
     ScriptedLoadableModuleWidget.setup(self)
+    VTKObservationMixin.__init__(self)
     self.logic = VentriculostomyPlanningLogic()
     self.logic.register(self)
     self.dicomWidget = DICOMWidget()
@@ -827,12 +829,14 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
   def onVolumeAddedNode(self, caller, eventId, callData):
     # When we are loading the cases, though the slicer.mrmlScene.NodeAddedEvent is removed, sometimes this function is still triggered.
     # We use the flag isLoadingCase to make sure it is not called.
+    slicer.app.processEvents()
     if callData.IsA("vtkMRMLVolumeNode") and (not self.isLoadingCase):
       volumeName = callData.GetName()
       #self.importedNodeIDs.append(callData.GetID())
       if self.onSaveDicomFiles():
         self.SerialAssignBox.AppendVolumeNode(callData)
         self.initialNodesIDList.append(callData.GetID())
+        """
         if ("Venous" in volumeName) or ("venous" in volumeName) :
           self.logic.baseVolumeNode = callData
           self.SerialAssignBox.volumesCheckedDict["Venous"] = callData
@@ -856,8 +860,9 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget):
           outputDir = os.path.join(self.slicerCaseWidget.currentCaseDirectory, "Results")
           self.logic.savePlanningDataToDirectory(self.logic.baseVolumeNode, outputDir)
           self.logic.savePlanningDataToDirectory(self.logic.ventricleVolume, outputDir)
+          self.isLoadingCase = True
           self.onSelect(self.logic.baseVolumeNode)
-
+        """
 
 
         #the setForegroundVolume will not work, because the slicerapp triggers the SetBackgroundVolume after the volume is loaded
@@ -3165,27 +3170,23 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
           targetNode.GetNthFiducialPosition(0, posTarget)
           posDistal = numpy.array([0.0, 0.0, 0.0])
           distalNode.GetNthFiducialPosition(0, posDistal)
-          if numpy.linalg.norm(posDistal-posTarget)<(self.minimalVentricleLen*0.999):
-            slicer.util.warningDisplay("The define ventricle horn is too short, distal point is automatically modified to make length longer than 10.0 mm")
-            posDistalNew = (posDistal-posTarget)/numpy.linalg.norm(posDistal-posTarget)*self.minimalVentricleLen + posTarget
-            distalNode.SetNthFiducialPositionFromArray(0,posDistalNew)
+          if numpy.linalg.norm(posDistal - posTarget) < (self.minimalVentricleLen * 0.999):
+            slicer.util.warningDisplay(
+              "The define ventricle horn is too short, distal point is automatically modified to make length longer than 10.0 mm")
+            posDistalNew = (posDistal - posTarget) / numpy.linalg.norm(
+              posDistal - posTarget) * self.minimalVentricleLen + posTarget
+            distalNode.SetNthFiducialPositionFromArray(0, posDistalNew)
             posDistal = posDistalNew
             self.ReleaseLeftButton()
-          if self.cylinderManager.curveFiducials:
-            slicer.mrmlScene.RemoveNode(self.cylinderManager.curveFiducials)
-            self.cylinderManager.curveFiducials = None
-          tempFiducialNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
-          tempFiducialNode.RemoveAllMarkups()
-          tempFiducialNode.AddFiducial(posTarget[0], posTarget[1], posTarget[2])
-          tempFiducialNode.AddFiducial(posDistal[0], posDistal[1], posDistal[2])
-          slicer.mrmlScene.AddNode(tempFiducialNode)
-          tempFiducialNode.SetDisplayVisibility(0)
+          if self.cylinderManager.curveFiducials.GetNumberOfFiducials():
+            self.cylinderManager.curveFiducials.RemoveAllMarkups()
+          self.cylinderManager.curveFiducials.AddFiducial(posTarget[0], posTarget[1], posTarget[2])
+          self.cylinderManager.curveFiducials.AddFiducial(posDistal[0], posDistal[1], posDistal[2])
+          self.cylinderManager.curveFiducials.SetDisplayVisibility(0)
           self.cylinderManager.setManagerTubeRadius(radius)
-          #self.cylinderManager.cmLogic.setTubeRadius(radius)
-          self.cylinderManager.curveFiducials = tempFiducialNode
           self.cylinderManager.startEditLine()
           self.cylinderManager.onLineSourceUpdated()
-          self.updateSliceViewBasedOnPoints(posTarget,posDistal)
+          self.updateSliceViewBasedOnPoints(posTarget, posDistal)
         else:
           self.cylinderManager.clearLine()
     else:
