@@ -18,12 +18,13 @@ from numpy import linalg
 from code import interact
 from SlicerCaseManager import SlicerCaseManagerWidget, onReturnProcessEvents, beforeRunProcessEvents
 from VentriculostomyPlanningUtils.PopUpMessageBox import SerialAssignMessageBox
+from VentriculostomyPlanningUtils.UserEvents import VentriculostomyUserEvents
+from VentriculostomyPlanningUtils.UsefulFunctions import UsefulFunctions
 from SlicerDevelopmentToolboxUtils.buttons import WindowLevelEffectsButton
 from shutil import copyfile
 from os.path import basename
 from os import listdir
-from VentriculostomyPlanningUtils.UserEvents import VentriculostomyUserEvents
-from VentriculostomyPlanningUtils.UsefulFunctions import UsefulFunctions
+
 from abc import ABCMeta, abstractmethod
 import datetime
 #
@@ -314,6 +315,8 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
     inputVolumeLayout.addWidget(ventricleVolumeLabel,0,2)
     inputVolumeLayout.addWidget(self.ventricleVolumeNameLabel,0,3)
     self.showVolumeTable = qt.QPushButton("Show Table")
+    self.showVolumeTable.setMaximumWidth(80)
+    self.showVolumeTable.setMaximumHeight(35)
     self.showVolumeTable.toolTip = "Show the table of volumes for assignment."
     self.showVolumeTable.enabled = True
     self.showVolumeTable.connect('clicked(bool)', self.onShowVolumeTable)
@@ -455,11 +458,12 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
     self.addVesselSeedButton.setMaximumHeight(buttonHeight)
     self.addVesselSeedButton.setMaximumWidth(buttonWidth)
     self.addVesselSeedButton.setToolTip("place the seeds on the vessels")
-    self.addVesselSeedButton.setIcon(qt.QIcon(qt.QPixmap(os.path.join(self.scriptDirectory, "cannula.png"))))
+    self.addVesselSeedButton.setIcon(qt.QIcon(qt.QPixmap(os.path.join(self.scriptDirectory, "vessel.png"))))
     self.addVesselSeedButton.setIconSize(qt.QSize(self.addVesselSeedButton.size))
     self.addVesselSeedButton.connect('clicked(bool)', self.onPlaceVesselSeed)
     self.mainGUIGroupBoxLayout.addWidget(self.addVesselSeedButton, 2, 4)
     
+    """
     self.vesselnessCalcButton = qt.QPushButton("VesselnessCalc")
     self.vesselnessCalcButton.toolTip = "Use Vesselness calculation "
     self.vesselnessCalcButton.enabled = True
@@ -467,7 +471,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
     self.vesselnessCalcButton.setMaximumWidth(buttonWidth)
     self.vesselnessCalcButton.connect('clicked(bool)', self.onVenousVesselnessCalc)
     self.mainGUIGroupBoxLayout.addWidget(self.vesselnessCalcButton, 2, 5)
-
+    """
     self.generatePathBox = qt.QGroupBox()
     generatePathLayout = qt.QVBoxLayout()
     generatePathLayout.setAlignment(qt.Qt.AlignCenter)
@@ -484,16 +488,27 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
     self.generatePathButton.setIcon(qt.QIcon(qt.QPixmap(os.path.join(self.scriptDirectory, "pathPlanning.png"))))
     self.generatePathButton.setIconSize(qt.QSize(self.generatePathButton.size))
     self.generatePathBox.setStyleSheet('QGroupBox{border:0;}')
-    self.mainGUIGroupBoxLayout.addWidget(self.generatePathButton, 2, 6)
+    self.mainGUIGroupBoxLayout.addWidget(self.generatePathButton, 2, 5)
 
+
+    self.tabWidget = qt.QTabWidget()
+    self.layout.addWidget(self.tabWidget)
+    self.tabWidget.tabBar().hide()
     # end of GUI section
     #####################################
+    self.tabMainGroupBox = qt.QGroupBox()
+    self.tabMainGroupBoxLayout = qt.QVBoxLayout()
+    self.tabMainGroupBox.setLayout(self.tabMainGroupBoxLayout)
+    self.tabMainGroupBoxName = "tabMainGroup"
+    self.tabMarkupsName = "markups"
+    self.tabWidgetChildrenName = [self.tabMainGroupBoxName, self.tabMarkupsName]
+    self.tabWidget.addTab(self.tabMainGroupBox, self.tabMainGroupBoxName)
+    simpleMarkupsWidget = slicer.qSlicerSimpleMarkupsWidget()
+    simpleMarkupsWidget.setMRMLScene(slicer.mrmlScene)
+    self.tabWidget.addTab(simpleMarkupsWidget, self.tabMarkupsName)
+    index = next((i for i, name in enumerate(self.tabWidgetChildrenName) if name == self.tabMainGroupBoxName), None)
+    self.tabWidget.setCurrentIndex(index)
     createPlanningLineHorizontalLayout = qt.QHBoxLayout()
-    self.lockTrajectoryCheckBox = qt.QCheckBox()
-    self.lockTrajectoryCheckBox.checked = 0
-    self.lockTrajectoryCheckBox.setToolTip("If checked, the trajectory will be locked.")
-    createPlanningLineHorizontalLayout.addWidget(self.lockTrajectoryCheckBox)
-
     self.setReverseViewButton = qt.QPushButton("Set Reverse 3D View")
     self.setReverseViewButton.setMinimumWidth(150)
     self.setReverseViewButton.toolTip = "Change the perspective view in 3D viewer."
@@ -505,7 +520,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
     self.viewGroupBox = qt.QGroupBox()
     self.viewGroupBoxLayout = qt.QVBoxLayout()
     self.viewGroupBox.setLayout(self.viewGroupBoxLayout)
-    self.layout.addWidget(self.viewGroupBox)
+    self.tabMainGroupBoxLayout.addWidget(self.viewGroupBox)
 
     viewGroupBoxLabel = qt.QLabel('Viewer Configuration')
     self.viewGroupBoxLayout.addWidget(viewGroupBoxLabel)
@@ -513,7 +528,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
     self.viewSubGroupBox = qt.QGroupBox()
     self.viewSubGroupBoxLayout = qt.QHBoxLayout()
     self.viewSubGroupBox.setLayout(self.viewSubGroupBoxLayout)
-    self.viewGroupBoxLayout.addWidget(self.viewSubGroupBox)
+    self.tabMainGroupBoxLayout.addWidget(self.viewSubGroupBox)
     # self.viewSubGroupBox.setStyleSheet("border:3")
 
     venousVolumeLabel = qt.QLabel('Venous Image')
@@ -535,7 +550,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
     self.infoGroupBox = qt.QGroupBox()
     self.infoGroupBoxLayout = qt.QVBoxLayout()
     self.infoGroupBox.setLayout(self.infoGroupBoxLayout)
-    self.layout.addWidget(self.infoGroupBox)
 
     cannulaLengthInfoLayout = qt.QHBoxLayout()
     lengthTrajectoryLabel = qt.QLabel('Cannula Length:')
@@ -574,7 +588,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
     self.createPlanningLineButton.setIcon(qt.QIcon(qt.QPixmap(os.path.join(self.scriptDirectory, "confirm.png"))))
     self.createPlanningLineButton.setIconSize(qt.QSize(self.createPlanningLineButton.size))
     self.confirmBox.setStyleSheet('QGroupBox{border:0;}')
-    self.mainGUIGroupBoxLayout.addWidget(self.createPlanningLineButton, 2, 7)
+    self.mainGUIGroupBoxLayout.addWidget(self.createPlanningLineButton, 2, 6)
 
     self.saveBox = qt.QGroupBox()
     saveLayout = qt.QVBoxLayout()
@@ -593,14 +607,13 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
     self.saveDataButton.setIcon(qt.QIcon(qt.QPixmap(os.path.join(self.scriptDirectory, "save.png"))))
     self.saveDataButton.setIconSize(qt.QSize(self.createPlanningLineButton.size))
     self.saveBox.setStyleSheet('QGroupBox{border:0;}')
-    self.mainGUIGroupBoxLayout.addWidget(self.saveDataButton, 2, 8)
+    self.mainGUIGroupBoxLayout.addWidget(self.saveDataButton, 2, 7)
 
      # Needle trajectory
     self.addCannulaTargetButton.connect('clicked(bool)', self.onEditPlanningTarget)
     #self.addCannulaDistalButton.connect('clicked(bool)', self.onEditPlanningDistal)
     self.generatePathButton.connect('clicked(bool)', self.onGeneratePath)
     self.clearTrajectoryButton.connect('clicked(bool)', self.onClearTrajectory)
-    self.lockTrajectoryCheckBox.connect('toggled(bool)', self.onLock)
 
     #
     # Mid-sagittalReference line
@@ -745,6 +758,8 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
     self.infoGroupBoxLayout.addLayout(planningSkullNormToCoronalAngleLayout)
     self.infoGroupBoxLayout.addLayout(planningCannulaToNormAngleLayout)
     self.infoGroupBoxLayout.addLayout(planningCannulaToCoronalAngleLayout)
+    self.tabMainGroupBoxLayout.addWidget(self.infoGroupBox)
+    self.tabMainGroupBoxLayout.addStretch(1)
 
     # Add vertical spacer
     self.layout.addStretch(1)
@@ -763,7 +778,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
     pass
 
   def updateFromCaseManager(self, EventID):
-    if EventID == VentriculostomyUserEvents.CloseCaseEvent:
+    if EventID == self.slicerCaseWidget.CloseCaseEvent:
       self.logic.clear()
       self.SerialAssignBox = SerialAssignMessageBox()
       self.initialFieldsValue()
@@ -771,7 +786,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
       self.venousVolumeNameLabel.text = ""
       self.ventricleVolumeNameLabel.text = ""
       self.isLoadingCase = False
-    elif EventID == VentriculostomyUserEvents.LoadCaseCompletedEvent:
+    elif EventID == self.slicerCaseWidget.LoadCaseCompletedEvent:
       allNodes = slicer.mrmlScene.GetNodes()
       for nodeIndex in range(allNodes.GetNumberOfItems()):
         node = allNodes.GetItemAsObject(nodeIndex)
@@ -794,7 +809,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
       self.nodeAddedEventObserverID = slicer.mrmlScene.AddObserver(slicer.mrmlScene.NodeAddedEvent,
                                                                    self.onVolumeAddedNode)
       self.isLoadingCase = False
-    elif EventID == VentriculostomyUserEvents.StartCaseImportEvent:
+    elif EventID == self.slicerCaseWidget.StartCaseImportEvent:
       self.red_cn.SetDoPropagateVolumeSelection(False) # make sure the compositenode doesn't get updated,
       self.green_cn.SetDoPropagateVolumeSelection(False) # so that the background and foreground volumes are not messed up
       self.yellow_cn.SetDoPropagateVolumeSelection(False)
@@ -1033,7 +1048,10 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
         self.progressBar.labelText = 'Calculating Vessel'
         slicer.app.processEvents()
         #self.onVenousGrayScaleCalc()
-        self.onVenousVesselnessCalc
+        vesselSeedsID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_vesselSeeds")
+        vesselSeedsNode = slicer.mrmlScene.GetNodeByID(vesselSeedsID)
+        if vesselSeedsNode and vesselSeedsNode.GetNumberOfFiducials():
+          self.onVenousVesselnessCalc()
         self.progressBar.value = 75
         self.logic.calculateCannulaTransform()
         self.onSetSliceViewerOnBaseVolume()
@@ -1145,14 +1163,36 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
     green_widget = slicer.app.layoutManager().sliceWidget("Green")
     green_logic = green_widget.sliceLogic()
     green_cn = green_logic.GetSliceCompositeNode()
-    red_cn.SetForegroundOpacity(sliderValue/100.0)
-    yellow_cn.SetForegroundOpacity(sliderValue/100.0)
-    green_cn.SetForegroundOpacity(sliderValue/100.0)
+    red_cn.SetForegroundOpacity(sliderValue / 100.0)
+    yellow_cn.SetForegroundOpacity(sliderValue / 100.0)
+    green_cn.SetForegroundOpacity(sliderValue / 100.0)
+
+  def setBackgroundAndForegroundIDs(self, foregroundVolumeID=None, backgroundVolumeID=None):
+    red_widget = slicer.app.layoutManager().sliceWidget("Red")
+    red_logic = red_widget.sliceLogic()
+    red_cn = red_logic.GetSliceCompositeNode()
+    yellow_widget = slicer.app.layoutManager().sliceWidget("Yellow")
+    yellow_logic = yellow_widget.sliceLogic()
+    yellow_cn = yellow_logic.GetSliceCompositeNode()
+    green_widget = slicer.app.layoutManager().sliceWidget("Green")
+    green_logic = green_widget.sliceLogic()
+    green_cn = green_logic.GetSliceCompositeNode()
+    if foregroundVolumeID:
+      red_cn.SetForegroundVolumeID(foregroundVolumeID)
+      yellow_cn.SetForegroundVolumeID(foregroundVolumeID)
+      green_cn.SetForegroundVolumeID(foregroundVolumeID)
+    if backgroundVolumeID:
+      red_cn.SetBackgroundVolumeID(backgroundVolumeID)
+      yellow_cn.SetBackgroundVolumeID(backgroundVolumeID)
+      green_cn.SetBackgroundVolumeID(backgroundVolumeID)
     pass
   
   def onPlaceVesselSeed(self):
     slicer.mrmlScene.RemoveObserver(self.nodeAddedEventObserverID)
+    self.imageSlider.setValue(0.0)
     if self.addVesselSeedButton.isChecked():
+      index = next((i for i, name in enumerate(self.tabWidgetChildrenName) if name == self.tabMarkupsName), None)
+      self.tabWidget.setCurrentIndex(index)
       self.isInAlgorithmSteps = True
       if not self.logic.baseVolumeNode:
         slicer.util.warningDisplay("No case is selected, please create a case", windowTitle="")
@@ -1198,9 +1238,13 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
             self.onSet3DViewer()
             self.onSetSliceViewerOnCroppedVolume()
             self.logic.selectVesselSeedsNode(croppedVolumeNode)
+            self.setBackgroundAndForegroundIDs(backgroundVolumeID=croppedVolumeNodeID)
     else:
+      index = next((i for i, name in enumerate(self.tabWidgetChildrenName) if name == self.tabMainGroupBoxName), None)
+      self.tabWidget.setCurrentIndex(index)
       self.logic.placeWidget.setPlaceModeEnabled(False)
       self.logic.interactionMode = "none"
+      self.onVenousVesselnessCalc()
       self.isInAlgorithmSteps = False
     self.nodeAddedEventObserverID = slicer.mrmlScene.AddObserver(slicer.mrmlScene.NodeAddedEvent,
                                                                  self.onVolumeAddedNode)
@@ -1409,7 +1453,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
       vesselnessVolumeNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_vesselnessVolume")
       if vesselnessVolumeNodeID:
         vesselnessVolumeNode = slicer.mrmlScene.GetNodeByID(vesselnessVolumeNodeID)
-        self.vesselnessCalcButton.setEnabled(0)
         slicer.mrmlScene.RemoveObserver(self.nodeAddedEventObserverID)
         outputTubeFile = os.path.join(self.slicerCaseWidget.outputDir, "OutputTubeTree")
         try:
@@ -1436,8 +1479,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
       self.progressBar.value = 50
       self.progressBar.labelText = 'Calculating Vessel margin'
       slicer.app.processEvents()
-      self.vesselnessCalcButton.setEnabled(1)
-      self.grayScaleMakerButton.setEnabled(1)
       slicer.mrmlScene.RemoveObserver(self.nodeAddedEventObserverID)
       try:
         self.logic.calculateVesselWithMargin()
@@ -1452,6 +1493,9 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
         self.progressBar.value = 100
         self.progressBar.close()
         self.onSaveData()
+    else:
+      slicer.util.warningDisplay("Vessel segmentation failed, considering replace the seeds.")
+    self.grayScaleMakerButton.enabled = True
     pass
 
   def onResetButtons(self, caller = None, event = None):
@@ -1503,6 +1547,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
   # Event handlers for trajectory
   def onEditPlanningTarget(self):
     if self.addCannulaTargetButton.isChecked():
+      self.onSetSliceViewerOnBaseVolume()
       self.imageSlider.setValue(100.0)
       self.initialFieldsValue()
       #self.logic.setSliceForCylinder()
@@ -2834,7 +2879,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         displayNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsDisplayNode")
         slicer.mrmlScene.AddNode(displayNode)
         slicer.mrmlScene.AddNode(vesselSeedsNode)
-        vesselSeedsNode.SetAndObserveDisplayNodeID(vesselSeedsNode.GetID())
+        vesselSeedsNode.SetAndObserveDisplayNodeID(displayNode.GetID())
         self.baseVolumeNode.SetAttribute(attribute, vesselSeedsNode.GetID())
       elif attribute == "vtkMRMLScalarVolumeNode.rel_cylinderRadius":
         self.baseVolumeNode.SetAttribute(attribute, str(self.cylinderRadius))

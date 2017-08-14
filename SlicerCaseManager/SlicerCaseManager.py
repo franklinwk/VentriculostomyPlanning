@@ -4,10 +4,9 @@ import shutil, datetime, logging
 import ctk, vtk, qt, slicer, inspect
 from collections import OrderedDict
 from functools import wraps
-from VentriculostomyPlanningUtils.UserEvents import VentriculostomyUserEvents
 
 from slicer.ScriptedLoadableModule import *
-from SlicerDevelopmentToolboxUtils import *
+#from SlicerDevelopmentToolboxUtils import *
 from SlicerDevelopmentToolboxUtils.widgets import BasicInformationWatchBox, DICOMBasedInformationWatchBox, IncomingDataWindow
 from SlicerDevelopmentToolboxUtils.helpers import WatchBoxAttribute
 from SlicerDevelopmentToolboxUtils.mixins import ModuleWidgetMixin, ModuleLogicMixin, ParameterNodeObservationMixin
@@ -61,6 +60,7 @@ class SlicerCaseManagerWidget(ModuleWidgetMixin, ScriptedLoadableModuleWidget):
     self.rootDirectoryLabel.setText(str(self._caseRootDir))
     self.openCaseButton.enabled = exists
     self.createNewCaseButton.enabled = exists
+
   
   @property
   def caseDirectoryList(self):
@@ -131,6 +131,10 @@ class SlicerCaseManagerWidget(ModuleWidgetMixin, ScriptedLoadableModuleWidget):
     self._caseDirectoryList = {}
     self.caseDirectoryList = {"DICOM/Planning", "Results"}
     self.warningBox = qt.QMessageBox()
+    self.caseDialog = NewCaseSelectionNameWidget(self.caseRootDir)
+    self.CloseCaseEvent = vtk.vtkCommand.UserEvent + 151
+    self.LoadCaseCompletedEvent = vtk.vtkCommand.UserEvent + 152
+    self.StartCaseImportEvent = vtk.vtkCommand.UserEvent + 157
     self.setup()
 
   def setup(self):
@@ -156,12 +160,12 @@ class SlicerCaseManagerWidget(ModuleWidgetMixin, ScriptedLoadableModuleWidget):
   @vtk.calldata_type(vtk.VTK_OBJECT)
   def StartCaseImportCallback(self, caller, eventId, callData):
     print("loading case")
-    self.logic.update_observers(VentriculostomyUserEvents.StartCaseImportEvent)
+    self.logic.update_observers(self.StartCaseImportEvent)
 
   @vtk.calldata_type(vtk.VTK_OBJECT)
   def LoadCaseCompletedCallback(self, caller, eventId, callData):
     print("case loaded")
-    self.logic.update_observers(VentriculostomyUserEvents.LoadCaseCompletedEvent)
+    self.logic.update_observers(self.LoadCaseCompletedEvent)
 
   def updateOutputFolder(self):
     if os.path.exists(self.generatedOutputDirectory):
@@ -223,7 +227,6 @@ class SlicerCaseManagerWidget(ModuleWidgetMixin, ScriptedLoadableModuleWidget):
       self.warningBox.exec_()
       return
     self.clearData()
-    self.caseDialog = NewCaseSelectionNameWidget(self.caseRootDir)
     selectedButton = self.caseDialog.exec_()
     if selectedButton == qt.QMessageBox.Ok:
       newCaseDirectory = self.caseDialog.newCaseDirectory
@@ -249,7 +252,7 @@ class SlicerCaseManagerWidget(ModuleWidgetMixin, ScriptedLoadableModuleWidget):
     if not path:
       return
     slicer.mrmlScene.Clear(0)
-    self.logic.update_observers(VentriculostomyUserEvents.CloseCaseEvent)
+    self.logic.update_observers(self.CloseCaseEvent)
     self.currentCaseDirectory = path
     if (not os.path.exists(os.path.join(path, "DICOM", "Planning")) ) or (not os.path.exists(os.path.join(path, "Results")) ):
       slicer.util.warningDisplay("The selected case directory seems not to be valid", windowTitle="")
@@ -275,7 +278,7 @@ class SlicerCaseManagerWidget(ModuleWidgetMixin, ScriptedLoadableModuleWidget):
       #self.logic.closeCase(self.currentCaseDirectory) #this function remove the whole case directory.
       self.currentCaseDirectory = None
     slicer.mrmlScene.Clear(0)
-    self.logic.update_observers(VentriculostomyUserEvents.CloseCaseEvent)
+    self.logic.update_observers(self.CloseCaseEvent)
     self.patientWatchBox.sourceFile = None
     self.caseWatchBox.sourceFile = None
     pass
@@ -319,7 +322,7 @@ class SlicerCaseManagerLogic(ModuleLogicMixin, ScriptedLoadableModuleLogic):
       self.caseCompleted = False
       if self.getDirectorySize(directory) == 0:
         shutil.rmtree(directory)
-      #self.update_observers(VentriculostomyUserEvents.CloseCaseEvent)
+      #self.update_observers(self.CloseCaseEvent)
         
   def hasCaseBeenCompleted(self, directory):
     self.caseCompleted = False
