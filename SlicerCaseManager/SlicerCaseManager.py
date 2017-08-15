@@ -6,11 +6,10 @@ from collections import OrderedDict
 from functools import wraps
 
 from slicer.ScriptedLoadableModule import *
-#from SlicerDevelopmentToolboxUtils import *
-from SlicerDevelopmentToolboxUtils.widgets import BasicInformationWatchBox, DICOMBasedInformationWatchBox, IncomingDataWindow
+from SlicerDevelopmentToolboxUtils.widgets import BasicInformationWatchBox, DICOMBasedInformationWatchBox
 from SlicerDevelopmentToolboxUtils.helpers import WatchBoxAttribute
-from SlicerDevelopmentToolboxUtils.mixins import ModuleWidgetMixin, ModuleLogicMixin, ParameterNodeObservationMixin
-from SlicerDevelopmentToolboxUtils.constants import DICOMTAGS, COLOR, STYLE, FileExtension
+from SlicerDevelopmentToolboxUtils.mixins import ModuleWidgetMixin, ModuleLogicMixin
+from SlicerDevelopmentToolboxUtils.constants import DICOMTAGS
 
 
 def onReturnProcessEvents(func):
@@ -34,7 +33,7 @@ class SlicerCaseManager(ScriptedLoadableModule):
     ScriptedLoadableModule.__init__(self, parent)
     self.parent.title = "SlicerCaseManager"
     self.parent.categories = ["Radiology"]
-    self.parent.dependencies = ["SlicerProstate"]
+    self.parent.dependencies = [""]
     self.parent.contributors = ["Longquan Chen(SPL)","Christian Herz (SPL)"]
     self.parent.helpText = """A common module for case management in Slicer"""
     self.parent.acknowledgementText = """Surgical Planning Laboratory, Brigham and Women's Hospital, Harvard
@@ -42,7 +41,7 @@ class SlicerCaseManager(ScriptedLoadableModule):
                                         Institutes of Health through grants R01 EB020667, U24 CA180918,
                                         R01 CA111288 and P41 EB015898. The code is originated from the module SliceTracker"""
 
-class SlicerCaseManagerWidget(ModuleWidgetMixin, ScriptedLoadableModuleWidget):
+class SlicerCaseManagerWidget(ScriptedLoadableModuleWidget, ModuleWidgetMixin):
   @property
   def caseRootDir(self):
     return self._caseRootDir
@@ -125,6 +124,7 @@ class SlicerCaseManagerWidget(ModuleWidgetMixin, ScriptedLoadableModuleWidget):
   def __init__(self, parent=None):
     ScriptedLoadableModuleWidget.__init__(self, parent)
     self.logic = SlicerCaseManagerLogic()
+    self.moduleName = "slicerCaseManager"
     #self.modulePath = os.path.dirname(slicer.util.modulePath(self.moduleName))
     self._caseRootDir = self.getSetting('CasesRootLocation')
     self._currentCaseDirectory = None
@@ -138,8 +138,7 @@ class SlicerCaseManagerWidget(ModuleWidgetMixin, ScriptedLoadableModuleWidget):
     self.setup()
 
   def setup(self):
-    #ScriptedLoadableModuleWidget.setup(self)
-
+    ScriptedLoadableModuleWidget.setup(self)
     self._mainGUIGroupBox = qt.QGroupBox()
     self._collapsibleDirectoryConfigurationArea = ctk.ctkCollapsibleButton()
     self.mainGUIGroupBoxLayout = qt.QGridLayout()
