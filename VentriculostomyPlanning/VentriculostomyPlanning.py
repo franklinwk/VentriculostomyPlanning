@@ -2220,7 +2220,10 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     marginNode = slicer.mrmlScene.GetNodeByID(marginNodeID)
     vesselnessNodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_vesselnessVolume")
     vesselnessNode = slicer.mrmlScene.GetNodeByID(vesselnessNodeID)
-    if marginNode and vesselnessNode and (marginNode.GetAttribute("vtkMRMLModelNode.modelCreated") == "False"):
+    if not vesselnessNode.GetImageData():
+      slicer.util.warningDisplay("Venous was not segmented yet, abort current procedure")
+      return None
+    if marginNode and (marginNode.GetAttribute("vtkMRMLModelNode.modelCreated") == "False"):
       vesselImage = sitk.Cast(sitkUtils.PullFromSlicer(vesselnessNodeID), sitk.sitkInt16)
       vesselImageReversed = sitk.Add(sitk.Multiply(vesselImage, -1),1)
       try:
