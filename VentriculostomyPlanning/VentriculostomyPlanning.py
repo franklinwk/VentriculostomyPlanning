@@ -4,9 +4,9 @@ import unittest
 import vtk, qt, ctk, slicer
 from slicer.ScriptedLoadableModule import *
 from slicer.util import VTKObservationMixin
-from ctk import ctkAxesWidget
 import logging
 import tempfile
+from ctk import ctkAxesWidget
 import numpy
 import SimpleITK as sitk
 import sitkUtils
@@ -20,6 +20,7 @@ from SlicerCaseManager import SlicerCaseManagerWidget, onReturnProcessEvents, be
 from VentriculostomyPlanningUtils.PopUpMessageBox import SerialAssignMessageBox
 from VentriculostomyPlanningUtils.UserEvents import VentriculostomyUserEvents
 from VentriculostomyPlanningUtils.UsefulFunctions import UsefulFunctions
+from VentriculostomyPlanningUtils.VentriclostomyButtons import GreenSliceLayoutButton, ConventionalSliceLayoutButton, ReverseViewOnCannulaButton
 from SlicerDevelopmentToolboxUtils.buttons import WindowLevelEffectsButton
 from shutil import copyfile
 from os.path import basename
@@ -68,21 +69,10 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
     self.dicomWidget = DICOMWidget()
     self.dicomWidget.parent.close()
     self.SerialAssignBox = SerialAssignMessageBox()
-    self.cameraPos = [0.0]*3
-    self.cameraReversePos = None
-    self.camera = None
     self.volumeSelected = False
     self.jsonFile = ""
     self.isLoadingCase = False
     self.isInAlgorithmSteps = False
-    layoutManager = slicer.app.layoutManager()
-    threeDView = layoutManager.threeDWidget(0).threeDView()
-    displayManagers = vtk.vtkCollection()
-    threeDView.getDisplayableManagers(displayManagers)
-    for index in range(displayManagers.GetNumberOfItems()):
-      if displayManagers.GetItemAsObject(index).GetClassName() == 'vtkMRMLCameraDisplayableManager':
-        self.camera = displayManagers.GetItemAsObject(index).GetCameraNode().GetCamera()
-        self.cameraPos = self.camera.GetPosition()
     self.progressBar = slicer.util.createProgressDialog()
     self.progressBar.close()
     self.red_widget = slicer.app.layoutManager().sliceWidget("Red")
@@ -481,6 +471,17 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
     self.generatePathBox.setStyleSheet('QGroupBox{border:0;}')
     self.mainGUIGroupBoxLayout.addWidget(self.generatePathButton, 2, 5)
 
+    self.viewGroupBox = qt.QGroupBox()
+    self.viewGroupBoxLayout = qt.QHBoxLayout()
+    self.viewGroupBox.setLayout(self.viewGroupBoxLayout)
+    self.layout.addWidget(self.viewGroupBox)
+
+    #viewGroupBoxLabel = qt.QLabel('Viewer Configuration')
+    #self.viewGroupBoxLayout.addWidget(viewGroupBoxLabel)
+
+    self.viewSubGroupBox = qt.QGroupBox()
+    self.viewSubGroupBoxLayout = qt.QHBoxLayout()
+    self.viewSubGroupBox.setLayout(self.viewSubGroupBoxLayout)
 
     self.tabWidget = qt.QTabWidget()
     self.layout.addWidget(self.tabWidget)
@@ -494,33 +495,16 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
     self.tabMarkupsName = "markups"
     self.tabWidgetChildrenName = [self.tabMainGroupBoxName, self.tabMarkupsName]
     self.tabWidget.addTab(self.tabMainGroupBox, self.tabMainGroupBoxName)
+
+    self.tabMarkupPlacementGroupBox = qt.QGroupBox()
+    self.tabMarkupPlacementGroupBoxLayout = qt.QVBoxLayout()
+    self.tabMarkupPlacementGroupBox.setLayout(self.tabMarkupPlacementGroupBoxLayout)
     simpleMarkupsWidget = slicer.qSlicerSimpleMarkupsWidget()
     simpleMarkupsWidget.setMRMLScene(slicer.mrmlScene)
-    self.tabWidget.addTab(simpleMarkupsWidget, self.tabMarkupsName)
+    self.tabMarkupPlacementGroupBoxLayout.addWidget(simpleMarkupsWidget)
+    self.tabWidget.addTab(self.tabMarkupPlacementGroupBox, self.tabMarkupsName)
     index = next((i for i, name in enumerate(self.tabWidgetChildrenName) if name == self.tabMainGroupBoxName), None)
     self.tabWidget.setCurrentIndex(index)
-    createPlanningLineHorizontalLayout = qt.QHBoxLayout()
-    self.setReverseViewButton = qt.QPushButton("Set Reverse 3D View")
-    self.setReverseViewButton.setMinimumWidth(150)
-    self.setReverseViewButton.toolTip = "Change the perspective view in 3D viewer."
-    self.setReverseViewButton.enabled = True
-    createPlanningLineHorizontalLayout.addWidget(self.setReverseViewButton)
-    self.setReverseViewButton.connect('clicked(bool)', self.onSetReverseView)
-    self.isReverseView = False
-
-    self.viewGroupBox = qt.QGroupBox()
-    self.viewGroupBoxLayout = qt.QVBoxLayout()
-    self.viewGroupBox.setLayout(self.viewGroupBoxLayout)
-    self.tabMainGroupBoxLayout.addWidget(self.viewGroupBox)
-
-    viewGroupBoxLabel = qt.QLabel('Viewer Configuration')
-    self.viewGroupBoxLayout.addWidget(viewGroupBoxLabel)
-
-    self.viewSubGroupBox = qt.QGroupBox()
-    self.viewSubGroupBoxLayout = qt.QHBoxLayout()
-    self.viewSubGroupBox.setLayout(self.viewSubGroupBoxLayout)
-    self.tabMainGroupBoxLayout.addWidget(self.viewSubGroupBox)
-    # self.viewSubGroupBox.setStyleSheet("border:3")
 
     venousVolumeLabel = qt.QLabel('Venous Image')
     self.viewSubGroupBoxLayout.addWidget(venousVolumeLabel)
@@ -530,10 +514,17 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
     self.viewSubGroupBoxLayout.addWidget(self.imageSlider)
     ventricleVolumeLabel = qt.QLabel('Ventricle Image')
     self.setWindowLevelButton = WindowLevelEffectsButton()
-    self.sliceWidgets = self.setWindowLevelButton.sliceWidgets
+    self.greenLayoutButton = GreenSliceLayoutButton()
+    self.conventionalLayoutButton = ConventionalSliceLayoutButton()
     self.viewSubGroupBoxLayout.addWidget(ventricleVolumeLabel)
-    self.viewSubGroupBoxLayout.addWidget(self.setWindowLevelButton, 0, 3)
-    self.viewGroupBoxLayout.addWidget(self.setReverseViewButton)
+    self.setReverseViewButton = ReverseViewOnCannulaButton()
+    self.viewGroupBoxLayout.addWidget(self.setReverseViewButton,0, 0)
+    self.viewGroupBoxLayout.addWidget(self.greenLayoutButton, 0, 1)
+    self.viewGroupBoxLayout.addWidget(self.conventionalLayoutButton, 0, 2)
+    self.viewGroupBoxLayout.addWidget(self.setWindowLevelButton, 0, 3)
+    self.viewGroupBoxLayout.addWidget(venousVolumeLabel)
+    self.viewGroupBoxLayout.addWidget(self.imageSlider)
+    self.viewGroupBoxLayout.addWidget(ventricleVolumeLabel)
 
     self.imageSlider.connect('valueChanged(int)', self.onChangeSliceViewImage)
 
@@ -966,6 +957,9 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
       """
       if self.logic.ventricleVolume and self.logic.baseVolumeNode:
         outputDir = os.path.join(self.slicerCaseWidget.currentCaseDirectory, "Results")
+        self.logic.savePlanningDataToDirectory(self.logic.baseVolumeNode, outputDir)
+        self.logic.savePlanningDataToDirectory(self.logic.ventricleVolume, outputDir)
+        outputDir = os.path.join(self.slicerCaseWidget.currentCaseDirectory, "Results")
         self.jsonFile = os.path.join(outputDir, "PlanningTimeStamp.json")
         self.logic.appendPlanningTimeStampToJson(self.jsonFile, "StartPreProcessing",
                                                  datetime.datetime.now().time().isoformat())
@@ -997,6 +991,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
         #  self.logic.croppedVolumeNode = slicer.mrmlScene.GetNodeByID(selectedNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_croppedVolume"))
         #else:
         #  self.logic.croppedVolumeNode = selectedNode
+        self.setReverseViewButton.cannulaNode = slicer.mrmlScene.GetNodeByID(self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_cannula"))
         self.logic.updateMeasureLength(float(self.lengthSagittalReferenceLineEdit.text), float(self.lengthCoronalReferenceLineEdit.text))
         self.logic.updatePathPlanningRadius(float(self.radiusPathPlanningEdit.text))
         self.lengthSagittalReferenceLineEdit.text = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagittalLength")
@@ -1097,54 +1092,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
     self.skullNormToSagittalAngleEdit.text = '--'
     self.skullNormToCoronalAngleEdit.text = '--'
 
-  def onSetReverseView(self):
-    if self.logic.baseVolumeNode:
-      layoutManager = slicer.app.layoutManager()
-      threeDView = layoutManager.threeDWidget(0).threeDView()
-      if self.isReverseView == False:
-        self.setReverseViewButton.setText("  Reset View     ")
-        self.isReverseView = True
-        displayManagers = vtk.vtkCollection()
-        threeDView.getDisplayableManagers(displayManagers)
-        for index in range(displayManagers.GetNumberOfItems()):
-          if displayManagers.GetItemAsObject(index).GetClassName() == 'vtkMRMLCameraDisplayableManager':
-            self.camera = displayManagers.GetItemAsObject(index).GetCameraNode().GetCamera()
-            self.cameraPos = self.camera.GetPosition()
-        if not self.cameraReversePos:
-          threeDView.lookFromViewAxis(ctkAxesWidget.Posterior)
-          threeDView.pitchDirection = threeDView.PitchUp
-          threeDView.yawDirection = threeDView.YawRight
-          threeDView.setPitchRollYawIncrement(self.logic.pitchAngle)
-          threeDView.pitch()
-          if self.logic.yawAngle < 0:
-            threeDView.setPitchRollYawIncrement(self.logic.yawAngle)
-          else:
-            threeDView.setPitchRollYawIncrement(360-self.logic.yawAngle)
-          threeDView.yaw()
-          cannulaNode = slicer.mrmlScene.GetNodeByID(self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_cannula"))
-          if cannulaNode and cannulaNode.GetNumberOfFiducials()>=2:
-            posSecond = [0.0]*3
-            cannulaNode.GetNthFiducialPosition(1, posSecond)
-            threeDView.setFocalPoint(posSecond[0],posSecond[1],posSecond[2])
-          self.cameraReversePos = self.camera.GetPosition()
-        else:
-          self.camera.SetPosition(self.cameraReversePos)
-          threeDView.zoomIn()  # to refresh the 3D viewer, when the view position is inside the skull model, the model is not rendered,
-          threeDView.zoomOut()  # Zoom in and out will refresh the viewer
-      else:
-        displayManagers = vtk.vtkCollection()
-        threeDView.getDisplayableManagers(displayManagers)
-        for index in range(displayManagers.GetNumberOfItems()):
-          if displayManagers.GetItemAsObject(index).GetClassName() == 'vtkMRMLCameraDisplayableManager':
-            self.camera = displayManagers.GetItemAsObject(index).GetCameraNode().GetCamera()
-            self.cameraReversePos = self.camera.GetPosition()
-        self.camera.SetPosition(self.cameraPos)
-        threeDView.zoomIn()# to refresh the 3D viewer, when the view position is inside the skull model, the model is not rendered,
-        threeDView.zoomOut()# Zoom in and out will refresh the viewer
-        self.setReverseViewButton.setText("Set Reverse View")
-        self.isReverseView = False
-    pass
-
   def onChangeSliceViewImage(self, sliderValue):
     red_widget = slicer.app.layoutManager().sliceWidget("Red")
     red_logic = red_widget.sliceLogic()
@@ -1240,6 +1187,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
             slicer.app.processEvents()
             self.logic.createClippedVolume(croppedVolumeNode, clipModelNode, clippedVolumeNode)
             self.onSetSliceViewerOnCroppedVolume()
+            self.green_widget.sliceOrientation = 'Coronal' #provide coronal view at green widget
             self.setBackgroundAndForegroundIDs(backgroundVolumeID=croppedVolumeNodeID)
             if self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_vesselSeeds"):
               vesselSeedsNode = slicer.mrmlScene.GetNodeByID(
@@ -1247,7 +1195,8 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
               self.logic.interactionMode = "vesselSeeds"
               self.logic.placeWidget.setPlaceMultipleMarkups(self.logic.placeWidget.ForcePlaceMultipleMarkups)
               self.logic.placeWidget.setMRMLScene(slicer.mrmlScene)
-              self.tabWidget.currentWidget().setCurrentNode(vesselSeedsNode)
+              self.tabWidget.currentWidget().children()[1].setCurrentNode(vesselSeedsNode)
+              self.greenLayoutButton.click()
 
     else:
       index = next((i for i, name in enumerate(self.tabWidgetChildrenName) if name == self.tabMainGroupBoxName), None)
@@ -1256,6 +1205,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
       self.logic.interactionMode = "none"
       self.onVenousVesselnessCalc()
       self.isInAlgorithmSteps = False
+      self.conventionalLayoutButton.click()
     self.nodeAddedEventObserverID = slicer.mrmlScene.AddObserver(slicer.mrmlScene.NodeAddedEvent,
                                                                  self.onVolumeAddedNode)
     pass
@@ -1318,7 +1268,11 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
   def onSaveData(self):
     if not self.isLoadingCase:
       outputDir = os.path.join(self.slicerCaseWidget.currentCaseDirectory, "Results")
-      nodeAttributes=["rel_model","rel_nasion","rel_sagittalPoint","rel_target","rel_distal", "rel_vesselSeeds", \
+      if self.logic.baseVolumeNode:
+        if self.logic.baseVolumeNode.GetModifiedSinceRead():
+          self.logic.savePlanningDataToDirectory(self.logic.baseVolumeNode, outputDir)
+
+      nodeAttributes=["rel_ventricleVolume", "rel_model","rel_nasion","rel_sagittalPoint","rel_target","rel_distal", "rel_vesselSeeds", \
                       "rel_cannula","rel_skullNorm","rel_cannulaModel","rel_sagittalReferenceModel","rel_coronalReferenceModel",\
                       "rel_sagittalPlanningModel","rel_coronalPlanningModel","rel_vesselnessModel","rel_vesselnessWithMarginModel","rel_vesselnessVolume"]
       for attribute in nodeAttributes:
