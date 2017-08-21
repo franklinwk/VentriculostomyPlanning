@@ -70,6 +70,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
     self.dicomWidget.parent.close()
     self.SerialAssignBox = SerialAssignMessageBox()
     self.volumeSelected = False
+    self.volumePrepared = False
     self.jsonFile = ""
     self.isLoadingCase = False
     self.isInAlgorithmSteps = False
@@ -170,19 +171,15 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
     detectVesselLayout = qt.QVBoxLayout()
     detectVesselLayout.setAlignment(qt.Qt.AlignCenter)
     self.detectVesselBox.setLayout(detectVesselLayout)
-    self.grayScaleMakerButton = qt.QPushButton("Segment Venous")
-    self.grayScaleMakerButton.enabled = True
-    self.grayScaleMakerButton.toolTip = "Use the GrayScaleMaker module for vessel calculation "
+
     detectVesselLabel = qt.QLabel('Detect Vessel')
     # detectVesselLayout.addWidget(detectVesselLabel)
-    detectVesselLayout.addWidget(self.grayScaleMakerButton)
+    #detectVesselLayout.addWidget(self.grayScaleMakerButton)
     #self.grayScaleMakerButton.setIcon(qt.QIcon(qt.QPixmap(os.path.join(self.scriptDirectory, "vessel.png"))))
     #self.grayScaleMakerButton.setIconSize(qt.QSize(self.grayScaleMakerButton.size))
     self.detectVesselBox.setStyleSheet('QGroupBox{border:0;}')
     # self.mainGUIGroupBoxLayout.addWidget(self.detectVesselBox, 2, 2)
 
-
-    self.grayScaleMakerButton.connect('clicked(bool)', self.onVenousGrayScaleCalc)
     createVesselHorizontalLayout.addWidget(self.venousCalcStatus)
 
     # -- Algorithm setting
@@ -224,6 +221,10 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
     self.venousMarginEdit.cursor = qt.QCursor(qt.Qt.IBeamCursor)
     distanceMapConfigLayout.addWidget(self.venousMarginEdit)
     venousMarginUnitLabel = qt.QLabel('mm  ')
+    self.grayScaleMakerButton = qt.QPushButton("Segment GrayScale")
+    self.grayScaleMakerButton.enabled = True
+    self.grayScaleMakerButton.toolTip = "Use the GrayScaleMaker module for vessel calculation "
+    self.grayScaleMakerButton.connect('clicked(bool)', self.onVenousGrayScaleCalc)
     distanceMapConfigLayout.addWidget(venousMarginUnitLabel)
     distanceMapConfigLayout.addWidget(self.grayScaleMakerButton)
     appSettingLayout.addRow(surfaceModelConfigLayout)
@@ -502,6 +503,25 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
     simpleMarkupsWidget = slicer.qSlicerSimpleMarkupsWidget()
     simpleMarkupsWidget.setMRMLScene(slicer.mrmlScene)
     self.tabMarkupPlacementGroupBoxLayout.addWidget(simpleMarkupsWidget)
+
+    vesselThresholdLabel = qt.QLabel('Vessel Threshold')
+    thresholdMin = qt.QLabel('50')
+    thresholdMax = qt.QLabel('300')
+    self.currentThresholdValue = qt.QLabel('100')
+    vesselThresholdLayout = qt.QHBoxLayout()
+    self.vesselThresholdGroupBox = qt.QGroupBox()
+    self.vesselThresholdGroupBox.setLayout(vesselThresholdLayout)
+    self.vesselThresholdSlider = qt.QSlider(qt.Qt.Horizontal)
+    self.vesselThresholdSlider.setMinimum(50)
+    self.vesselThresholdSlider.setMaximum(300)
+    self.vesselThresholdSlider.setValue(100)
+    self.vesselThresholdSlider.connect('valueChanged(int)', self.onChangeThresholdValue)
+    vesselThresholdLayout.addWidget(vesselThresholdLabel)
+    vesselThresholdLayout.addWidget(thresholdMin)
+    vesselThresholdLayout.addWidget(self.vesselThresholdSlider)
+    vesselThresholdLayout.addWidget(thresholdMax)
+    vesselThresholdLayout.addWidget(self.currentThresholdValue)
+    self.tabMarkupPlacementGroupBoxLayout.addWidget(self.vesselThresholdGroupBox)
     self.tabWidget.addTab(self.tabMarkupPlacementGroupBox, self.tabMarkupsName)
     index = next((i for i, name in enumerate(self.tabWidgetChildrenName) if name == self.tabMainGroupBoxName), None)
     self.tabWidget.setCurrentIndex(index)
@@ -805,6 +825,8 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
       self.onSetSliceViewerOnBaseVolume()
     if EventID == VentriculostomyUserEvents.SaveModifiedFiducialEvent:
       self.onSaveData()
+    if EventID == VentriculostomyUserEvents.VentricleCylinderModified:
+      self.volumePrepared = False # As the cylinder has been modified, the cropped, clipped and quartervolume is not valid, needs to be recalculated.
 
   def initialFieldsValue(self):
     self.lengthSagittalPlanningLineEdit.text = '--'
@@ -972,6 +994,10 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
         self.logic.enableRelatedModel("vtkMRMLScalarVolumeNode.rel_coronalPlanningModel", "coronalPlanningModel", color=[0.0,1.0,0.0])
         self.logic.enableRelatedModel("vtkMRMLScalarVolumeNode.rel_vesselnessModel", "vesselnessModel", color=[1.0, 0.0, 0.0])
         self.logic.enableRelatedModel("vtkMRMLScalarVolumeNode.rel_vesselnessWithMarginModel", "vesselnessWithMarginModel", visibility=False)
+        self.logic.enableRelatedModel("vtkMRMLScalarVolumeNode.rel_grayScaleModel", "grayScaleModel",
+                                      color=[0.8, 0.2, 0.0])
+        self.logic.enableRelatedModel("vtkMRMLScalarVolumeNode.rel_grayScaleWithMarginModel",
+                                      "grayScaleWithMarginModel", visibility=False)
         self.logic.enableRelatedMarkups("vtkMRMLScalarVolumeNode.rel_nasion", "nasion")
         self.logic.enableRelatedMarkups("vtkMRMLScalarVolumeNode.rel_sagittalPoint", "sagittalPoint")
         self.logic.enableRelatedMarkups("vtkMRMLScalarVolumeNode.rel_target", "target")
@@ -983,6 +1009,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
         self.logic.enableRelatedVolume("vtkMRMLScalarVolumeNode.rel_quarterVolume", "quarterVolume")
         self.logic.enableRelatedVolume("vtkMRMLScalarVolumeNode.rel_vesselnessVolume", "vesselnessVolume")
         self.logic.enableRelateVariables("vtkMRMLScalarVolumeNode.rel_cylinderRadius", "cylinderRadius")
+        self.logic.enableRelateVariables("vtkMRMLScalarVolumeNode.rel_vesselThreshold", "vesselThreshold")
 
         #self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_skullNorm", caseName)
         self.logic.enableEventObserver()
@@ -1092,6 +1119,11 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
     self.skullNormToSagittalAngleEdit.text = '--'
     self.skullNormToCoronalAngleEdit.text = '--'
 
+
+  def onChangeThresholdValue(self, sliderValue):
+    self.logic.vesselThreshold = sliderValue
+    self.currentThresholdValue.setText(str(sliderValue))
+
   def onChangeSliceViewImage(self, sliderValue):
     red_widget = slicer.app.layoutManager().sliceWidget("Red")
     red_logic = red_widget.sliceLogic()
@@ -1125,7 +1157,66 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
       yellow_cn.SetBackgroundVolumeID(backgroundVolumeID)
       green_cn.SetBackgroundVolumeID(backgroundVolumeID)
     pass
-  
+
+  def prepareVolumes(self):
+    self.isInAlgorithmSteps = True
+    if self.volumePrepared == False:
+      targetNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_target")
+      distalNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_distal")
+      clipModelNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_clipModel")
+      croppedVolumeNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_croppedVolume")
+      clippedVolumeNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_clippedVolume")
+      quarterVolumeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_quarterVolume")
+      if targetNodeID and distalNodeID and clippedVolumeNodeID and croppedVolumeNodeID and clipModelNodeID and quarterVolumeID:
+        targetNode = slicer.mrmlScene.GetNodeByID(targetNodeID)
+        distalNode = slicer.mrmlScene.GetNodeByID(distalNodeID)
+        croppedVolumeNode = slicer.mrmlScene.GetNodeByID(croppedVolumeNodeID)
+        clippedVolumeNode = slicer.mrmlScene.GetNodeByID(clippedVolumeNodeID)
+        clipModelNode = slicer.mrmlScene.GetNodeByID(clipModelNodeID)
+        quarterVolume = slicer.mrmlScene.GetNodeByID(quarterVolumeID)
+        if targetNode.GetNumberOfFiducials() and distalNode.GetNumberOfFiducials() and clipModelNode and quarterVolume:
+          posTarget = numpy.array([0.0, 0.0, 0.0])
+          targetNode.GetNthFiducialPosition(0, posTarget)
+          posDistal = numpy.array([0.0, 0.0, 0.0])
+          distalNode.GetNthFiducialPosition(0, posDistal)
+          coneForVolumeClip = vtk.vtkConeSource()
+          coneHeight = 100.0  # in millimeter
+          coneForVolumeClip.SetHeight(coneHeight)
+          coneForVolumeClip.SetResolution(60)
+          ventricleDirect = (posDistal - posTarget) / numpy.linalg.norm(
+            posTarget - posDistal)
+          coneTipPoint = posTarget - numpy.linalg.norm(posDistal - posTarget) / 2.0 * ventricleDirect
+          coneCenter = coneHeight / 2.0 * ventricleDirect + coneTipPoint
+          coneForVolumeClip.SetCenter(coneCenter)
+          coneForVolumeClip.SetDirection(-1.0 * ventricleDirect)  # we want the open end of the cone towards outside
+          angle = 180.0 / math.pi * math.atan(2 * self.logic.cylinderRadius / numpy.linalg.norm(
+            posTarget - posDistal))
+          coneForVolumeClip.SetAngle(angle)
+          coneForVolumeClip.Update()
+          clipModelNode.SetAndObservePolyData(coneForVolumeClip.GetOutput())
+          # -----------
+          ROICenterPoint = coneTipPoint + ventricleDirect * numpy.array([0, 1, 1])* coneHeight
+          self.logic.ROINode.SetXYZ(ROICenterPoint)
+          # ROICenterPoint = coneTipPoint + numpy.array([0, 1, 1]) * 75
+          ROIRadiusXYZ = [150, coneHeight * ventricleDirect[1],
+                          max(coneHeight * math.tan(angle * math.pi / 180.0), coneHeight * ventricleDirect[2])]
+          self.logic.ROINode.SetRadiusXYZ(ROIRadiusXYZ)
+          cropVolumeLogic = slicer.modules.cropvolume.logic()
+          cropVolumeLogic.CropVoxelBased(self.logic.ROINode, self.logic.baseVolumeNode, quarterVolume)
+          slicer.app.processEvents()
+          ROICenterPoint = coneTipPoint + ventricleDirect * coneHeight
+          self.logic.ROINode.SetXYZ(ROICenterPoint)
+          ROIRadiusXYZ = [max(coneHeight * math.tan(angle * math.pi / 180.0), coneHeight * ventricleDirect[0]),
+                          coneHeight * ventricleDirect[1],
+                          max(coneHeight * math.tan(angle * math.pi / 180.0), coneHeight * ventricleDirect[2])]
+          self.logic.ROINode.SetRadiusXYZ(ROIRadiusXYZ)
+          cropVolumeLogic = slicer.modules.cropvolume.logic()
+          cropVolumeLogic.CropVoxelBased(self.logic.ROINode, self.logic.baseVolumeNode, croppedVolumeNode)
+          slicer.app.processEvents()
+          self.logic.createClippedVolume(croppedVolumeNode, clipModelNode, clippedVolumeNode)
+          self.volumePrepared = True
+    self.isInAlgorithmSteps = False
+
   def onPlaceVesselSeed(self):
     slicer.mrmlScene.RemoveObserver(self.nodeAddedEventObserverID)
     self.imageSlider.setValue(0.0)
@@ -1136,74 +1227,28 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
       if not self.logic.baseVolumeNode:
         slicer.util.warningDisplay("No case is selected, please create a case", windowTitle="")
       else:
-        targetNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_target")
-        distalNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_distal")
-        clipModelNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_clipModel")
-        croppedVolumeNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_croppedVolume")
-        clippedVolumeNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_clippedVolume")
-        quarterVolumeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_quarterVolume")
-        if targetNodeID and distalNodeID and clippedVolumeNodeID and croppedVolumeNodeID and clipModelNodeID and quarterVolumeID:
-          targetNode = slicer.mrmlScene.GetNodeByID(targetNodeID)
-          distalNode = slicer.mrmlScene.GetNodeByID(distalNodeID)
-          croppedVolumeNode = slicer.mrmlScene.GetNodeByID(croppedVolumeNodeID)
-          clippedVolumeNode = slicer.mrmlScene.GetNodeByID(clippedVolumeNodeID)
-          clipModelNode = slicer.mrmlScene.GetNodeByID(clipModelNodeID)
-          quarterVolume = slicer.mrmlScene.GetNodeByID(quarterVolumeID)
-          if targetNode.GetNumberOfFiducials() and distalNode.GetNumberOfFiducials() and clipModelNode and quarterVolume:
-            posTarget = numpy.array([0.0, 0.0, 0.0])
-            targetNode.GetNthFiducialPosition(0, posTarget)
-            posDistal = numpy.array([0.0, 0.0, 0.0])
-            distalNode.GetNthFiducialPosition(0, posDistal)
-            coneForVolumeClip = vtk.vtkConeSource()
-            coneHeight = 100.0 # in millimeter
-            coneForVolumeClip.SetHeight(coneHeight)
-            coneForVolumeClip.SetResolution(60)
-            ventricleDirect = (posDistal - posTarget) / numpy.linalg.norm(
-              posTarget - posDistal)
-            coneTipPoint = posTarget - numpy.linalg.norm(posDistal - posTarget)/2.0*ventricleDirect
-            coneCenter = coneHeight/2.0*ventricleDirect + coneTipPoint
-            coneForVolumeClip.SetCenter(coneCenter)
-            coneForVolumeClip.SetDirection(-1.0*ventricleDirect) # we want the open end of the cone towards outside
-            angle = 180.0/math.pi*math.atan(2*self.logic.cylinderRadius/numpy.linalg.norm(
-              posTarget - posDistal))
-            coneForVolumeClip.SetAngle(angle)
-            coneForVolumeClip.Update()
-            clipModelNode.SetAndObservePolyData(coneForVolumeClip.GetOutput())
-            #-----------
-
-            ROICenterPoint = coneTipPoint + numpy.array([0,1,1]) * 75
-            self.logic.ROINode.SetXYZ(ROICenterPoint)
-            ROIRadiusXYZ = [150, 75, 75]
-            self.logic.ROINode.SetRadiusXYZ(ROIRadiusXYZ)
-            cropVolumeLogic = slicer.modules.cropvolume.logic()
-            cropVolumeLogic.CropVoxelBased(self.logic.ROINode, self.logic.baseVolumeNode, quarterVolume)
-            slicer.app.processEvents()
-            ROICenterPoint = coneTipPoint + ventricleDirect* coneHeight
-            self.logic.ROINode.SetXYZ(ROICenterPoint)
-            ROIRadiusXYZ = [max(coneHeight*math.tan(angle*math.pi/180.0),coneHeight*ventricleDirect[0]) , coneHeight*ventricleDirect[1], max(coneHeight*math.tan(angle*math.pi/180.0), coneHeight*ventricleDirect[2])]
-            self.logic.ROINode.SetRadiusXYZ(ROIRadiusXYZ)
-            cropVolumeLogic = slicer.modules.cropvolume.logic()
-            cropVolumeLogic.CropVoxelBased(self.logic.ROINode, self.logic.baseVolumeNode, croppedVolumeNode)
-            slicer.app.processEvents()
-            self.logic.createClippedVolume(croppedVolumeNode, clipModelNode, clippedVolumeNode)
-            self.onSetSliceViewerOnCroppedVolume()
-            self.green_widget.sliceOrientation = 'Coronal' #provide coronal view at green widget
-            self.setBackgroundAndForegroundIDs(backgroundVolumeID=croppedVolumeNodeID)
-            if self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_vesselSeeds"):
-              vesselSeedsNode = slicer.mrmlScene.GetNodeByID(
-                self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_vesselSeeds"))
-              self.logic.interactionMode = "vesselSeeds"
-              self.logic.placeWidget.setPlaceMultipleMarkups(self.logic.placeWidget.ForcePlaceMultipleMarkups)
-              self.logic.placeWidget.setMRMLScene(slicer.mrmlScene)
-              self.tabWidget.currentWidget().children()[1].setCurrentNode(vesselSeedsNode)
-              self.greenLayoutButton.click()
+        self.prepareVolumes()
+        if self.volumePrepared:
+          self.onSetSliceViewerOnCroppedVolume()
+          quarterVolumeNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_quarterVolume")
+          self.green_widget.sliceOrientation = 'Coronal' #provide coronal view at green widget
+          self.setBackgroundAndForegroundIDs(backgroundVolumeID=quarterVolumeNodeID)
+          if self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_vesselSeeds"):
+            vesselSeedsNode = slicer.mrmlScene.GetNodeByID(
+              self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_vesselSeeds"))
+            self.logic.interactionMode = "vesselSeeds"
+            self.logic.placeWidget.setPlaceMultipleMarkups(self.logic.placeWidget.ForcePlaceMultipleMarkups)
+            self.logic.placeWidget.setMRMLScene(slicer.mrmlScene)
+            self.tabWidget.currentWidget().children()[1].setCurrentNode(vesselSeedsNode)
+            self.greenLayoutButton.click()
 
     else:
       index = next((i for i, name in enumerate(self.tabWidgetChildrenName) if name == self.tabMainGroupBoxName), None)
       self.tabWidget.setCurrentIndex(index)
       self.logic.placeWidget.setPlaceModeEnabled(False)
       self.logic.interactionMode = "none"
-      self.onVenousVesselnessCalc()
+      #self.onVenousVesselnessCalc()
+      self.onConnectedComponentCalc()
       self.isInAlgorithmSteps = False
       self.conventionalLayoutButton.click()
     self.nodeAddedEventObserverID = slicer.mrmlScene.AddObserver(slicer.mrmlScene.NodeAddedEvent,
@@ -1290,15 +1335,20 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
     self.logic.distanceMapThreshold = float(self.distanceMapThresholdEdit.text)
     vesselnessModelNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_vesselnessModel")
     vesselnessModelNode = slicer.mrmlScene.GetNodeByID(vesselnessModelNodeID)
+    grayScaleModelNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_grayScaleModel")
+    grayScaleModelNode = slicer.mrmlScene.GetNodeByID(grayScaleModelNodeID)
     if vesselnessModelNode:
       vesselnessModelNode.SetAttribute("vtkMRMLModelNode.modelCreated","False")
+    if grayScaleModelNode:
+      grayScaleModelNode.SetAttribute("vtkMRMLModelNode.modelCreated","False")
     nodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_vesselnessWithMarginModel")
     node = slicer.mrmlScene.GetNodeByID(nodeID)
-    if not node:
-      node = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
-      slicer.mrmlScene.AddNode(node)
     if node:
       node.SetAttribute("vtkMRMLModelNode.modelCreated","False")
+    nodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_grayScaleWithMarginModel")
+    node = slicer.mrmlScene.GetNodeByID(nodeID)
+    if node:
+      node.SetAttribute("vtkMRMLModelNode.modelCreated", "False")
     pass
 
   def onModifySurfaceModel(self):
@@ -1368,28 +1418,20 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
   def onVenousGrayScaleCalc(self):
     self.isInAlgorithmSteps = True
     if self.logic.baseVolumeNode:
-      croppedVolumeNode = self.logic.baseVolumeNode
-      croppedVolumeNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_croppedVolume")
-      if croppedVolumeNodeID:
-        croppedVolumeNode = slicer.mrmlScene.GetNodeByID(croppedVolumeNodeID)
+      self.prepareVolumes()
+      quarterVolumeNode = self.logic.baseVolumeNode
+      quarterVolumeNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_quarterVolume")
+      if quarterVolumeNodeID:
+        quarterVolumeNode = slicer.mrmlScene.GetNodeByID(quarterVolumeNodeID)
       grayScaleModelNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_grayScaleModel")
       grayScaleModelNode = slicer.mrmlScene.GetNodeByID(grayScaleModelNodeID)
       if grayScaleModelNode and (grayScaleModelNode.GetAttribute("vtkMRMLModelNode.modelCreated") == "False"):
-        grayScaleModelNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
-        slicer.mrmlScene.AddNode(grayScaleModelNode)
-        modelDisplayNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelDisplayNode")
-        ModelColor = [0.5, 0.0, 0.0]
-        modelDisplayNode.SetColor(ModelColor)
-        modelDisplayNode.SetOpacity(0.5)
-        slicer.mrmlScene.AddNode(modelDisplayNode)
-        grayScaleModelNode.SetAndObserveDisplayNodeID(modelDisplayNode.GetID())
-        self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_grayScaleModel",grayScaleModelNode.GetID())
         grayScaleModelNodeID = grayScaleModelNode.GetID()
         grayScaleModelNode = slicer.mrmlScene.GetNodeByID(grayScaleModelNodeID)
         self.grayScaleMakerButton.setEnabled(0)
         slicer.mrmlScene.RemoveObserver(self.nodeAddedEventObserverID)
         try:
-          self.logic.calculateVenousGrayScale(croppedVolumeNode, grayScaleModelNode)
+          self.logic.calculateVenousGrayScale(quarterVolumeNode, grayScaleModelNode)
         except ValueError:
           slicer.util.warningDisplay(
             "Venouse Calculation error, volumes might not be suitable for calculation")
@@ -1401,7 +1443,36 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
           self.onSaveData()
     self.isInAlgorithmSteps = False    
     pass
-  
+
+  def onConnectedComponentCalc(self):
+    self.isInAlgorithmSteps = True
+    vesselSeedsNode = None
+    if self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_vesselSeeds"):
+      vesselSeedsNode = slicer.mrmlScene.GetNodeByID(
+        self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_vesselSeeds"))
+    if self.logic.baseVolumeNode and vesselSeedsNode:
+      quarterVolumeNode = self.logic.baseVolumeNode
+      quarterVolumeNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_quarterVolume")
+      if quarterVolumeNodeID:
+        quarterVolumeNode = slicer.mrmlScene.GetNodeByID(quarterVolumeNodeID)
+      vesselnessModelNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_vesselnessModel")
+      if vesselnessModelNodeID:
+        vesselnessModelNode = slicer.mrmlScene.GetNodeByID(vesselnessModelNodeID)
+        slicer.mrmlScene.RemoveObserver(self.nodeAddedEventObserverID)
+        try:
+          self.logic.calculateConnectedComponent(quarterVolumeNode, vesselSeedsNode, vesselnessModelNode)
+        except ValueError:
+          slicer.util.warningDisplay(
+            "Vessel Margin Calculation error, volumes might not be suitable for calculation")
+        finally:
+          slicer.app.processEvents()
+          self.nodeAddedEventObserverID = slicer.mrmlScene.AddObserver(slicer.mrmlScene.NodeAddedEvent,
+                                                                       self.onVolumeAddedNode)
+          self.onCalculateVenousCompletion()
+          self.onSaveData()
+    self.isInAlgorithmSteps = False
+    pass
+
   def onVenousVesselnessCalc(self):
     self.isInAlgorithmSteps = True
     vesselSeedsNode = None
@@ -1428,22 +1499,26 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
           slicer.app.processEvents()
           self.nodeAddedEventObserverID = slicer.mrmlScene.AddObserver(slicer.mrmlScene.NodeAddedEvent,
                                                                      self.onVolumeAddedNode)
-          #self.onCalculateVenousCompletion(self.logic.cliNode)
+          self.onCalculateVenousCompletion(self.logic.cliNode)
           self.onSaveData()
     self.isInAlgorithmSteps = False    
     pass
 
   #@beforeRunProcessEvents
-  def onCalculateVenousCompletion(self,node,event=None):
-    status = node.GetStatusString()
-    self.venousCalcStatus.setText(node.GetName() +' '+status)
+  def onCalculateVenousCompletion(self,node=None,event=None):
+    status = 'Completed'
+    if node:
+      status = node.GetStatusString()
+      self.venousCalcStatus.setText(node.GetName() +' '+status)
     if status == 'Completed':
       self.progressBar.value = 50
       self.progressBar.labelText = 'Calculating Vessel margin'
       slicer.app.processEvents()
       slicer.mrmlScene.RemoveObserver(self.nodeAddedEventObserverID)
       try:
-        self.logic.calculateVesselWithMargin()
+        self.logic.calculateConnectedCompWithMargin()
+        #self.logic.calculateVesselWithMargin()
+        #self.logic.calculateGrayScaleWithMargin()
       except ValueError:
         slicer.util.warningDisplay(
           "Vessel Margin Calculation error, volumes might not be suitable for calculation")
@@ -1456,7 +1531,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
         self.progressBar.close()
         self.onSaveData()
     else:
-      slicer.util.warningDisplay("Vessel segmentation failed, considering replace the seeds.")
+      slicer.util.warningDisplay("Vessel segmentation failed.")
     self.grayScaleMakerButton.enabled = True
     pass
 
@@ -1919,6 +1994,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     self.enableAuxilaryNodes()
 
     self.distanceMapFilter = sitk.ApproximateSignedDistanceMapImageFilter()
+    self.connectedComponentFilter = sitk.ConnectedThresholdImageFilter()
     self.baseVolumeNode = None
     self.ventricleVolume = None
     self.functions = UsefulFunctions()
@@ -1928,6 +2004,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     self.topPoint = []
     self.sufaceModelThreshold = -500.0
     self.distanceMapThreshold = 100
+    self.vesselThreshold = 100
     self.venousMargin = 10.0 #in mm
     self.minimalVentricleLen = 10.0 # in mm
     self.yawAngle = 0.0
@@ -2246,17 +2323,53 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         marginNode.SetAttribute("vtkMRMLModelNode.modelCreated", "True")
       self.update_observers(VentriculostomyUserEvents.SetSliceViewerEvent)
     return marginNode
+
+
+  def calculateConnectedCompWithMargin(self):
+    marginNodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_vesselnessWithMarginModel")
+    marginNode = slicer.mrmlScene.GetNodeByID(marginNodeID)
+    imageCollection = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLScalarVolumeNode", "connectedImage")
+    if imageCollection:
+      connectedImageNode = imageCollection.GetItemAsObject(0)
+      if connectedImageNode.GetImageData():
+        slicer.util.warningDisplay("vessel was not segmented yet, abort current procedure")
+        return None
+      if marginNode and (marginNode.GetAttribute("vtkMRMLModelNode.modelCreated") == "False"):
+        connectedImage = sitk.Cast(sitkUtils.PullFromSlicer(connectedImageNode.GetID()), sitk.sitkInt16)
+        connectedImageReversed = sitk.Add(sitk.Multiply(connectedImage, -1),1)
+        try:
+          distanceMap = sitk.Multiply(self.distanceMapFilter.Execute(connectedImageReversed, 0, 1),-1)
+        except ValueError:
+          slicer.util.warningDisplay(
+            "distance map calucation failed, try use different settings")
+          return None
+        sitkUtils.PushToSlicer(distanceMap, "distanceMap", 0, True)
+        imageCollection = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLScalarVolumeNode", "distanceMap")
+        if imageCollection:
+          distanceMapNode = imageCollection.GetItemAsObject(0)
+          parameters = {}
+          parameters["InputVolume"] = distanceMapNode.GetID()
+          parameters["OutputGeometry"] = marginNode.GetID()
+          parameters["Threshold"] = -self.venousMargin
+          grayMaker = slicer.modules.grayscalemodelmaker
+          self.cliNode = slicer.cli.run(grayMaker, None, parameters, wait_for_completion=True)
+          self.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_vesselnessWithMarginModel", marginNode.GetID())
+          marginNode.SetAttribute("vtkMRMLModelNode.modelCreated", "True")
+        self.update_observers(VentriculostomyUserEvents.SetSliceViewerEvent)
+    return marginNode
   
   def calculateGrayScaleWithMargin(self):
-    nodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_vesselnessWithMarginModel")
+    nodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_grayScaleWithMarginModel")
     node = slicer.mrmlScene.GetNodeByID(nodeID)
     if not node:
       node = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
       slicer.mrmlScene.AddNode(node)
     if node and (node.GetAttribute("vtkMRMLModelNode.modelCreated") == "False"):
+      quarterVolumeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_quarterVolume")
+      quarterVolume = slicer.mrmlScene.GetNodeByID(quarterVolumeID)
       originImage = sitk.Cast(sitkUtils.PullFromSlicer(self.baseVolumeNode.GetID()), sitk.sitkInt16)
       try:
-        distanceMap = self.distanceMapFilter.Execute(originImage, self.distanceMapThreshold - 10, self.distanceMapThreshold )
+        distanceMap = self.distanceMapFilter.Execute(quarterVolume, self.distanceMapThreshold - 10, self.distanceMapThreshold )
       except ValueError:
         slicer.util.warningDisplay(
           "distance map calucation failed, try use different settings")
@@ -2271,7 +2384,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         parameters["Threshold"] = -self.venousMargin
         grayMaker = slicer.modules.grayscalemodelmaker
         self.cliNode = slicer.cli.run(grayMaker, None, parameters, wait_for_completion=True)
-        self.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_vesselnessWithMarginModel", node.GetID())
+        self.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_grayScaleWithMarginModel", node.GetID())
         node.SetAttribute("vtkMRMLModelNode.modelCreated", "True")
       self.update_observers(VentriculostomyUserEvents.SetSliceViewerEvent)
     node.SetDisplayVisibility(0)  
@@ -2723,11 +2836,36 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
   def calculateVenousGrayScale(self, inputVolumeNode, grayScaleModelNode):    
       parameters = {}
       parameters["InputVolume"] = inputVolumeNode.GetID()
-      parameters["Threshold"] = 100.0
+      parameters["Threshold"] = self.distanceMapThreshold
       parameters["OutputGeometry"] = grayScaleModelNode.GetID()
       grayMaker = slicer.modules.grayscalemodelmaker
       self.cliNode = slicer.cli.run(grayMaker, None, parameters, wait_for_completion=True)
-  
+
+  def calculateConnectedComponent(self,inputVolumeNode, vesselSeedsNode, vesselnessModelNode):
+      if inputVolumeNode:
+        oriImage = sitk.Cast(sitkUtils.PullFromSlicer(inputVolumeNode.GetID()), sitk.sitkInt16)
+        matrix = vtk.vtkMatrix4x4()
+        inputVolumeNode.GetRASToIJKMatrix(matrix)
+        self.connectedComponentFilter.ClearSeeds()
+        for iSeed in range(vesselSeedsNode.GetNumberOfFiducials()):
+          posRAS = [0.0,0.0,0.0]
+          vesselSeedsNode.GetNthFiducialPosition(iSeed, posRAS)
+          posIJK = matrix.MultiplyFloatPoint([posRAS[0], posRAS[1], posRAS[2], 1.0])
+          self.connectedComponentFilter.AddSeed([int(posIJK[0]),int(posIJK[1]),int(posIJK[2])])
+        self.connectedComponentFilter.SetLower(self.vesselThreshold)
+        self.connectedComponentFilter.SetUpper(1000000.0)
+        self.connectedComponentFilter.SetConnectivity(self.connectedComponentFilter.FullConnectivity)
+        connectedImage = self.connectedComponentFilter.Execute(oriImage)
+        sitkUtils.PushToSlicer(connectedImage, "connectedImage", 0, True)
+        imageCollection = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLScalarVolumeNode", "connectedImage")
+        if imageCollection:
+          connectedImageNode = imageCollection.GetItemAsObject(0)
+          parameters = {}
+          parameters["InputVolume"] = connectedImageNode.GetID()
+          parameters["Threshold"] = 0.5
+          parameters["OutputGeometry"] = vesselnessModelNode.GetID()
+          grayMaker = slicer.modules.grayscalemodelmaker
+          slicer.cli.run(grayMaker, None, parameters, wait_for_completion=True)
   
   def calculateVenousVesselness(self,inputVolumeNode, vesselnessVolumeNode, vesselSeedsNode, outputTubeFile, vesselnessModelNode):
       parameters = {}
@@ -3134,6 +3272,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         self.cylinderInteractor.AddFiducial(cylinderInteractorPos[0],cylinderInteractorPos[1],cylinderInteractorPos[2])
         self.cylinderInteractor.SetNthFiducialLabel(0,"")
         self.cylinderInteractor.SetDisplayVisibility(1)
+        self.update_observers(VentriculostomyUserEvents.VentricleCylinderModified)
     pass
   
   def ReleaseLeftButton(self):
