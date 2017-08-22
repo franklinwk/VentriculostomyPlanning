@@ -63,6 +63,16 @@ class SerialAssignMessageBox(qt.QMessageBox):
   def AppendVolumeNode(self, addedVolumeNode):
     self.volumes.append(addedVolumeNode)
     self.SetAssignTableWithVolumes(self.volumes)
+
+  def Clear(self):
+    self.volumesCheckedDict = dict()
+    self.volumesCheckedDictPre = dict()  # Store the previous selected item. if the user click the cancel button. all value should be reset.
+    self.serialCheckboxVenous = []
+    self.serialCheckboxVentricle = []
+    self.volumeNames = []
+    self.importedVolumeIDs = []
+    self.volumes = []
+
   def SetAssignTableWithVolumes(self, addedVolumeNodes):
     self.volumes = addedVolumeNodes
     if self.volumes:

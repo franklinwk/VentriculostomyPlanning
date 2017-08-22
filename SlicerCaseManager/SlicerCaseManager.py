@@ -341,17 +341,27 @@ class NewCaseSelectionNameWidget(qt.QMessageBox, ModuleWidgetMixin):
   CASE_NUMBER_DIGITS = 3
   PATTERN = PREFIX+"[0-9]{"+str(CASE_NUMBER_DIGITS-1)+"}[0-9]{1}"+SUFFIX_PATTERN
 
-  def __init__(self, destination, parent=None):
+  @property
+  def destinationRoot(self):
+    return self._destinationRoot
+
+  @destinationRoot.setter
+  def destinationRoot(self, root):
+    self._destinationRoot = root
+
+  def __init__(self, destination=None, parent=None):
     super(NewCaseSelectionNameWidget, self).__init__(parent)
+    self.setupUI()
     if not os.path.exists(destination):
       slicer.util.warningDisplay("Root directory is not set, please set the root in the 'Case Directory Settings' panel ", windowTitle="")
       raise
-    self.destinationRoot = destination
+    else:
+      self._destinationRoot = destination
+      self.minimum = self.getNextCaseNumber()
+      self.onCaseNumberChanged(self.minimum)
     self.newCaseDirectory = None
-    self.minimum = self.getNextCaseNumber()
-    self.setupUI()
     self.setupConnections()
-    self.onCaseNumberChanged(self.minimum)
+
 
   def getNextCaseNumber(self):
     import re
@@ -367,7 +377,7 @@ class NewCaseSelectionNameWidget(qt.QMessageBox, ModuleWidgetMixin):
     self.setText("Please select a case number for the new case.")
     self.setIcon(qt.QMessageBox.Question)
     self.spinbox = qt.QSpinBox()
-    self.spinbox.setRange(self.minimum, int("9"*self.CASE_NUMBER_DIGITS))
+    self.spinbox.setRange(0, int("9"*self.CASE_NUMBER_DIGITS))
     self.preview = qt.QLabel()
     self.notice = qt.QLabel()
     self.layout().addWidget(self.createVLayout([self.createHLayout([qt.QLabel("Proposed Case Number"), self.spinbox]),
