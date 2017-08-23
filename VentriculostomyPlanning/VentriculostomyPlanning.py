@@ -20,11 +20,12 @@ from SlicerCaseManager import SlicerCaseManagerWidget, onReturnProcessEvents, be
 from VentriculostomyPlanningUtils.PopUpMessageBox import SerialAssignMessageBox
 from VentriculostomyPlanningUtils.UserEvents import VentriculostomyUserEvents
 from VentriculostomyPlanningUtils.UsefulFunctions import UsefulFunctions
-from VentriculostomyPlanningUtils.VentriclostomyButtons import GreenSliceLayoutButton, ConventionalSliceLayoutButton, ReverseViewOnCannulaButton
+from VentriculostomyPlanningUtils.VentriclostomyButtons import GreenSliceLayoutButton, ConventionalSliceLayoutButton, ReverseViewOnCannulaButton, ScreenShotButton
 from SlicerDevelopmentToolboxUtils.buttons import WindowLevelEffectsButton
 from shutil import copyfile
 from os.path import basename
 from os import listdir
+import ScreenCapture
 
 from abc import ABCMeta, abstractmethod
 import datetime
@@ -44,8 +45,7 @@ class VentriculostomyPlanning(ScriptedLoadableModule):
     #self.parent.dependencies = [""]
     self.parent.contributors = ["Junichi Tokuda (BWH)", "Longquan Chen(BWH)"] # replace with "Firstname Lastname (Organization)"
     self.parent.helpText = """
-    This is an example of scripted loadable module bundled in an extension.
-    It performs a simple thresholding on the input volume and optionally captures a screenshot.
+    This is an scripted module for ventriclostomy planning
     """
     self.parent.acknowledgementText = """
     This module was developed based on an example code provided by Jean-Christophe Fillion-Robin, Kitware Inc.
@@ -537,11 +537,13 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
     self.greenLayoutButton = GreenSliceLayoutButton()
     self.conventionalLayoutButton = ConventionalSliceLayoutButton()
     self.viewSubGroupBoxLayout.addWidget(ventricleVolumeLabel)
+    self.screenShotButton = ScreenShotButton()
     self.setReverseViewButton = ReverseViewOnCannulaButton()
     self.viewGroupBoxLayout.addWidget(self.setReverseViewButton,0, 0)
     self.viewGroupBoxLayout.addWidget(self.greenLayoutButton, 0, 1)
     self.viewGroupBoxLayout.addWidget(self.conventionalLayoutButton, 0, 2)
-    self.viewGroupBoxLayout.addWidget(self.setWindowLevelButton, 0, 3)
+    self.viewGroupBoxLayout.addWidget(self.screenShotButton, 0, 3)
+    self.viewGroupBoxLayout.addWidget(self.setWindowLevelButton, 0, 4)
     self.viewGroupBoxLayout.addWidget(venousVolumeLabel)
     self.viewGroupBoxLayout.addWidget(self.imageSlider)
     self.viewGroupBoxLayout.addWidget(ventricleVolumeLabel)
@@ -787,7 +789,9 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
       self.venousVolumeNameLabel.text = ""
       self.ventricleVolumeNameLabel.text = ""
       self.isLoadingCase = False
+      self.screenShotButton.caseResultDir = ""
     elif EventID == self.slicerCaseWidget.LoadCaseCompletedEvent:
+      self.screenShotButton.caseResultDir = self.slicerCaseWidget.currentCaseDirectory
       allNodes = slicer.mrmlScene.GetNodes()
       for nodeIndex in range(allNodes.GetNumberOfItems()):
         node = allNodes.GetItemAsObject(nodeIndex)
@@ -817,6 +821,8 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
       self.yellow_cn.SetDoPropagateVolumeSelection(False)
       self.isLoadingCase = True
       slicer.mrmlScene.RemoveObserver(self.nodeAddedEventObserverID)
+    elif EventID == self.slicerCaseWidget.CreatedNewCaseEvent:
+      self.screenShotButton.caseResultDir = self.slicerCaseWidget.currentCaseDirectory
     pass
 
   def updateFromLogic(self, EventID):
@@ -859,34 +865,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
       if self.onSaveDicomFiles():
         self.SerialAssignBox.AppendVolumeNode(callData)
         self.initialNodesIDList.append(callData.GetID())
-        """
-        if ("Venous" in volumeName) or ("venous" in volumeName) :
-          self.logic.baseVolumeNode = callData
-          self.SerialAssignBox.volumesCheckedDict["Venous"] = callData
-          self.SerialAssignBox.SetCheckBoxAccordingToAssignment()
-          self.venousVolumeNameLabel.text = self.logic.baseVolumeNode.GetName()
-        elif ("Ventricle" in volumeName) or ("ventricle" in volumeName) :
-          self.logic.ventricleVolume = callData
-          self.SerialAssignBox.volumesCheckedDict["Ventricle"] = callData
-          self.SerialAssignBox.SetCheckBoxAccordingToAssignment()
-          self.ventricleVolumeNameLabel.text = self.logic.ventricleVolume.GetName()
-        else:
-          self.onShowVolumeTable()
-        if self.logic.baseVolumeNode and self.logic.ventricleVolume and (not self.volumeSelected):
-          self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_ventricleVolume", self.logic.ventricleVolume.GetID())
-          self.logic.ventricleVolume.SetAttribute("vtkMRMLScalarVolumeNode.rel_venousVolume", self.logic.baseVolumeNode.GetID())
-          self.volumeSelected = True
-          self.dicomWidget.detailsPopup.close()
-          self.progressBar.value = 0
-          self.progressBar.labelText = 'Saving imported volume'
-          slicer.app.processEvents()
-          outputDir = os.path.join(self.slicerCaseWidget.currentCaseDirectory, "Results")
-          self.logic.savePlanningDataToDirectory(self.logic.baseVolumeNode, outputDir)
-          self.logic.savePlanningDataToDirectory(self.logic.ventricleVolume, outputDir)
-          self.isLoadingCase = True
-          self.onSelect(self.logic.baseVolumeNode)
-        """
-
 
         #the setForegroundVolume will not work, because the slicerapp triggers the SetBackgroundVolume after the volume is loaded
   def onShowVolumeTable(self):

@@ -131,10 +131,10 @@ class SlicerCaseManagerWidget(ScriptedLoadableModuleWidget, ModuleWidgetMixin):
     self._caseDirectoryList = {}
     self.caseDirectoryList = {"DICOM/Planning", "Results"}
     self.warningBox = qt.QMessageBox()
-    self.caseDialog = NewCaseSelectionNameWidget(self.caseRootDir)
-    self.CloseCaseEvent = vtk.vtkCommand.UserEvent + 151
-    self.LoadCaseCompletedEvent = vtk.vtkCommand.UserEvent + 152
-    self.StartCaseImportEvent = vtk.vtkCommand.UserEvent + 157
+    self.CloseCaseEvent = vtk.vtkCommand.UserEvent + 201
+    self.LoadCaseCompletedEvent = vtk.vtkCommand.UserEvent + 202
+    self.StartCaseImportEvent = vtk.vtkCommand.UserEvent + 203
+    self.CreatedNewCaseEvent = vtk.vtkCommand.UserEvent + 204
     self.setup()
 
   def setup(self):
@@ -226,6 +226,7 @@ class SlicerCaseManagerWidget(ScriptedLoadableModuleWidget, ModuleWidgetMixin):
       self.warningBox.exec_()
       return
     self.clearData()
+    self.caseDialog = NewCaseSelectionNameWidget(self.caseRootDir)
     selectedButton = self.caseDialog.exec_()
     if selectedButton == qt.QMessageBox.Ok:
       newCaseDirectory = self.caseDialog.newCaseDirectory
@@ -239,6 +240,7 @@ class SlicerCaseManagerWidget(ScriptedLoadableModuleWidget, ModuleWidgetMixin):
           if not os.path.exists(os.path.join(newCaseDirectory,fullPath)): 
             os.mkdir(os.path.join(newCaseDirectory,fullPath))
       self.currentCaseDirectory = newCaseDirectory
+      self.logic.update_observers(self.CreatedNewCaseEvent)
   
   def onOpenCaseButtonClicked(self):
     if not self.checkAndWarnUserIfCaseInProgress():
@@ -341,27 +343,17 @@ class NewCaseSelectionNameWidget(qt.QMessageBox, ModuleWidgetMixin):
   CASE_NUMBER_DIGITS = 3
   PATTERN = PREFIX+"[0-9]{"+str(CASE_NUMBER_DIGITS-1)+"}[0-9]{1}"+SUFFIX_PATTERN
 
-  @property
-  def destinationRoot(self):
-    return self._destinationRoot
-
-  @destinationRoot.setter
-  def destinationRoot(self, root):
-    self._destinationRoot = root
-
-  def __init__(self, destination=None, parent=None):
+  def __init__(self, destination, parent=None):
     super(NewCaseSelectionNameWidget, self).__init__(parent)
-    self.setupUI()
     if not os.path.exists(destination):
       slicer.util.warningDisplay("Root directory is not set, please set the root in the 'Case Directory Settings' panel ", windowTitle="")
       raise
-    else:
-      self._destinationRoot = destination
-      self.minimum = self.getNextCaseNumber()
-      self.onCaseNumberChanged(self.minimum)
+    self.destinationRoot = destination
     self.newCaseDirectory = None
+    self.minimum = self.getNextCaseNumber()
+    self.setupUI()
     self.setupConnections()
-
+    self.onCaseNumberChanged(self.minimum)
 
   def getNextCaseNumber(self):
     import re
@@ -377,7 +369,7 @@ class NewCaseSelectionNameWidget(qt.QMessageBox, ModuleWidgetMixin):
     self.setText("Please select a case number for the new case.")
     self.setIcon(qt.QMessageBox.Question)
     self.spinbox = qt.QSpinBox()
-    self.spinbox.setRange(0, int("9"*self.CASE_NUMBER_DIGITS))
+    self.spinbox.setRange(self.minimum, int("9"*self.CASE_NUMBER_DIGITS))
     self.preview = qt.QLabel()
     self.notice = qt.QLabel()
     self.layout().addWidget(self.createVLayout([self.createHLayout([qt.QLabel("Proposed Case Number"), self.spinbox]),

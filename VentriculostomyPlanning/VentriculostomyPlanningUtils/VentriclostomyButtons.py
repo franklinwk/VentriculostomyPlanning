@@ -1,6 +1,7 @@
 import slicer, vtk
 from ctk import ctkAxesWidget
-from SlicerDevelopmentToolboxUtils.buttons import LayoutButton, CheckableIconButton
+from SlicerDevelopmentToolboxUtils.buttons import LayoutButton, CheckableIconButton, BasicIconButton
+import os
 
 class GreenSliceLayoutButton(LayoutButton):
   """ LayoutButton inherited class which represents a button for the SlicerLayoutOneUpGreenSliceView including the icon.
@@ -47,6 +48,44 @@ class ConventionalSliceLayoutButton(LayoutButton):
     super(ConventionalSliceLayoutButton, self).__init__(text, parent, **kwargs)
     self.toolTip = "Conventional Slice Only Layout"
 
+
+class ScreenShotButton(BasicIconButton):
+  _ICON_FILENAME = 'screenShot.png'
+
+  @property
+  def caseResultDir(self):
+    return self._caseResultDir
+
+  @caseResultDir.setter
+  def caseResultDir(self, value):
+    self._caseResultDir = value
+    self.imageIndex = 0
+
+  def __init__(self, text="", parent=None, **kwargs):
+    super(ScreenShotButton, self).__init__(text, parent, **kwargs)
+    import ScreenCapture
+    self.cap = ScreenCapture.ScreenCaptureLogic()
+    self.checkable = False
+    self._caseResultDir = ""
+    self.imageIndex = 0
+
+  def _connectSignals(self):
+    super(ScreenShotButton, self)._connectSignals()
+    self.clicked.connect(self.onClicked)
+
+  def onClicked(self):
+    if self.caseResultDir:
+      self.cap.showViewControllers(False)
+      fileName = os.path.join(self._caseResultDir, 'Results', 'screenShot'+str(self.imageIndex)+'.png')
+      if os.path.exists(fileName):
+        self.imageIndex = self.imageIndex + 1
+        fileName = os.path.join(self._caseResultDir, 'Results', 'screenShot' + str(self.imageIndex) + '.png')
+      self.cap.captureImageFromView(None, fileName)
+      self.cap.showViewControllers(True)
+      self.imageIndex = self.imageIndex + 1
+    else:
+      slicer.util.warningDisplay("Case was not created, create a case first")
+    pass
 
 class ReverseViewOnCannulaButton(CheckableIconButton):
   _ICON_FILENAME = 'ReverseView.png'
