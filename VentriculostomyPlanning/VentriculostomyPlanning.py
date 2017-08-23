@@ -1012,7 +1012,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
         self.logic.enableRelatedVolume("vtkMRMLScalarVolumeNode.rel_vesselnessVolume", "vesselnessVolume")
         self.logic.enableRelateVariables("vtkMRMLScalarVolumeNode.rel_cylinderRadius", "cylinderRadius")
         self.logic.enableRelateVariables("vtkMRMLScalarVolumeNode.rel_vesselThreshold", "vesselThreshold")
-
+        self.vesselThresholdSlider.setValue(self.logic.vesselThreshold)
         #self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_skullNorm", caseName)
         self.logic.enableEventObserver()
         #Set the cropped image for processing
@@ -1059,7 +1059,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
         self.progressBar.show()
         self.progressBar.labelText = 'Calculating Skull Surface'
         slicer.app.processEvents()
-        self.onCreateModel()
+        self.createModel()
         self.progressBar.value = 25
         self.progressBar.labelText = 'Calculating Vessel'
         slicer.app.processEvents()
@@ -1254,25 +1254,35 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
     self.nodeAddedEventObserverID = slicer.mrmlScene.AddObserver(slicer.mrmlScene.NodeAddedEvent,
                                                                  self.onVolumeAddedNode)
     pass
-    
+
   def onCreateModel(self):
     if self.logic.baseVolumeNode:
       outputModelNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_model")
       if outputModelNodeID:
         outputModelNode = slicer.mrmlScene.GetNodeByID(outputModelNodeID)
-        #outputModelNode.SetAttribute("vtkMRMLModelNode.modelCreated","False")
+        outputModelNode.SetAttribute("vtkMRMLModelNode.modelCreated", "False")
+        self.createModel()
+
+  def createModel(self):
+    self.isInAlgorithmSteps = True
+    if self.logic.baseVolumeNode:
+      outputModelNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_model")
+      if outputModelNodeID:
+        outputModelNode = slicer.mrmlScene.GetNodeByID(outputModelNodeID)
         slicer.mrmlScene.RemoveObserver(self.nodeAddedEventObserverID)
         try:
           self.logic.createModel(outputModelNode, self.logic.sufaceModelThreshold)
         except ValueError:
           slicer.util.warningDisplay(
             "Skull surface calculation error, volumes might not be suitable for calculation")
+          self.isInAlgorithmSteps = False
         finally:
           slicer.app.processEvents()
           self.nodeAddedEventObserverID = slicer.mrmlScene.AddObserver(slicer.mrmlScene.NodeAddedEvent,
                                                                      self.onVolumeAddedNode)
           self.onSet3DViewer()
           self.onSaveData()
+    self.isInAlgorithmSteps = False
 
   def onSelectNasionPoint(self):
     if self.selectNasionButton.isChecked():
@@ -2461,6 +2471,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
             points.InsertNextPoint(pointTranslated)
         synthesizedData.SetPoints(points)
         tempModel = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
+        tempModel.SetName("candicateCannula")
         tempModel.SetAndObservePolyData(synthesizedData)
         vesselModelWithMarginNodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_vesselnessWithMarginModel")
         vesselModelWithMarginNode = slicer.mrmlScene.GetNodeByID(vesselModelWithMarginNodeID)
@@ -2688,11 +2699,11 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
 
     Decimate = 0.05
 
-    if self.baseVolumeNode == None:
+    if self.ventricleVolume == None:
       return
     if outputModelNode.GetAttribute("vtkMRMLModelNode.modelCreated") == "False":
       resampleFilter = sitk.ResampleImageFilter()
-      originImage = sitk.Cast(sitkUtils.PullFromSlicer(self.baseVolumeNode.GetID()), sitk.sitkInt16)
+      originImage = sitk.Cast(sitkUtils.PullFromSlicer(self.ventricleVolume.GetID()), sitk.sitkInt16)
       self.samplingFactor = 2
       resampleFilter.SetSize(numpy.array(originImage.GetSize())/self.samplingFactor)
       resampleFilter.SetOutputSpacing(numpy.array(originImage.GetSpacing())*self.samplingFactor)
@@ -2700,11 +2711,14 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       resampledImage = resampleFilter.Execute(originImage)
       thresholdFilter = sitk.BinaryThresholdImageFilter()
       thresholdImage = thresholdFilter.Execute(resampledImage,thresholdValue,10000,1,0)
+      padFilter = sitk.ConstantPadImageFilter()
+      padFilter.SetPadLowerBound([10, 10, 10])
+      paddedImage = padFilter.Execute(thresholdImage)
       dilateFilter = sitk.BinaryDilateImageFilter()
       dilateFilter.SetKernelRadius([10,10,6])
       dilateFilter.SetBackgroundValue(0)
       dilateFilter.SetForegroundValue(1)
-      dilatedImage = dilateFilter.Execute(thresholdImage)
+      dilatedImage = dilateFilter.Execute(paddedImage)
       erodeFilter = sitk.BinaryErodeImageFilter()
       erodeFilter.SetKernelRadius([10,10,6])
       erodeFilter.SetBackgroundValue(0)
