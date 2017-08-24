@@ -52,7 +52,7 @@ class SerialAssignMessageBox(qt.QMessageBox):
     #self.tableWidget.setMinimumHeight(200)
     #self.tableWidget.setMinimumWidth(300)
     self.tableWidget.setObjectName ('tableWidget')
-    self.tableWidget.setColumnCount(3)
+    self.tableWidget.setColumnCount(2)
     self.tableWidget.setRowCount(2)
     #self.tableWidget.resizeRowsToContents()
     #self.tableWidget.resizeColumnsToContents()
@@ -61,8 +61,9 @@ class SerialAssignMessageBox(qt.QMessageBox):
     #self.tableWidget.horizontalHeader().setStretchLastSection(True)
     #self.tableWidget.verticalHeader().setStretchLastSection(True)
   def AppendVolumeNode(self, addedVolumeNode):
-    self.volumes.append(addedVolumeNode)
-    self.SetAssignTableWithVolumes(self.volumes)
+    if addedVolumeNode not in self.volumes:
+      self.volumes.append(addedVolumeNode)
+      self.SetAssignTableWithVolumes(self.volumes)
 
   def Clear(self):
     self.volumesCheckedDict = dict()
@@ -72,6 +73,7 @@ class SerialAssignMessageBox(qt.QMessageBox):
     self.volumeNames = []
     self.importedVolumeIDs = []
     self.volumes = []
+    self.tableWidget.setRowCount(0)
 
   def SetAssignTableWithVolumes(self, addedVolumeNodes):
     self.volumes = addedVolumeNodes

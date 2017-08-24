@@ -823,6 +823,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
       slicer.mrmlScene.RemoveObserver(self.nodeAddedEventObserverID)
     elif EventID == self.slicerCaseWidget.CreatedNewCaseEvent:
       self.screenShotButton.caseResultDir = self.slicerCaseWidget.currentCaseDirectory
+      self.SerialAssignBox.Clear()
     pass
 
   def updateFromLogic(self, EventID):
@@ -895,6 +896,8 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
             self.initialNodesIDList.append(self.logic.baseVolumeNode.GetStorageNodeID()) 
             self.initialNodesIDList.append(self.logic.ventricleVolume.GetDisplayNodeID())  
             self.initialNodesIDList.append(self.logic.ventricleVolume.GetStorageNodeID())
+            # To start the whole planning procedure, the MRMLScene needs to be clean up, but the nodes such as cameraNode, sliceNodes, baseVolumeNode and ventricleVolumeNode should not be deleted.
+            # The following lines deletes the nodes generated from the previous planning case.
             allNodes = slicer.mrmlScene.GetNodes()
             for nodeIndex in range(allNodes.GetNumberOfItems()):
               node = allNodes.GetItemAsObject(nodeIndex)
@@ -984,6 +987,10 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
         self.logic.enableRelatedMarkups("vtkMRMLScalarVolumeNode.rel_distal", "distal")
         self.logic.enableRelatedMarkups("vtkMRMLScalarVolumeNode.rel_vesselSeeds", "vesselSeeds")
         self.logic.enableRelatedMarkups("vtkMRMLScalarVolumeNode.rel_cannula", "cannula")
+        self.logic.enableRelatedMarkups("vtkMRMLScalarVolumeNode.rel_sagittalReferenceMarker", "sagittalReferenceMarker",visibility=False)
+        self.logic.enableRelatedMarkups("vtkMRMLScalarVolumeNode.rel_coronalReferenceMarker", "coronalReferenceMarker", visibility=False)
+        self.logic.enableRelatedMarkups("vtkMRMLScalarVolumeNode.rel_sagittalPlanningMarker", "sagittalPlanningMarker", visibility=False)
+        self.logic.enableRelatedMarkups("vtkMRMLScalarVolumeNode.rel_coronalPlanningMarker", "coronalPlanningMarker", visibility=False)
         self.logic.enableRelatedVolume("vtkMRMLScalarVolumeNode.rel_croppedVolume","croppedVolume")
         self.logic.enableRelatedVolume("vtkMRMLScalarVolumeNode.rel_clippedVolume", "clippedVolume")
         self.logic.enableRelatedVolume("vtkMRMLScalarVolumeNode.rel_quarterVolume", "quarterVolume")
@@ -1006,13 +1013,22 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
         self.radiusPathPlanningEdit.text = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_planningRadius")
   
         ReferenceModelID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagittalReferenceModel")
-        self.logic.sagittalReferenceCurveManager._curveModel = slicer.mrmlScene.GetNodeByID(ReferenceModelID)
+        self.logic.sagittalReferenceCurveManager.connectModelNode(slicer.mrmlScene.GetNodeByID(ReferenceModelID))
         ReferenceModelID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_coronalReferenceModel")
-        self.logic.coronalReferenceCurveManager._curveModel = slicer.mrmlScene.GetNodeByID(ReferenceModelID)
+        self.logic.coronalReferenceCurveManager.connectModelNode(slicer.mrmlScene.GetNodeByID(ReferenceModelID))
         ReferenceModelID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagittalPlanningModel")
-        self.logic.sagittalPlanningCurveManager._curveModel = slicer.mrmlScene.GetNodeByID(ReferenceModelID)
+        self.logic.sagittalPlanningCurveManager.connectModelNode(slicer.mrmlScene.GetNodeByID(ReferenceModelID))
         ReferenceModelID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_coronalPlanningModel")
-        self.logic.coronalPlanningCurveManager._curveModel = slicer.mrmlScene.GetNodeByID(ReferenceModelID)
+        self.logic.coronalPlanningCurveManager.connectModelNode(slicer.mrmlScene.GetNodeByID(ReferenceModelID))
+
+        ReferenceMarkerID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagittalReferenceMarker")
+        self.logic.sagittalReferenceCurveManager.connectMarkerNode(slicer.mrmlScene.GetNodeByID(ReferenceMarkerID))
+        ReferenceMarkerID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_coronalReferenceMarker")
+        self.logic.coronalReferenceCurveManager.connectMarkerNode(slicer.mrmlScene.GetNodeByID(ReferenceMarkerID))
+        ReferenceMarkerID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagittalPlanningMarker")
+        self.logic.sagittalPlanningCurveManager.connectMarkerNode(slicer.mrmlScene.GetNodeByID(ReferenceMarkerID))
+        ReferenceMarkerID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_coronalPlanningMarker")
+        self.logic.coronalPlanningCurveManager.connectMarkerNode(slicer.mrmlScene.GetNodeByID(ReferenceMarkerID))
         #self.logic.sagittalReferenceCurveManager.startEditLine()
         #self.logic.coronalReferenceCurveManager.startEditLine()
         #self.logic.sagittalPlanningCurveManager.startEditLine()
@@ -1023,7 +1039,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
         cannulaModelID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_cannulaModel")
         cannulaFiducialsID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_cannula")
         self.logic.pathNavigationModel.SetDisplayVisibility(0)
-        self.logic.cannulaManager._curveModel = slicer.mrmlScene.GetNodeByID(cannulaModelID)
+        self.logic.cannulaManager.connectModelNode(slicer.mrmlScene.GetNodeByID(cannulaModelID))
         self.logic.cannulaManager.curveFiducials = slicer.mrmlScene.GetNodeByID(cannulaFiducialsID)
         self.logic.cannulaManager.curveFiducials.AddObserver(slicer.vtkMRMLMarkupsNode().PointStartInteractionEvent, self.logic.updateSelectedMarker)
         self.logic.cannulaManager.curveFiducials.AddObserver(slicer.vtkMRMLMarkupsNode().PointModifiedEvent, self.logic.updateCannulaPosition)
@@ -1056,6 +1072,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
         self.progressBar.close()
         self.logic.appendPlanningTimeStampToJson(self.jsonFile, "EndPreprocessing",
                                                  datetime.datetime.now().time().isoformat())
+        self.imageSlider.setValue(100.0)
     self.nodeAddedEventObserverID = slicer.mrmlScene.AddObserver(slicer.mrmlScene.NodeAddedEvent,
                                                                  self.onVolumeAddedNode)
     pass
@@ -1306,8 +1323,8 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
           self.logic.savePlanningDataToDirectory(self.logic.baseVolumeNode, outputDir)
 
       nodeAttributes=["rel_ventricleVolume", "rel_model","rel_nasion","rel_sagittalPoint","rel_target","rel_distal", "rel_vesselSeeds", \
-                      "rel_cannula","rel_skullNorm","rel_cannulaModel","rel_sagittalReferenceModel","rel_coronalReferenceModel",\
-                      "rel_sagittalPlanningModel","rel_coronalPlanningModel","rel_vesselnessModel","rel_vesselnessWithMarginModel","rel_vesselnessVolume"]
+                      "rel_cannula","rel_skullNorm","rel_cannulaModel","rel_sagittalReferenceModel","rel_sagittalReferenceMarker","rel_coronalReferenceModel","rel_coronalReferenceMarker",\
+                      "rel_sagittalPlanningModel","rel_sagittalPlanningMarker","rel_coronalPlanningModel","rel_coronalPlanningMarker","rel_vesselnessModel","rel_vesselnessWithMarginModel","rel_vesselnessVolume"]
       for attribute in nodeAttributes:
         nodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode."+attribute)
         if nodeID and slicer.mrmlScene.GetNodeByID(nodeID):
@@ -1702,7 +1719,19 @@ class CurveManager():
       slicer.mrmlScene.RemoveNode(self.curveFiducials)
     self.curveFiducials = None
     self._curveModel = None
-  
+
+  def connectModelNode(self, mrmlModelNode):
+    if self._curveModel:
+      slicer.mrmlScene.RemoveNode(self._curveModel.GetDisplayNode())
+      slicer.mrmlScene.RemoveNode(self._curveModel)
+    self._curveModel =  mrmlModelNode
+
+  def connectMarkerNode(self, mrmlMarkerNode):
+    if self.curveFiducials:
+      slicer.mrmlScene.RemoveNode(self.curveFiducials.GetDisplayNode())
+      slicer.mrmlScene.RemoveNode(self.curveFiducials)
+    self.curveFiducials =  mrmlMarkerNode
+
   def setName(self, name):
     self.curveName = name
     self.curveModelName = "%s-Model" % (name)
@@ -2032,6 +2061,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     slicer.mrmlScene.AddNode(modelDisplay)
     self.pathCandidatesModel = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
     slicer.mrmlScene.AddNode(self.pathCandidatesModel)
+    self.pathCandidatesModel.SetName("pathCandidatesModel")
     self.pathCandidatesModel.SetAndObserveDisplayNodeID(modelDisplay.GetID())
     modelDisplay2 = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelDisplayNode")
     modelDisplay2.SetColor(yellow[0], yellow[1], yellow[2])
@@ -2040,6 +2070,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     slicer.mrmlScene.AddNode(modelDisplay2)
     self.pathNavigationModel = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
     slicer.mrmlScene.AddNode(self.pathNavigationModel)
+    self.pathNavigationModel.SetName("pathNavigationModel")
     self.pathNavigationModel.SetAndObserveDisplayNodeID(modelDisplay2.GetID())
     displayNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsDisplayNode")
     displayNode.SetColor(red[0], red[1], red[2])
@@ -2099,6 +2130,8 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     if self.ROINode:
       #slicer.mrmlScene.RemoveNode(self.ROINode)
       self.ROINode = None
+    self.baseVolumeNode = None
+    self.ventricleVolume = None
 
   def appendPlanningTimeStampToJson(self, JSONFile, parameterName, value):
     data = {}
@@ -2329,9 +2362,14 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
         return None
       if marginNode and (marginNode.GetAttribute("vtkMRMLModelNode.modelCreated") == "False"):
         connectedImage = sitk.Cast(sitkUtils.PullFromSlicer(connectedImageNode.GetID()), sitk.sitkInt8)
-        #connectedImageReversed = sitk.Add(sitk.Multiply(connectedImage, -1),1)
+        # padding is necessary, because some venous could be very close to the volume boundary. Which causes distance map to be incomplete at the coundary.
+        # In the end, the incomplete distance map will create holes in the venous margin model
+        padFilter = sitk.ConstantPadImageFilter()
+        padFilter.SetPadLowerBound([int(self.venousMargin), int(self.venousMargin), int(self.venousMargin)])
+        padFilter.SetPadUpperBound([int(self.venousMargin), int(self.venousMargin), int(self.venousMargin)])
+        paddedImage = padFilter.Execute(connectedImage)
         try:
-          distanceMap = sitk.Multiply(self.distanceMapFilter.Execute(connectedImage),-1)
+          distanceMap = sitk.Multiply(self.distanceMapFilter.Execute(paddedImage),-1)
         except ValueError:
           slicer.util.warningDisplay(
             "distance map calucation failed, try use different settings")
