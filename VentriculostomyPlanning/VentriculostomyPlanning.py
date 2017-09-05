@@ -22,6 +22,7 @@ from VentriculostomyPlanningUtils.UserEvents import VentriculostomyUserEvents
 from VentriculostomyPlanningUtils.UsefulFunctions import UsefulFunctions
 from VentriculostomyPlanningUtils.VentriclostomyButtons import GreenSliceLayoutButton, ConventionalSliceLayoutButton, ReverseViewOnCannulaButton, ScreenShotButton
 from SlicerDevelopmentToolboxUtils.buttons import WindowLevelEffectsButton
+from SlicerDevelopmentToolboxUtils.mixins import ModuleWidgetMixin, ModuleLogicMixin
 from shutil import copyfile
 from os.path import basename
 from os import listdir
@@ -56,14 +57,16 @@ class VentriculostomyPlanning(ScriptedLoadableModule):
 # VentriculostomyPlanningWidget
 #
 
-class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
+class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMixin):
   """Uses ScriptedLoadableModuleWidget base class, available at:
   https://github.com/Slicer/Slicer/blob/master/Base/Python/slicer/ScriptedLoadableModule.py
   """
+  buttonWidth = 45
+  buttonHeight = 45
 
   def setup(self):
     ScriptedLoadableModuleWidget.setup(self)
-    VTKObservationMixin.__init__(self)
+    ModuleWidgetMixin.__init__(self)
     self.logic = VentriculostomyPlanningLogic()
     self.logic.register(self)
     self.dicomWidget = DICOMWidget()
@@ -107,147 +110,62 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
     #
     """"""
     referenceConfigLayout = qt.QHBoxLayout()
-
-    #-- Curve length
-    lengthSagittalReferenceLineLabel = qt.QLabel('Sagittal Length:  ')
-    referenceConfigLayout.addWidget(lengthSagittalReferenceLineLabel)
-    self.lengthSagittalReferenceLineEdit = qt.QLineEdit()
-    self.lengthSagittalReferenceLineEdit.text = '100.0'
-    self.lengthSagittalReferenceLineEdit.readOnly = False
-    self.lengthSagittalReferenceLineEdit.frame = True
-    self.lengthSagittalReferenceLineEdit.styleSheet = "QLineEdit { background:transparent; }"
-    self.lengthSagittalReferenceLineEdit.cursor = qt.QCursor(qt.Qt.IBeamCursor)
-    referenceConfigLayout.addWidget(self.lengthSagittalReferenceLineEdit)
-    lengthSagittalReferenceLineUnitLabel = qt.QLabel('mm  ')
-    referenceConfigLayout.addWidget(lengthSagittalReferenceLineUnitLabel)
-
-    lengthCoronalReferenceLineLabel = qt.QLabel('Coronal Length:  ')
-    referenceConfigLayout.addWidget(lengthCoronalReferenceLineLabel)
-    self.lengthCoronalReferenceLineEdit = qt.QLineEdit()
-    self.lengthCoronalReferenceLineEdit.text = '30.0'
-    self.lengthCoronalReferenceLineEdit.readOnly = False
-    self.lengthCoronalReferenceLineEdit.frame = True
-    self.lengthCoronalReferenceLineEdit.styleSheet = "QLineEdit { background:transparent; }"
-    self.lengthCoronalReferenceLineEdit.cursor = qt.QCursor(qt.Qt.IBeamCursor)
-    referenceConfigLayout.addWidget(self.lengthCoronalReferenceLineEdit)
-    lengthCoronalReferenceLineUnitLabel = qt.QLabel('mm  ')
-    referenceConfigLayout.addWidget(lengthCoronalReferenceLineUnitLabel)
-
-    radiusPathPlanningLabel = qt.QLabel('Radius:  ')
-    self.radiusPathPlanningEdit = qt.QLineEdit()
-    self.radiusPathPlanningEdit.text = '30.0'
-    self.radiusPathPlanningEdit.readOnly = False
-    self.radiusPathPlanningEdit.frame = True
-    self.radiusPathPlanningEdit.styleSheet = "QLineEdit { background:transparent; }"
-    self.radiusPathPlanningEdit.cursor = qt.QCursor(qt.Qt.IBeamCursor)
-    radiusPathPlanningUnitLabel = qt.QLabel('mm  ')
-    # referenceConfigLayout.addWidget(radiusPathPlanningLabel)
-    # referenceConfigLayout.addWidget(self.radiusPathPlanningEdit)
-    # referenceConfigLayout.addWidget(radiusPathPlanningUnitLabel)
     appSettingLayout.addRow(referenceConfigLayout)
 
-    self.reloadButton = qt.QPushButton("Reload")
-    self.reloadButton.toolTip = "Reload this module."
-    self.reloadButton.name = "VentriculostomyPlanning Reload"
+    lengthSagittalReferenceLineLabel = self.createLabel('Sagittal Length:  ')
+    #-- Curve length
+    referenceConfigLayout.addWidget(lengthSagittalReferenceLineLabel)
+    self.lengthSagittalReferenceLineEdit = self.createLineEdit(title= "", text = '100.0', readOnly = False, frame = True,
+                                                               styleSheet = "QLineEdit { background:transparent; }", cursor = qt.QCursor(qt.Qt.IBeamCursor))
+    self.lengthSagittalReferenceLineEdit.connect('textEdited(QString)', self.onModifyMeasureLength)
+    referenceConfigLayout.addWidget(self.lengthSagittalReferenceLineEdit)
+    lengthSagittalReferenceLineUnitLabel = self.createLabel('mm  ')
+    referenceConfigLayout.addWidget(lengthSagittalReferenceLineUnitLabel)
+
+    lengthCoronalReferenceLineLabel = self.createLabel('Coronal Length:  ')
+    referenceConfigLayout.addWidget(lengthCoronalReferenceLineLabel)
+    self.lengthCoronalReferenceLineEdit = self.createLineEdit(title= "", text = '30.0', readOnly = False, frame = True,
+                                                              styleSheet="QLineEdit { background:transparent; }", cursor = qt.QCursor(qt.Qt.IBeamCursor))
+    self.lengthCoronalReferenceLineEdit.connect('textEdited(QString)', self.onModifyMeasureLength)
+    referenceConfigLayout.addWidget(self.lengthCoronalReferenceLineEdit)
+    lengthCoronalReferenceLineUnitLabel = self.createLabel('mm  ')
+    referenceConfigLayout.addWidget(lengthCoronalReferenceLineUnitLabel)
+
+    self.reloadButton = self.createButton(title="Reload", toolTip = "Reload this module.", name = "VentriculostomyPlanning Reload")
+    self.reloadButton.connect('clicked()', self.onReload)
     referenceConfigLayout.addWidget(self.reloadButton)
 
-    #
-    # Create Entry point Button
-    #
-
-    self.createModelButton = qt.QPushButton("Create Surface")
-    self.createModelButton.toolTip = "Create a surface model."
-    self.createModelButton.enabled = True
-    self.createModelButton.connect('clicked(bool)', self.onCreateModel)
-    #
-    # Venous Segmentation/Rendering
-    #
-
-    # Layout within the dummy collapsible button
-    createVesselHorizontalLayout = qt.QHBoxLayout()
-    self.venousCalcStatus = qt.QLabel('VenousCalcStatus')
-
-    self.detectVesselBox = qt.QGroupBox()
-    detectVesselLayout = qt.QVBoxLayout()
-    detectVesselLayout.setAlignment(qt.Qt.AlignCenter)
-    self.detectVesselBox.setLayout(detectVesselLayout)
-
-    detectVesselLabel = qt.QLabel('Detect Vessel')
-    # detectVesselLayout.addWidget(detectVesselLabel)
-    #detectVesselLayout.addWidget(self.grayScaleMakerButton)
-    #self.grayScaleMakerButton.setIcon(qt.QIcon(qt.QPixmap(os.path.join(self.scriptDirectory, "vessel.png"))))
-    #self.grayScaleMakerButton.setIconSize(qt.QSize(self.grayScaleMakerButton.size))
-    self.detectVesselBox.setStyleSheet('QGroupBox{border:0;}')
-    # self.mainGUIGroupBoxLayout.addWidget(self.detectVesselBox, 2, 2)
-
-    createVesselHorizontalLayout.addWidget(self.venousCalcStatus)
-
     # -- Algorithm setting
+    # Surface Model calculation
     surfaceModelConfigLayout = qt.QHBoxLayout()
-    surfaceModelThresholdLabel = qt.QLabel('Surface Model Intensity Threshold Setting:  ')
+    appSettingLayout.addRow(surfaceModelConfigLayout)
+    surfaceModelThresholdLabel = self.createLabel('Surface Model Intensity Threshold Setting:  ')
     surfaceModelConfigLayout.addWidget(surfaceModelThresholdLabel)
-    self.surfaceModelThresholdEdit = qt.QLineEdit()
-    self.surfaceModelThresholdEdit.text = '-500'
-    self.surfaceModelThresholdEdit.toolTip = "set this value to the intensity of the skull, higher value means less segmented skull"
-    self.surfaceModelThresholdEdit.setMaxLength(6)
-    self.surfaceModelThresholdEdit.readOnly = False
-    self.surfaceModelThresholdEdit.frame = True
-    self.surfaceModelThresholdEdit.styleSheet = "QLineEdit { background:transparent; }"
-    self.surfaceModelThresholdEdit.cursor = qt.QCursor(qt.Qt.IBeamCursor)
+    self.surfaceModelThresholdEdit = self.createLineEdit(title= "", text = '-500', readOnly = False, frame = True, toolTip = "set this value to the intensity of the skull, higher value means less segmented skull",
+                                                         maxLength = 6, styleSheet = "QLineEdit { background:transparent; }", cursor = qt.QCursor(qt.Qt.IBeamCursor))
+    self.surfaceModelThresholdEdit.connect('textEdited(QString)', self.onModifySurfaceModel)
     surfaceModelConfigLayout.addWidget(self.surfaceModelThresholdEdit)
+
+    self.createModelButton = self.createButton(title="Create Surface", toolTip="Create a surface model.", enabled=True)
+    self.createModelButton.connect('clicked(bool)', self.onCreateModel)
     surfaceModelConfigLayout.addWidget(self.createModelButton)
 
-    distanceMapConfigLayout = qt.QHBoxLayout()
-    distanceMapThresholdLabel = qt.QLabel('Distance Map Intensity Threshold Setting:  ')
-    distanceMapConfigLayout.addWidget(distanceMapThresholdLabel)
-    self.distanceMapThresholdEdit = qt.QLineEdit()
-    self.distanceMapThresholdEdit.text = '100'
-    self.distanceMapThresholdEdit.toolTip = "Set the value to the intensity of venous. higher value means less venous"
-    self.distanceMapThresholdEdit.setMaxLength(6)
-    self.distanceMapThresholdEdit.readOnly = False
-    self.distanceMapThresholdEdit.frame = True
-    self.distanceMapThresholdEdit.styleSheet = "QLineEdit { background:transparent; }"
-    self.distanceMapThresholdEdit.cursor = qt.QCursor(qt.Qt.IBeamCursor)
-    distanceMapConfigLayout.addWidget(self.distanceMapThresholdEdit)
-
-    venousMarginLabel = qt.QLabel('Venous Safty Margin:  ')
-    distanceMapConfigLayout.addWidget(venousMarginLabel)
-    self.venousMarginEdit = qt.QLineEdit()
-    self.venousMarginEdit.text = '10.0'
-    self.venousMarginEdit.setMaxLength(6)
-    self.venousMarginEdit.readOnly = False
-    self.venousMarginEdit.frame = True
-    self.venousMarginEdit.styleSheet = "QLineEdit { background:transparent; }"
-    self.venousMarginEdit.cursor = qt.QCursor(qt.Qt.IBeamCursor)
-    distanceMapConfigLayout.addWidget(self.venousMarginEdit)
-    venousMarginUnitLabel = qt.QLabel('mm  ')
-    self.grayScaleMakerButton = qt.QPushButton("Segment GrayScale")
-    self.grayScaleMakerButton.enabled = True
-    self.grayScaleMakerButton.toolTip = "Use the GrayScaleMaker module for vessel calculation "
-    self.grayScaleMakerButton.connect('clicked(bool)', self.onVenousGrayScaleCalc)
-    distanceMapConfigLayout.addWidget(venousMarginUnitLabel)
-    distanceMapConfigLayout.addWidget(self.grayScaleMakerButton)
-    appSettingLayout.addRow(surfaceModelConfigLayout)
-    appSettingLayout.addRow(distanceMapConfigLayout)
-
-    self.surfaceModelThresholdEdit.connect('textEdited(QString)', self.onModifySurfaceModel)
-    self.distanceMapThresholdEdit.connect('textEdited(QString)', self.onModifyVenousMargin)
+    # Venous model calculation and margin setting
+    venousMarginConfigLayout = qt.QHBoxLayout()
+    appSettingLayout.addRow(venousMarginConfigLayout)
+    venousMarginLabel = self.createLabel('Venous Safty Margin: ')
+    venousMarginConfigLayout.addWidget(venousMarginLabel)
+    self.venousMarginEdit = self.createLineEdit(title="", text='10.0', readOnly=False, frame=True, maxLength = 6,
+                                                styleSheet="QLineEdit { background:transparent; }",
+                                                         cursor=qt.QCursor(qt.Qt.IBeamCursor))
     self.venousMarginEdit.connect('textEdited(QString)', self.onModifyVenousMargin)
+    venousMarginConfigLayout.addWidget(self.venousMarginEdit)
+    venousMarginUnitLabel = qt.QLabel('mm  ')
+    venousMarginConfigLayout.addWidget(venousMarginUnitLabel)
+    self.grayScaleMakerButton = self.createButton(title="Segment GrayScale", enabled = True, toolTip = "Use the GrayScaleMaker module for vessel calculation ")
+    self.grayScaleMakerButton.connect('clicked(bool)', self.onVenousGrayScaleCalc)
+    venousMarginConfigLayout.addWidget(self.grayScaleMakerButton)
 
-
-    self.reloadButton.connect('clicked()', self.onReload)
-    self.lengthSagittalReferenceLineEdit.connect('textEdited(QString)', self.onModifyMeasureLength)
-    self.lengthCoronalReferenceLineEdit.connect('textEdited(QString)', self.onModifyMeasureLength)
-    self.radiusPathPlanningEdit.connect('textEdited(QString)', self.onModifyPathPlanningRadius)
-
-    # PatientModel Area
-    #
-    #referenceCollapsibleButton = ctk.ctkCollapsibleButton()
-    #referenceCollapsibleButton.text = "Reference Generating "
-    #self.layout.addWidget(referenceCollapsibleButton)
-    
-    # Layout within the dummy collapsible button
-    #referenceFormLayout = qt.QFormLayout(referenceCollapsibleButton)
 
     self.caseManagerBox = qt.QGroupBox()
     CaseManagerConfigLayout = qt.QVBoxLayout()
@@ -262,215 +180,102 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
     CaseManagerConfigLayout.addWidget(self.slicerCaseWidget.mainGUIGroupBox)
     self.layout.addWidget(self.caseManagerBox)
 
-    #referenceFormLayout.addRow(CaseManagerConfigLayout)
-    #
-    # input volume selector
-    #
-
     self.mainGUIGroupBox = qt.QGroupBox()
     self.mainGUIGroupBoxLayout = qt.QGridLayout()
     self.mainGUIGroupBox.setLayout(self.mainGUIGroupBoxLayout)
-
-    buttonWidth = 45
-    buttonHeight = 45
+    self.layout.addWidget(self.mainGUIGroupBox)
 
     self.inputVolumeBox = qt.QGroupBox()
     inputVolumeLayout = qt.QGridLayout()
-    #inputVolumeLayout.setAlignment(qt.Qt.AlignHCenter)
     self.inputVolumeBox.setLayout(inputVolumeLayout)
-    venousVolumeLabel = qt.QLabel('Venous: ')
-    self.venousVolumeNameLabel = qt.QLineEdit()
-    self.venousVolumeNameLabel.text = '--'
-    self.venousVolumeNameLabel.setMaxLength(50)
-    self.venousVolumeNameLabel.readOnly = True
-    #self.venousVolumeNameLabel.frame = True
-    self.venousVolumeNameLabel.styleSheet = "QLineEdit { background:transparent; }"
+    self.layout.addWidget(self.inputVolumeBox)
+    venousVolumeLabel = self.createLabel(title = 'Venous: ')
+    self.venousVolumeNameLabel = self.createLineEdit(title="", text = '--', readOnly = True, maxLength = 50, styleSheet = "QLineEdit { background:transparent; }")
     inputVolumeLayout.addWidget(venousVolumeLabel,0,0)
     inputVolumeLayout.addWidget(self.venousVolumeNameLabel,0,1)
-    ventricleVolumeLabel = qt.QLabel('Ventricle: ')
-    self.ventricleVolumeNameLabel = qt.QLineEdit()
-    self.ventricleVolumeNameLabel.text = '--'
+    ventricleVolumeLabel = self.createLabel(title='Ventricle: ')
+    self.ventricleVolumeNameLabel = self.createLineEdit(title="", text='--', readOnly=True,
+                                                     styleSheet="QLineEdit { background:transparent; }")
+    self.venousVolumeNameLabel.setMaxLength(50)
     self.ventricleVolumeNameLabel.setMaxLength(50)
-    self.ventricleVolumeNameLabel.readOnly = True
-    #self.ventricleVolumeNameLabel.frame = True
-    self.ventricleVolumeNameLabel.styleSheet = "QLineEdit { background:transparent; }"
     inputVolumeLayout.addWidget(ventricleVolumeLabel,0,2)
     inputVolumeLayout.addWidget(self.ventricleVolumeNameLabel,0,3)
-    self.showVolumeTable = qt.QPushButton("Show Table")
-    self.showVolumeTable.setMaximumWidth(80)
-    self.showVolumeTable.setMaximumHeight(35)
-    self.showVolumeTable.toolTip = "Show the table of volumes for assignment."
-    self.showVolumeTable.enabled = True
+    self.showVolumeTable = self.createButton(title = "Show Table", maximumHeight = 35, maximumWidth = 80, toolTip = "Show the table of volumes for assignment.", enabled = True)
     self.showVolumeTable.connect('clicked(bool)', self.onShowVolumeTable)
     inputVolumeLayout.addWidget(self.showVolumeTable,0,4)
-    self.inputVolumeSelector = slicer.qMRMLNodeComboBox()
-    self.inputVolumeSelector.nodeTypes = ["vtkMRMLScalarVolumeNode"]
-    self.inputVolumeSelector.setMRMLScene( slicer.mrmlScene )
-    self.inputVolumeSelector.editEnabled = False
-    self.inputVolumeSelector.addEnabled = False
-    self.inputVolumeSelector.removeEnabled = False
-    self.inputVolumeSelector.selectNodeUponCreation = False
-    #self.inputVolumeSelector.sortFilterProxyModel().setFilterRegExp("(Venous)")
-    #self.inputVolumeSelector.sortFilterProxyModel().setFilterRegExp("^((?!NotShownEntity31415).)*$" )
-    #self.inputVolumeSelector.connect("nodeAdded(vtkMRMLNode*)", self.onAddedNode)
-    #self.inputVolumeSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
-    #inputVolumeLayout.addWidget(self.inputVolumeSelector)
-    self.layout.addWidget(self.inputVolumeBox)
-    self.layout.addWidget(self.mainGUIGroupBox)
+
     self.importedNodeIDs= []
-
     self.nodeAddedEventObserverID = slicer.mrmlScene.AddObserver(slicer.mrmlScene.NodeAddedEvent, self.onVolumeAddedNode)
-    #
-    # Create Model Button
-    #
-    #self.mainGUIGroupBoxLayout.addWidget(self.inputVolumeSelector,1,0)
-
-
     self.scriptDirectory = os.path.join(os.path.dirname(os.path.realpath(__file__)),"Resources", "icons")
 
 
-
-    self.loadCaseBox = qt.QGroupBox()
-    loadCaseLayout = qt.QVBoxLayout()
-    loadCaseLayout.setAlignment(qt.Qt.AlignCenter)
-    self.loadCaseBox.setLayout(loadCaseLayout)
-    self.LoadCaseButton = qt.QPushButton("")
-    self.LoadCaseButton.toolTip = "Load a dicom dataset"
-    self.LoadCaseButton.enabled = True
-    loadCaseLabel = qt.QLabel('Load Dicom')
-    #loadCaseLayout.addWidget(loadCaseLabel)
-    loadCaseLayout.addWidget(self.LoadCaseButton)
-    #self.LoadCaseButton.setFixedHeight(50)
-    self.LoadCaseButton.setMaximumHeight(buttonHeight)
-    self.LoadCaseButton.setMaximumWidth(buttonWidth)
-    self.LoadCaseButton.setIcon(qt.QIcon(qt.QPixmap(os.path.join(self.scriptDirectory, "load.png"))))
-    self.LoadCaseButton.setIconSize(qt.QSize(self.LoadCaseButton.size))
-    self.loadCaseBox.setStyleSheet('QGroupBox{border:0;}')
+    self.LoadCaseButton = self.createButton(title = "", toolTip = "Load a dicom dataset", enabled = True,
+                                            maximumHeight = self.buttonHeight, maximumWidth = self.buttonWidth,
+                                            icon = self.createIcon("load.png", self.scriptDirectory),
+                                            iconSize = qt.QSize(self.buttonHeight, self.buttonWidth))
+    self.LoadCaseButton.connect('clicked(bool)', self.onLoadDicom)
     self.mainGUIGroupBoxLayout.addWidget(self.LoadCaseButton, 2, 0)
 
-    self.selectNasionBox = qt.QGroupBox()
-    selectNasionLayout = qt.QVBoxLayout()
-    selectNasionLayout.setAlignment(qt.Qt.AlignCenter)
-    self.selectNasionBox.setLayout(selectNasionLayout)
-    self.selectNasionBox.setStyleSheet('QGroupBox{border:0;}')
-    self.selectNasionButton = qt.QPushButton("")
-    self.selectNasionButton.setCheckable(True)
-    self.selectNasionButton.toolTip = "Add a point in the 3D window"
-    self.selectNasionButton.enabled = True
-    self.selectNasionButton.setMaximumHeight(buttonHeight)
-    self.selectNasionButton.setMaximumWidth(buttonWidth)
-    self.selectNasionButton.setIcon(qt.QIcon(qt.QPixmap(os.path.join(self.scriptDirectory, "nasion.png"))))
-    self.selectNasionButton.setIconSize(qt.QSize(self.selectNasionButton.size))
-    selectNasionLabel = qt.QLabel('Select Nasion')
-    selectNasionLayout.addWidget(self.selectNasionButton)
-    self.mainGUIGroupBoxLayout.addWidget(self.selectNasionButton, 2 , 1)
-
-    self.selectSagittalBox = qt.QGroupBox()
-    selectSagittalLayout = qt.QVBoxLayout()
-    selectSagittalLayout.setAlignment(qt.Qt.AlignCenter)
-    self.selectSagittalBox.setLayout(selectSagittalLayout)
-    self.selectSagittalBox.setStyleSheet('QGroupBox{border:0;}')
-    self.selectSagittalButton = qt.QPushButton("")
-    self.selectSagittalButton.setCheckable(True)
-    self.selectSagittalButton.setMaximumHeight(buttonHeight)
-    self.selectSagittalButton.setMaximumWidth(buttonWidth)
-    self.selectSagittalButton.toolTip = "Add a point in the 3D window to identify the sagittal plane"
-    self.selectSagittalButton.enabled = True
-    self.selectSagittalButton.setIcon(qt.QIcon(qt.QPixmap(os.path.join(self.scriptDirectory, "sagittalPoint.png"))))
-    self.selectSagittalButton.setIconSize(qt.QSize(self.selectSagittalButton.size))
-    selectSagittalLayout.addWidget(self.selectSagittalButton)
-    self.mainGUIGroupBoxLayout.addWidget(self.selectSagittalButton, 2 , 2)
-
-    self.createEntryPointButton = qt.QPushButton("Create Entry Point")
-    self.createEntryPointButton.toolTip = "Create the initial entry point."
-    self.createEntryPointButton.toolTip = "Create the initial entry point."
-    self.createEntryPointButton.enabled = True
-
-    self.LoadCaseButton.connect('clicked(bool)', self.onLoadDicom)
+    self.selectNasionButton = self.createButton(title="", toolTip="Add a point in the 3D window", enabled=True,
+                                            maximumHeight=self.buttonHeight, maximumWidth=self.buttonWidth,
+                                            icon=self.createIcon("nasion.png", self.scriptDirectory),
+                                            iconSize=qt.QSize(self.buttonHeight, self.buttonWidth))
     self.selectNasionButton.connect('clicked(bool)', self.onSelectNasionPoint)
+    self.mainGUIGroupBoxLayout.addWidget(self.selectNasionButton, 2, 1)
+
+    self.selectSagittalButton = self.createButton(title="", toolTip="Add a point in the 3D window to identify the sagittal plane", enabled=True,
+                                                maximumHeight=self.buttonHeight, maximumWidth=self.buttonWidth,
+                                                icon=self.createIcon("sagittalPoint.png", self.scriptDirectory),
+                                                iconSize=qt.QSize(self.buttonHeight, self.buttonWidth))
     self.selectSagittalButton.connect('clicked(bool)', self.onSelectSagittalPoint)
-    self.createEntryPointButton.connect('clicked(bool)', self.onCreateEntryPoint)
-
-    
-
-    #
-    # Trajectory
-    #
+    self.mainGUIGroupBoxLayout.addWidget(self.selectSagittalButton, 2, 2)
 
 
     #-- Add Point
-    self.addCannulaBox = qt.QGroupBox()
-    addCannulaLayout = qt.QVBoxLayout()
-    addCannulaLayout.setAlignment(qt.Qt.AlignCenter)
-    self.addCannulaBox.setLayout(addCannulaLayout)
-    self.addCannulaTargetButton = qt.QPushButton("")
-    self.addCannulaTargetButton.setCheckable(True)
-    self.addCannulaTargetButton.toolTip = ""
-    self.addCannulaTargetButton.enabled = True
-    addCannulaLabel = qt.QLabel('Add Cannula')
-    #addCannulaLayout.addWidget(addCannulaLabel)
-    addCannulaLayout.addWidget(self.addCannulaTargetButton)
-    self.addCannulaTargetButton.setMaximumHeight(buttonHeight)
-    self.addCannulaTargetButton.setMaximumWidth(buttonWidth)
-    self.addCannulaTargetButton.setToolTip("Define the ventricle cylinder")
-    self.addCannulaTargetButton.setIcon(qt.QIcon(qt.QPixmap(os.path.join(self.scriptDirectory, "cannula.png"))))
-    self.addCannulaTargetButton.setIconSize(qt.QSize(self.addCannulaTargetButton.size))
-    '''
-    self.addCannulaBox.setStyleSheet('QGroupBox{border:0;}')
-    self.addCannulaDistalButton = qt.QPushButton("")
-    self.addCannulaDistalButton.setMaximumHeight(buttonHeight)
-    self.addCannulaDistalButton.setMaximumWidth(buttonWidth)
-    self.addCannulaDistalButton.toolTip = "Define the distal cannula point"
-    self.addCannulaDistalButton.enabled = True
-    self.addCannulaDistalButton.setIcon(qt.QIcon(qt.QPixmap(os.path.join(self.scriptDirectory, "cannula.png"))))
-    self.addCannulaDistalButton.setIconSize(qt.QSize(self.addCannulaDistalButton.size))
-    addCannulaLayout.addWidget(self.addCannulaDistalButton)
-    '''
+    self.addCannulaTargetButton = self.createButton(title="",
+                                                  toolTip="Define the ventricle cylinder",
+                                                  enabled=True,
+                                                  maximumHeight=self.buttonHeight, maximumWidth=self.buttonWidth,
+                                                  icon=self.createIcon("cannula.png", self.scriptDirectory),
+                                                  iconSize=qt.QSize(self.buttonHeight, self.buttonWidth))
+    self.addCannulaTargetButton.connect('clicked(bool)', self.onEditPlanningTarget)
     self.mainGUIGroupBoxLayout.addWidget(self.addCannulaTargetButton,2,3)
 
-    self.addVesselSeedBox = qt.QGroupBox()
-    addVesselSeedLayout = qt.QVBoxLayout()
-    addVesselSeedLayout.setAlignment(qt.Qt.AlignCenter)
-    self.addVesselSeedBox.setLayout(addVesselSeedLayout)
-    self.addVesselSeedButton = qt.QPushButton("")
-    self.addVesselSeedButton.setCheckable(True)
-    self.addVesselSeedButton.toolTip = ""
-    self.addVesselSeedButton.enabled = True
-    addVesselSeedLayout.addWidget(self.addVesselSeedButton)
-    self.addVesselSeedButton.setMaximumHeight(buttonHeight)
-    self.addVesselSeedButton.setMaximumWidth(buttonWidth)
-    self.addVesselSeedButton.setToolTip("place the seeds on the vessels")
-    self.addVesselSeedButton.setIcon(qt.QIcon(qt.QPixmap(os.path.join(self.scriptDirectory, "vessel.png"))))
-    self.addVesselSeedButton.setIconSize(qt.QSize(self.addVesselSeedButton.size))
+    self.addVesselSeedButton = self.createButton(title="",
+                                                    toolTip="Place the seeds for venous segmentation",
+                                                    enabled=True,
+                                                    maximumHeight=self.buttonHeight, maximumWidth=self.buttonWidth,
+                                                    icon=self.createIcon("vessel.png", self.scriptDirectory),
+                                                    iconSize=qt.QSize(self.buttonHeight, self.buttonWidth))
     self.addVesselSeedButton.connect('clicked(bool)', self.onPlaceVesselSeed)
     self.mainGUIGroupBoxLayout.addWidget(self.addVesselSeedButton, 2, 4)
-    
-    """
-    self.vesselnessCalcButton = qt.QPushButton("VesselnessCalc")
-    self.vesselnessCalcButton.toolTip = "Use Vesselness calculation "
-    self.vesselnessCalcButton.enabled = True
-    self.vesselnessCalcButton.setMaximumHeight(buttonHeight)
-    self.vesselnessCalcButton.setMaximumWidth(buttonWidth)
-    self.vesselnessCalcButton.connect('clicked(bool)', self.onVenousVesselnessCalc)
-    self.mainGUIGroupBoxLayout.addWidget(self.vesselnessCalcButton, 2, 5)
-    """
-    self.generatePathBox = qt.QGroupBox()
-    generatePathLayout = qt.QVBoxLayout()
-    generatePathLayout.setAlignment(qt.Qt.AlignCenter)
-    self.generatePathBox.setLayout(generatePathLayout)
-    self.generatePathButton = qt.QPushButton("")
-    self.generatePathButton.toolTip = ""
-    self.generatePathButton.enabled = True
-    generatePathLabel = qt.QLabel('Generate Path')
-    #generatePathLayout.addWidget(generatePathLabel)
-    generatePathLayout.addWidget(self.generatePathButton)
-    self.generatePathButton.setMaximumHeight(buttonHeight)
-    self.generatePathButton.setMaximumWidth(buttonWidth)
-    self.generatePathButton.setToolTip("Generate cannula paths")
-    self.generatePathButton.setIcon(qt.QIcon(qt.QPixmap(os.path.join(self.scriptDirectory, "pathPlanning.png"))))
-    self.generatePathButton.setIconSize(qt.QSize(self.generatePathButton.size))
-    self.generatePathBox.setStyleSheet('QGroupBox{border:0;}')
+
+    self.generatePathButton = self.createButton(title="",
+                                                 toolTip="Generate cannula candidates",
+                                                 enabled=True,
+                                                 maximumHeight=self.buttonHeight, maximumWidth=self.buttonWidth,
+                                                 icon=self.createIcon("pathPlanning.png", self.scriptDirectory),
+                                                 iconSize=qt.QSize(self.buttonHeight, self.buttonWidth))
+    self.generatePathButton.connect('clicked(bool)', self.onGeneratePath)
     self.mainGUIGroupBoxLayout.addWidget(self.generatePathButton, 2, 5)
+
+    self.createPlanningLineButton = self.createButton(title="",
+                                                 toolTip="Confirm the target and generate the planning line.",
+                                                 enabled=True,
+                                                 maximumHeight=self.buttonHeight, maximumWidth=self.buttonWidth,
+                                                 icon=self.createIcon("confirm.png", self.scriptDirectory),
+                                                 iconSize=qt.QSize(self.buttonHeight, self.buttonWidth))
+    self.createPlanningLineButton.connect('clicked(bool)', self.onCreatePlanningLine)
+    self.mainGUIGroupBoxLayout.addWidget(self.createPlanningLineButton, 2, 6)
+
+    self.saveDataButton = self.createButton(title="",
+                                                toolTip="Save the scene and data.",
+                                                enabled=True,
+                                                maximumHeight=self.buttonHeight, maximumWidth=self.buttonWidth,
+                                                icon=self.createIcon("save.png", self.scriptDirectory),
+                                                iconSize=qt.QSize(self.buttonHeight, self.buttonWidth))
+    self.saveDataButton.connect('clicked(bool)', self.onSaveData)
+    self.mainGUIGroupBoxLayout.addWidget(self.saveDataButton, 2, 7)
 
     self.viewGroupBox = qt.QGroupBox()
     self.viewGroupBoxLayout = qt.QHBoxLayout()
@@ -556,203 +361,117 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
     self.infoGroupBox.setLayout(self.infoGroupBoxLayout)
 
     cannulaLengthInfoLayout = qt.QHBoxLayout()
-    lengthTrajectoryLabel = qt.QLabel('Cannula Length:')
-    cannulaLengthInfoLayout.addWidget(lengthTrajectoryLabel)
-    self.lengthCannulaEdit = qt.QLineEdit()
-    self.lengthCannulaEdit.text = '--'
-    self.lengthCannulaEdit.setMaxLength(5)
-    self.lengthCannulaEdit.readOnly = True
-    self.lengthCannulaEdit.frame = True
-    self.lengthCannulaEdit.styleSheet = "QLineEdit { background:transparent; }"
-    self.lengthCannulaEdit.cursor = qt.QCursor(qt.Qt.IBeamCursor)
+    lengthCannulaLabel = self.createLabel('Cannula Length:  ')
+    cannulaLengthInfoLayout.addWidget(lengthCannulaLabel)
+    self.lengthCannulaEdit = self.createLineEdit(title="", text='--', readOnly=True, frame=True, maxLength = 5,
+                                                              styleSheet="QLineEdit { background:transparent; }",
+                                                              cursor=qt.QCursor(qt.Qt.IBeamCursor))
     cannulaLengthInfoLayout.addWidget(self.lengthCannulaEdit)
-    lengthTrajectoryUnitLabel = qt.QLabel('mm  ')
-    cannulaLengthInfoLayout.addWidget(lengthTrajectoryUnitLabel)
-    self.infoGroupBoxLayout.addLayout(cannulaLengthInfoLayout)
+    lengthCannulaUnitLabel = self.createLabel('mm  ')
+    cannulaLengthInfoLayout.addWidget(lengthCannulaUnitLabel)
 
-    #-- Clear Point
-    self.clearTrajectoryButton = qt.QPushButton("Clear")
-    self.clearTrajectoryButton.toolTip = "Remove Trajectory"
-    self.clearTrajectoryButton.enabled = True
-    #trajectoryLayout.addWidget(self.clearTrajectoryButton)
-
-    self.confirmBox = qt.QGroupBox()
-    confirmLayout = qt.QVBoxLayout()
-    confirmLayout.setAlignment(qt.Qt.AlignCenter)
-    self.confirmBox.setLayout(confirmLayout)
-    self.createPlanningLineButton = qt.QPushButton("")
-    self.createPlanningLineButton.toolTip = "Confirm the target and generate the planning line."
-    self.createPlanningLineButton.enabled = True
-    confirmLabel = qt.QLabel('   Confirm')
-    #confirmLayout.addWidget(confirmLabel)
-    confirmLayout.addWidget(self.createPlanningLineButton)
-    self.createPlanningLineButton.connect('clicked(bool)', self.onCreatePlanningLine)
-    self.createPlanningLineButton.setMaximumHeight(buttonHeight)
-    self.createPlanningLineButton.setMaximumWidth(buttonWidth)
-    self.createPlanningLineButton.setIcon(qt.QIcon(qt.QPixmap(os.path.join(self.scriptDirectory, "confirm.png"))))
-    self.createPlanningLineButton.setIconSize(qt.QSize(self.createPlanningLineButton.size))
-    self.confirmBox.setStyleSheet('QGroupBox{border:0;}')
-    self.mainGUIGroupBoxLayout.addWidget(self.createPlanningLineButton, 2, 6)
-
-    self.saveBox = qt.QGroupBox()
-    saveLayout = qt.QVBoxLayout()
-    saveLayout.setAlignment(qt.Qt.AlignCenter)
-    self.saveBox.setLayout(saveLayout)
-    self.saveDataButton = qt.QPushButton("")
-    self.saveDataButton.toolTip = "Save the scene and data"
-    self.saveDataButton.enabled = True
-    self.saveDataButton.connect('clicked(bool)', self.onSaveData)
-    saveLabel = qt.QLabel('Save Result')
-    #saveLayout.addWidget(saveLabel)
-    saveLayout.addWidget(self.saveDataButton)
-
-    self.saveDataButton.setMaximumHeight(buttonHeight)
-    self.saveDataButton.setMaximumWidth(buttonWidth)
-    self.saveDataButton.setIcon(qt.QIcon(qt.QPixmap(os.path.join(self.scriptDirectory, "save.png"))))
-    self.saveDataButton.setIconSize(qt.QSize(self.createPlanningLineButton.size))
-    self.saveBox.setStyleSheet('QGroupBox{border:0;}')
-    self.mainGUIGroupBoxLayout.addWidget(self.saveDataButton, 2, 7)
-
-     # Needle trajectory
-    self.addCannulaTargetButton.connect('clicked(bool)', self.onEditPlanningTarget)
-    #self.addCannulaDistalButton.connect('clicked(bool)', self.onEditPlanningDistal)
-    self.generatePathButton.connect('clicked(bool)', self.onGeneratePath)
-    self.clearTrajectoryButton.connect('clicked(bool)', self.onClearTrajectory)
-
-    #
-    # Mid-sagittalReference line
-    #
-
-
-    #-- Curve length
     planningSagittalLineLayout = qt.QHBoxLayout()
-    lengthSagittalPlanningLineLabel = qt.QLabel('Sagittal Length:  ')
+    lengthSagittalPlanningLineLabel = self.createLabel('Sagittal Length:  ')
     planningSagittalLineLayout.addWidget(lengthSagittalPlanningLineLabel)
-    self.lengthSagittalPlanningLineEdit = qt.QLineEdit()
-    self.lengthSagittalPlanningLineEdit.text = '--'
-    self.lengthSagittalPlanningLineEdit.setMaxLength(5)
-    self.lengthSagittalPlanningLineEdit.readOnly = True
-    self.lengthSagittalPlanningLineEdit.frame = True
-    self.lengthSagittalPlanningLineEdit.styleSheet = "QLineEdit { background:transparent; }"
-    self.lengthSagittalPlanningLineEdit.cursor = qt.QCursor(qt.Qt.IBeamCursor)
+    self.lengthSagittalPlanningLineEdit = self.createLineEdit(title="", text='--', readOnly=True, frame=True,
+                                                              maxLength=5, styleSheet="QLineEdit { background:transparent; }",
+                                                              cursor=qt.QCursor(qt.Qt.IBeamCursor))
     planningSagittalLineLayout.addWidget(self.lengthSagittalPlanningLineEdit)
-    lengthSagittalPlanningLineUnitLabel = qt.QLabel('mm  ')
+    lengthSagittalPlanningLineUnitLabel = self.createLabel('mm  ')
     planningSagittalLineLayout.addWidget(lengthSagittalPlanningLineUnitLabel)
 
     planningCoronalLineLayout = qt.QHBoxLayout()
-    lengthCoronalPlanningLineLabel = qt.QLabel('Coronal Length: ')
+    lengthCoronalPlanningLineLabel = self.createLabel('Coronal Length:  ')
     planningCoronalLineLayout.addWidget(lengthCoronalPlanningLineLabel)
-    self.lengthCoronalPlanningLineEdit = qt.QLineEdit()
-    self.lengthCoronalPlanningLineEdit.text = '--'
-    self.lengthCoronalPlanningLineEdit.setMaxLength(5)
-    self.lengthCoronalPlanningLineEdit.readOnly = True
-    self.lengthCoronalPlanningLineEdit.frame = True
-    self.lengthCoronalPlanningLineEdit.styleSheet = "QLineEdit { background:transparent; }"
-    self.lengthCoronalPlanningLineEdit.cursor = qt.QCursor(qt.Qt.IBeamCursor)
+    self.lengthCoronalPlanningLineEdit = self.createLineEdit(title="", text='--', readOnly=True, frame=True,
+                                                              maxLength=5,
+                                                              styleSheet="QLineEdit { background:transparent; }",
+                                                              cursor=qt.QCursor(qt.Qt.IBeamCursor))
     planningCoronalLineLayout.addWidget(self.lengthCoronalPlanningLineEdit)
-    lengthCoronalPlanningLineUnitLabel = qt.QLabel('mm  ')
+    lengthCoronalPlanningLineUnitLabel = self.createLabel('mm  ')
     planningCoronalLineLayout.addWidget(lengthCoronalPlanningLineUnitLabel)
 
+
     planningDistanceKocherLayout = qt.QHBoxLayout()
-    distanceKocherPointLabel = qt.QLabel("Distance to Kocher's point:  ")
+    distanceKocherPointLabel = self.createLabel("Distance to Kocher's point:  ")
     planningDistanceKocherLayout.addWidget(distanceKocherPointLabel)
-    self.distanceKocherPointEdit = qt.QLineEdit()
-    self.distanceKocherPointEdit.text = '--'
-    self.distanceKocherPointEdit.setMaxLength(5)
-    self.distanceKocherPointEdit.readOnly = True
-    self.distanceKocherPointEdit.frame = True
-    self.distanceKocherPointEdit.styleSheet = "QLineEdit { background:transparent; }"
-    self.distanceKocherPointEdit.cursor = qt.QCursor(qt.Qt.IBeamCursor)
+    self.distanceKocherPointEdit = self.createLineEdit(title="", text='--', readOnly=True, frame=True,
+                                                             maxLength=5,
+                                                             styleSheet="QLineEdit { background:transparent; }",
+                                                             cursor=qt.QCursor(qt.Qt.IBeamCursor))
     planningDistanceKocherLayout.addWidget(self.distanceKocherPointEdit)
-    distanceKocherPointUnitLabel = qt.QLabel('mm  ')
+    distanceKocherPointUnitLabel = self.createLabel('mm  ')
     planningDistanceKocherLayout.addWidget(distanceKocherPointUnitLabel)
 
     planningPitchAngleLayout = qt.QHBoxLayout()
     #-- Curve length
-    pitchAngleLabel = qt.QLabel('Pitch Angle:       ')
+    pitchAngleLabel = self.createLabel('Pitch Angle:       ')
     planningPitchAngleLayout.addWidget(pitchAngleLabel)
-    self.pitchAngleEdit = qt.QLineEdit()
-    self.pitchAngleEdit.text = '--'
-    self.pitchAngleEdit.setMaxLength(5)
-    self.pitchAngleEdit.readOnly = True
-    self.pitchAngleEdit.frame = True
-    self.pitchAngleEdit.styleSheet = "QLineEdit { background:transparent; }"
-    self.pitchAngleEdit.cursor = qt.QCursor(qt.Qt.IBeamCursor)
+    self.pitchAngleEdit = self.createLineEdit(title="", text='--', readOnly=True, frame=True,
+                                                       maxLength=5,
+                                                       styleSheet="QLineEdit { background:transparent; }",
+                                                       cursor=qt.QCursor(qt.Qt.IBeamCursor))
     planningPitchAngleLayout.addWidget(self.pitchAngleEdit)
-    pitchAngleUnitLabel = qt.QLabel('degree  ')
+    pitchAngleUnitLabel = self.createLabel('degree  ')
     planningPitchAngleLayout.addWidget(pitchAngleUnitLabel)
 
     planningYawAngleLayout = qt.QHBoxLayout()
-    yawAngleLabel = qt.QLabel('Yaw Angle:        ')
+    yawAngleLabel = self.createLabel('Yaw Angle:        ')
     planningYawAngleLayout.addWidget(yawAngleLabel)
-    self.yawAngleEdit = qt.QLineEdit()
-    self.yawAngleEdit.text = '--'
-    self.yawAngleEdit.setMaxLength(5)
-    self.yawAngleEdit.readOnly = True
-    self.yawAngleEdit.frame = True
-    self.yawAngleEdit.styleSheet = "QLineEdit { background:transparent; }"
-    self.yawAngleEdit.cursor = qt.QCursor(qt.Qt.IBeamCursor)
+    self.yawAngleEdit = self.createLineEdit(title="", text='--', readOnly=True, frame=True,
+                                              maxLength=5,
+                                              styleSheet="QLineEdit { background:transparent; }",
+                                              cursor=qt.QCursor(qt.Qt.IBeamCursor))
     planningYawAngleLayout.addWidget(self.yawAngleEdit)
-    yawAngleUnitLabel = qt.QLabel('degree  ')
+    yawAngleUnitLabel = self.createLabel('degree  ')
     planningYawAngleLayout.addWidget(yawAngleUnitLabel)
 
     planningCannulaToNormAngleLayout = qt.QHBoxLayout()
-    cannulaToNormAngleLabel = qt.QLabel('Cannula To Norm Angle:   ')
+    cannulaToNormAngleLabel = self.createLabel('Cannula To Norm Angle:   ')
     planningCannulaToNormAngleLayout.addWidget(cannulaToNormAngleLabel)
-    self.cannulaToNormAngleEdit = qt.QLineEdit()
-    self.cannulaToNormAngleEdit.text = '--'
-    self.cannulaToNormAngleEdit.setMaxLength(5)
-    self.cannulaToNormAngleEdit.readOnly = True
-    self.cannulaToNormAngleEdit.frame = True
-    self.cannulaToNormAngleEdit.styleSheet = "QLineEdit { background:transparent; }"
-    self.cannulaToNormAngleEdit.cursor = qt.QCursor(qt.Qt.IBeamCursor)
+    self.cannulaToNormAngleEdit = self.createLineEdit(title="", text='--', readOnly=True, frame=True,
+                                            maxLength=5,
+                                            styleSheet="QLineEdit { background:transparent; }",
+                                            cursor=qt.QCursor(qt.Qt.IBeamCursor))
     planningCannulaToNormAngleLayout.addWidget(self.cannulaToNormAngleEdit)
-    cannulaToNormAngleUnitLabel = qt.QLabel('degree  ')
+    cannulaToNormAngleUnitLabel = self.createLabel('degree  ')
     planningCannulaToNormAngleLayout.addWidget(cannulaToNormAngleUnitLabel)
 
 
     planningCannulaToCoronalAngleLayout = qt.QHBoxLayout()
-    cannulaToCoronalAngleLabel = qt.QLabel('Cannula To Coronal Angle:')
+    cannulaToCoronalAngleLabel = self.createLabel('Cannula To Coronal Angle:')
     planningCannulaToCoronalAngleLayout.addWidget(cannulaToCoronalAngleLabel)
-    self.cannulaToCoronalAngleEdit = qt.QLineEdit()
-    self.cannulaToCoronalAngleEdit.text = '--'
-    self.cannulaToCoronalAngleEdit.setMaxLength(5)
-    self.cannulaToCoronalAngleEdit.readOnly = True
-    self.cannulaToCoronalAngleEdit.frame = True
-    self.cannulaToCoronalAngleEdit.styleSheet = "QLineEdit { background:transparent; }"
-    self.cannulaToCoronalAngleEdit.cursor = qt.QCursor(qt.Qt.IBeamCursor)
+    self.cannulaToCoronalAngleEdit = self.createLineEdit(title="", text='--', readOnly=True, frame=True,
+                                                      maxLength=5,
+                                                      styleSheet="QLineEdit { background:transparent; }",
+                                                      cursor=qt.QCursor(qt.Qt.IBeamCursor))
     planningCannulaToCoronalAngleLayout.addWidget(self.cannulaToCoronalAngleEdit)
-    cannulaToCoronalAngleUnitLabel = qt.QLabel('degree  ')
+    cannulaToCoronalAngleUnitLabel = self.createLabel('degree  ')
     planningCannulaToCoronalAngleLayout.addWidget(cannulaToCoronalAngleUnitLabel)
 
     planningSkullNormToSagittalAngleLayout = qt.QHBoxLayout()
-    skullNormToSagittalAngleLabel = qt.QLabel('Skull Norm To Sagital Angle:')
+    skullNormToSagittalAngleLabel = self.createLabel('Skull Norm To Sagital Angle:')
     planningSkullNormToSagittalAngleLayout.addWidget(skullNormToSagittalAngleLabel)
-    self.skullNormToSagittalAngleEdit = qt.QLineEdit()
-    self.skullNormToSagittalAngleEdit.text = '--'
-    self.skullNormToSagittalAngleEdit.setMaxLength(5)
-    self.skullNormToSagittalAngleEdit.readOnly = True
-    self.skullNormToSagittalAngleEdit.frame = True
-    self.skullNormToSagittalAngleEdit.styleSheet = "QLineEdit { background:transparent; }"
-    self.skullNormToSagittalAngleEdit.cursor = qt.QCursor(qt.Qt.IBeamCursor)
+    self.skullNormToSagittalAngleEdit = self.createLineEdit(title="", text='--', readOnly=True, frame=True,
+                                                         maxLength=5,
+                                                         styleSheet="QLineEdit { background:transparent; }",
+                                                         cursor=qt.QCursor(qt.Qt.IBeamCursor))
     planningSkullNormToSagittalAngleLayout.addWidget(self.skullNormToSagittalAngleEdit)
-    skullNormToSagittalAngleUnitLabel = qt.QLabel('degree  ')
+    skullNormToSagittalAngleUnitLabel = self.createLabel('degree  ')
     planningSkullNormToSagittalAngleLayout.addWidget(skullNormToSagittalAngleUnitLabel)
 
     planningSkullNormToCoronalAngleLayout = qt.QHBoxLayout()
-    skullNormToCoronalAngleLabel = qt.QLabel('Skull Norm To Coronal Angle:')
+    skullNormToCoronalAngleLabel = self.createLabel('Skull Norm To Coronal Angle:')
     planningSkullNormToCoronalAngleLayout.addWidget(skullNormToCoronalAngleLabel)
-    self.skullNormToCoronalAngleEdit = qt.QLineEdit()
-    self.skullNormToCoronalAngleEdit.text = '--'
-    self.skullNormToCoronalAngleEdit.setMaxLength(5)
-    self.skullNormToCoronalAngleEdit.readOnly = True
-    self.skullNormToCoronalAngleEdit.frame = True
-    self.skullNormToCoronalAngleEdit.styleSheet = "QLineEdit { background:transparent; }"
-    self.skullNormToCoronalAngleEdit.cursor = qt.QCursor(qt.Qt.IBeamCursor)
+    self.skullNormToCoronalAngleEdit = self.createLineEdit(title="", text='--', readOnly=True, frame=True,
+                                                            maxLength=5,
+                                                            styleSheet="QLineEdit { background:transparent; }",
+                                                            cursor=qt.QCursor(qt.Qt.IBeamCursor))
     planningSkullNormToCoronalAngleLayout.addWidget(self.skullNormToCoronalAngleEdit)
-    skullNormToCoronalAngleUnitLabel = qt.QLabel('degree  ')
+    skullNormToCoronalAngleUnitLabel = self.createLabel('degree  ')
     planningSkullNormToCoronalAngleLayout.addWidget(skullNormToCoronalAngleUnitLabel)
 
+    self.infoGroupBoxLayout.addLayout(cannulaLengthInfoLayout)
     self.infoGroupBoxLayout.addLayout(planningSagittalLineLayout)
     self.infoGroupBoxLayout.addLayout(planningCoronalLineLayout)
     self.infoGroupBoxLayout.addLayout(planningDistanceKocherLayout)
@@ -995,8 +714,8 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
         self.logic.enableRelatedVolume("vtkMRMLScalarVolumeNode.rel_clippedVolume", "clippedVolume")
         self.logic.enableRelatedVolume("vtkMRMLScalarVolumeNode.rel_quarterVolume", "quarterVolume")
         self.logic.enableRelatedVolume("vtkMRMLScalarVolumeNode.rel_vesselnessVolume", "vesselnessVolume")
-        self.logic.enableRelateVariables("vtkMRMLScalarVolumeNode.rel_cylinderRadius", "cylinderRadius")
-        self.logic.enableRelateVariables("vtkMRMLScalarVolumeNode.rel_vesselThreshold", "vesselThreshold")
+        self.logic.enableRelatedVariables("vtkMRMLScalarVolumeNode.rel_cylinderRadius", "cylinderRadius")
+        self.logic.enableRelatedVariables("vtkMRMLScalarVolumeNode.rel_vesselThreshold", "vesselThreshold")
         self.vesselThresholdSlider.setValue(self.logic.vesselThreshold)
         #self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_skullNorm", caseName)
         self.logic.enableEventObserver()
@@ -1007,10 +726,8 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
         #  self.logic.croppedVolumeNode = selectedNode
         self.setReverseViewButton.cannulaNode = slicer.mrmlScene.GetNodeByID(self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_cannula"))
         self.logic.updateMeasureLength(float(self.lengthSagittalReferenceLineEdit.text), float(self.lengthCoronalReferenceLineEdit.text))
-        self.logic.updatePathPlanningRadius(float(self.radiusPathPlanningEdit.text))
         self.lengthSagittalReferenceLineEdit.text = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagittalLength")
         self.lengthCoronalReferenceLineEdit.text = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_coronalLength")
-        self.radiusPathPlanningEdit.text = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_planningRadius")
   
         ReferenceModelID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagittalReferenceModel")
         self.logic.sagittalReferenceCurveManager.connectModelNode(slicer.mrmlScene.GetNodeByID(ReferenceModelID))
@@ -1371,18 +1088,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
     if self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagittalLength"):
         self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_sagittalLength", '%.1f' % sagittalReferenceLength) 
     if self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_coronalLength"):
-        self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_coronalLength", '%.1f' % coronalReferenceLength)    
-
-  def onModifyPathPlanningRadius(self):
-    radius = float(self.radiusPathPlanningEdit.text)
-    if self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_planningRadius"):
-      self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_planningRadius", '%.1f' % radius)
-
-
-  def onCreateEntryPoint(self):
-    self.onModifyMeasureLength()
-    self.onModifyPathPlanningRadius()
-    self.logic.createEntryPoint()
+        self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_coronalLength", '%.1f' % coronalReferenceLength)
 
   # Event handlers for sagittalReference line
   def onEditSagittalReferenceLine(self, switch):
@@ -1619,10 +1325,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
       self.nodeAddedEventObserverID = slicer.mrmlScene.AddObserver(slicer.mrmlScene.NodeAddedEvent,
                                                                  self.onVolumeAddedNode)
       self.onSaveData()
-
-    
-  def onClearTrajectory(self):
-    self.logic.clearTrajectory()
     
   def onCannulaModified(self, caller, event):
     self.lengthCannulaEdit.text = '%.2f' % self.logic.getCannulaLength()
@@ -1667,11 +1369,9 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, VTKObservation
   def onLock(self):
     if self.lockTrajectoryCheckBox.checked == 1:
       self.addCannulaTargetButton.enabled = False
-      self.clearTrajectoryButton.enabled = False
       self.logic.lockTrajectoryLine()
     else:
       self.addCannulaTargetButton.enabled = True
-      self.clearTrajectoryButton.enabled = True
       self.logic.unlockTrajectoryLine()
 
   def onReload(self,moduleName="VentriculostomyPlanning"):
@@ -1927,7 +1627,7 @@ class CurveManager():
 # VentriculostomyPlanningLogic
 #
 
-class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
+class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin):
   """This class should implement all the actual
   computation done by your module.  The interface
   should be such that other python code can import
@@ -2630,9 +2330,6 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       self.trajectoryProjectedMarker.RemoveAllMarkups()
     pass
 
-  def clearTrajectory(self):
-    self.cylinderManager.clearLine()
-
   def setTrajectoryModifiedEventHandler(self, handler):
     self.cylinderManager.setModifiedEventHandler(handler)
 
@@ -3006,7 +2703,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
     return markupsNode
 
 
-  def enableRelateVariables(self, attributeName, fieldName):
+  def enableRelatedVariables(self, attributeName, fieldName):
     enabledAttributeID = self.baseVolumeNode.GetAttribute(attributeName)
     fieldvalue = -1
     if enabledAttributeID:
@@ -3026,9 +2723,6 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic):
       if coronalReferenceLength:
         self.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_coronalLength", '%.1f' % coronalReferenceLength)
 
-  def updatePathPlanningRadius(self, radius):
-    if not self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_planningRadius"):
-        self.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_planningRadius", '%.1f' % radius)
 
   @vtk.calldata_type(vtk.VTK_INT)
   def updateSelectedMarker(self,node, eventID, callData):
