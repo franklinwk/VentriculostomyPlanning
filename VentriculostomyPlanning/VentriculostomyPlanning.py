@@ -665,6 +665,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
   def onSelect(self, selectedNode=None):
     slicer.mrmlScene.RemoveObserver(self.nodeAddedEventObserverID)
     if selectedNode:
+      qt.QApplication.setOverrideCursor(qt.Qt.WaitCursor)
       self.red_cn.SetDoPropagateVolumeSelection(False)  # make sure the compositenode doesn't get updated,
       self.green_cn.SetDoPropagateVolumeSelection(False)  # so that the background and foreground volumes are not messed up
       self.yellow_cn.SetDoPropagateVolumeSelection(False)
@@ -677,20 +678,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
       self.logic.baseVolumeNode = selectedNode
       if self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_ventricleVolume"):
         self.logic.ventricleVolume = slicer.mrmlScene.GetNodeByID(self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_ventricleVolume"))
-      """
-      ventricleVolumeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_ventricleVolume")
-      if not ventricleVolumeID:
-        if len(self.importedNodeIDs) ==2:
-          slicer.util.warningDisplay("No ventricle volume defined, the other volume is selected as Ventricle volume.")
-          if self.logic.baseVolumeNode.GetID() == self.importedNodeIDs[0]:
-            self.logic.ventricleVolume = slicer.mrmlScene.GetNodeByID(self.importedNodeIDs[1])
-          else:
-            self.logic.ventricleVolume = slicer.mrmlScene.GetNodeByID(self.importedNodeIDs[0])  
-        else:    
-          slicer.util.warningDisplay("This case has a volume number other than two, please load the data correctly into slicer or define the images manually", windowTitle="")
-      else:
-        self.logic.ventricleVolume = slicer.mrmlScene.GetNodeByID(ventricleVolumeID)
-      """
       if self.logic.ventricleVolume and self.logic.baseVolumeNode:
         self.volumePrepared = False
         outputDir = os.path.join(self.slicerCaseWidget.currentCaseDirectory, "Results")
@@ -732,13 +719,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         self.logic.enableRelatedVariables("vtkMRMLScalarVolumeNode.rel_posteriorMargin", "posteriorMargin")
         self.vesselThresholdSlider.setValue(self.logic.vesselThreshold)
         self.posteriorMarginEdit.setText(self.logic.posteriorMargin)
-        #self.logic.enableAttribute("vtkMRMLScalarVolumeNode.rel_skullNorm", caseName)
         self.logic.enableEventObserver()
-        #Set the cropped image for processing
-        #if selectedNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_croppedVolume"):
-        #  self.logic.croppedVolumeNode = slicer.mrmlScene.GetNodeByID(selectedNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_croppedVolume"))
-        #else:
-        #  self.logic.croppedVolumeNode = selectedNode
         self.setReverseViewButton.cannulaNode = slicer.mrmlScene.GetNodeByID(self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_cannula"))
         self.logic.updateMeasureLength(float(self.lengthSagittalReferenceLineEdit.text), float(self.lengthCoronalReferenceLineEdit.text))
         self.lengthSagittalReferenceLineEdit.text = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagittalLength")
@@ -761,11 +742,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         self.logic.sagittalPlanningCurveManager.connectMarkerNode(slicer.mrmlScene.GetNodeByID(ReferenceMarkerID))
         ReferenceMarkerID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_coronalPlanningMarker")
         self.logic.coronalPlanningCurveManager.connectMarkerNode(slicer.mrmlScene.GetNodeByID(ReferenceMarkerID))
-        #self.logic.sagittalReferenceCurveManager.startEditLine()
-        #self.logic.coronalReferenceCurveManager.startEditLine()
-        #self.logic.sagittalPlanningCurveManager.startEditLine()
-        #self.logic.coronalPlanningCurveManager.startEditLine()
-        #self.logic.cylinderManager.startEditLine()
         self.logic.createTrueSagittalPlane()
         self.logic.createEntryPoint()
         cannulaModelID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_cannulaModel")
@@ -789,7 +765,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         self.progressBar.value = 25
         self.progressBar.labelText = 'Calculating Vessel'
         slicer.app.processEvents()
-        #self.onVenousGrayScaleCalc()
         vesselSeedsID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_vesselSeeds")
         vesselSeedsNode = slicer.mrmlScene.GetNodeByID(vesselSeedsID)
         if vesselSeedsNode and vesselSeedsNode.GetNumberOfFiducials():
@@ -805,6 +780,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         self.logic.appendPlanningTimeStampToJson(self.jsonFile, "EndPreprocessing",
                                                  datetime.datetime.now().time().isoformat())
         self.imageSlider.setValue(100.0)
+      qt.QApplication.restoreOverrideCursor()  
     self.nodeAddedEventObserverID = slicer.mrmlScene.AddObserver(slicer.mrmlScene.NodeAddedEvent,
                                                                  self.onVolumeAddedNode)
     pass

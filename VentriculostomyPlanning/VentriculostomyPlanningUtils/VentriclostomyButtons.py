@@ -2,6 +2,7 @@ import slicer, vtk
 from ctk import ctkAxesWidget
 from SlicerDevelopmentToolboxUtils.buttons import LayoutButton, CheckableIconButton, BasicIconButton
 import os
+import qt
 
 class GreenSliceLayoutButton(LayoutButton):
   """ LayoutButton inherited class which represents a button for the SlicerLayoutOneUpGreenSliceView including the icon.
@@ -18,7 +19,8 @@ class GreenSliceLayoutButton(LayoutButton):
     button.show()
   """
 
-  _ICON_FILENAME = 'LayoutOneUpGreenSliceView.png'
+  iconFileName=os.path.join(os.path.dirname(os.path.normpath(os.path.dirname(os.path.realpath(__file__)))),'Resources','Icons','LayoutOneUpGreenSliceView.png')
+  _ICON = qt.QIcon(iconFileName)
   LAYOUT = slicer.vtkMRMLLayoutNode.SlicerLayoutOneUpGreenSliceView
 
   def __init__(self, text="", parent=None, **kwargs):
@@ -40,8 +42,8 @@ class ConventionalSliceLayoutButton(LayoutButton):
     button = ConventionalSliceLayoutButton()
     button.show()
   """
-
-  _ICON_FILENAME = 'LayoutConventionalSliceView.png'
+  iconFileName=os.path.join(os.path.dirname(os.path.normpath(os.path.dirname(os.path.realpath(__file__)))),'Resources','Icons','LayoutConventionalSliceView.png')
+  _ICON = qt.QIcon(iconFileName)
   LAYOUT = slicer.vtkMRMLLayoutNode.SlicerLayoutConventionalView
 
   def __init__(self, text="", parent=None, **kwargs):
@@ -50,8 +52,10 @@ class ConventionalSliceLayoutButton(LayoutButton):
 
 
 class ScreenShotButton(BasicIconButton):
-  _ICON_FILENAME = 'screenShot.png'
-
+  
+  iconFileName=os.path.join(os.path.dirname(os.path.normpath(os.path.dirname(os.path.realpath(__file__)))),'Resources','Icons','screenShot.png')
+  _ICON = qt.QIcon(iconFileName)
+  
   @property
   def caseResultDir(self):
     return self._caseResultDir
@@ -88,8 +92,10 @@ class ScreenShotButton(BasicIconButton):
     pass
 
 class ReverseViewOnCannulaButton(CheckableIconButton):
-  _ICON_FILENAME = 'ReverseView.png'
-
+  
+  iconFileName=os.path.join(os.path.dirname(os.path.normpath(os.path.dirname(os.path.realpath(__file__)))),'Resources','Icons','ReverseView.png')
+  _ICON = qt.QIcon(iconFileName)
+  
   @property
   def cannulaNode(self):
     return self._cannulaNode
