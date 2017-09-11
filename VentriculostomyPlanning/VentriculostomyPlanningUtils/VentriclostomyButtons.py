@@ -3,6 +3,7 @@ from ctk import ctkAxesWidget
 from SlicerDevelopmentToolboxUtils.buttons import LayoutButton, CheckableIconButton, BasicIconButton
 import os
 import qt
+import numpy
 
 class GreenSliceLayoutButton(LayoutButton):
   """ LayoutButton inherited class which represents a button for the SlicerLayoutOneUpGreenSliceView including the icon.
@@ -107,6 +108,8 @@ class ReverseViewOnCannulaButton(CheckableIconButton):
   def __init__(self, text="", parent=None, **kwargs):
     super(ReverseViewOnCannulaButton, self).__init__(text, parent, **kwargs)
     self._cannulaNode = None
+    self._pitchAngle = 0.0
+    self._yawAngle = 0.0
     self.cameraPos = [0.0] * 3
     self.cameraReversePos = None
     self.camera = None
@@ -120,11 +123,23 @@ class ReverseViewOnCannulaButton(CheckableIconButton):
         self.cameraPos = self.camera.GetPosition()
     self.toolTip = "Reverse the view of the cannula from the other end"
 
+  def calculateAnglesBasedOnCannula(self):
+    nFiducials = self.cannulaNode.GetNumberOfFiducials()
+    if nFiducials>=1:
+      firstPos = numpy.array([0.0, 0.0, 0.0])
+      self.cannulaNode.GetNthFiducialPosition(0,firstPos)
+      lastPos = numpy.array([0.0, 0.0, 0.0])
+      self.cannulaNode.GetNthFiducialPosition(nFiducials-1,lastPos)
+      self._pitchAngle = numpy.arctan2(lastPos[2] - firstPos[2], abs(lastPos[1] - firstPos[1])) * 180.0 / numpy.pi
+      self._yawAngle = -numpy.arctan2(lastPos[0] - firstPos[0], abs(lastPos[1] - firstPos[1])) * 180.0 / numpy.pi
+      return True
+    return False
+
   def _onToggled(self, checked):
     if self.cannulaNode:
       layoutManager = slicer.app.layoutManager()
       threeDView = layoutManager.threeDWidget(0).threeDView()
-      if checked == True:
+      if checked == True and self.calculateAnglesBasedOnCannula():
         #self.setReverseViewButton.setText("  Reset View     ")
         displayManagers = vtk.vtkCollection()
         threeDView.getDisplayableManagers(displayManagers)
@@ -136,12 +151,12 @@ class ReverseViewOnCannulaButton(CheckableIconButton):
           threeDView.lookFromViewAxis(ctkAxesWidget.Posterior)
           threeDView.pitchDirection = threeDView.PitchUp
           threeDView.yawDirection = threeDView.YawRight
-          threeDView.setPitchRollYawIncrement(self.logic.pitchAngle)
+          threeDView.setPitchRollYawIncrement(self._pitchAngle)
           threeDView.pitch()
-          if self.logic.yawAngle < 0:
-            threeDView.setPitchRollYawIncrement(self.logic.yawAngle)
+          if self._yawAngle < 0:
+            threeDView.setPitchRollYawIncrement(self._yawAngle)
           else:
-            threeDView.setPitchRollYawIncrement(360 - self.logic.yawAngle)
+            threeDView.setPitchRollYawIncrement(360 - self._yawAngle)
           threeDView.yaw()
           if self.cannulaNode and self.cannulaNode.GetNumberOfFiducials() >= 2:
             posSecond = [0.0] * 3
