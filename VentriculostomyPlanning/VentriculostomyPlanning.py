@@ -265,14 +265,16 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     self.addVesselSeedButton.connect('clicked(bool)', self.onPlaceVesselSeed)
     self.mainGUIGroupBoxLayout.addWidget(self.addVesselSeedButton, 2, 4)
 
-    self.generatePathButton = self.createButton(title="",
-                                                 toolTip="Generate cannula candidates",
+
+    self.relocatePathToKocherButton = self.createButton(title="",
+                                                 toolTip="Relocate the cannula to be close to Kocher's point",
                                                  enabled=True,
                                                  maximumHeight=self.buttonHeight, maximumWidth=self.buttonWidth,
                                                  icon=self.createIcon("pathPlanning.png", self.scriptDirectory),
                                                  iconSize=qt.QSize(self.buttonHeight, self.buttonWidth))
-    self.generatePathButton.connect('clicked(bool)', self.onGeneratePath)
-    self.mainGUIGroupBoxLayout.addWidget(self.generatePathButton, 2, 5)
+    self.relocatePathToKocherButton.connect('clicked(bool)', self.onRelocatePathToKocher)
+    self.mainGUIGroupBoxLayout.addWidget(self.relocatePathToKocherButton, 2, 5)
+
 
     self.createPlanningLineButton = self.createButton(title="",
                                                  toolTip="Confirm the target and generate the planning line.",
@@ -320,10 +322,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     self.tabMarkupPlacementGroupBox = qt.QGroupBox()
     self.tabMarkupPlacementGroupBoxLayout = qt.QVBoxLayout()
     self.tabMarkupPlacementGroupBox.setLayout(self.tabMarkupPlacementGroupBoxLayout)
-    simpleMarkupsWidget = slicer.qSlicerSimpleMarkupsWidget()
-    simpleMarkupsWidget.setMRMLScene(slicer.mrmlScene)
-    self.tabMarkupPlacementGroupBoxLayout.addWidget(simpleMarkupsWidget)
-
     vesselThresholdLabel = qt.QLabel('Vessel Threshold')
     thresholdMin = qt.QLabel('50')
     thresholdMax = qt.QLabel('300')
@@ -341,7 +339,21 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     vesselThresholdLayout.addWidget(self.vesselThresholdSlider)
     vesselThresholdLayout.addWidget(thresholdMax)
     vesselThresholdLayout.addWidget(self.currentThresholdValue)
+    self.segmentVesselWithSeedsButton = self.createButton(title="",
+                                                toolTip="Segment the vessel based on threshold and seeds.",
+                                                enabled=True,
+                                                maximumHeight=self.buttonHeight*0.8, maximumWidth=self.buttonWidth*0.8,
+                                                icon=self.createIcon("startVesselSegment.png", self.scriptDirectory),
+                                                iconSize=qt.QSize(self.buttonHeight*0.8, self.buttonWidth*0.8))
+    self.segmentVesselWithSeedsButton.connect('clicked(bool)', self.onSegmentVesselWithSeeds)
+    vesselThresholdLayout.addWidget(self.currentThresholdValue)
+    vesselThresholdLayout.addWidget(self.segmentVesselWithSeedsButton)
     self.tabMarkupPlacementGroupBoxLayout.addWidget(self.vesselThresholdGroupBox)
+
+    self.simpleMarkupsWidget = slicer.qSlicerSimpleMarkupsWidget()
+    self.simpleMarkupsWidget.setMRMLScene(slicer.mrmlScene)
+    self.tabMarkupPlacementGroupBoxLayout.addWidget(self.simpleMarkupsWidget)
+
     self.tabWidget.addTab(self.tabMarkupPlacementGroupBox, self.tabMarkupsName)
     index = next((i for i, name in enumerate(self.tabWidgetChildrenName) if name == self.tabMainGroupBoxName), None)
     self.tabWidget.setCurrentIndex(index)
@@ -788,6 +800,8 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         slicer.app.processEvents()
         vesselSeedsID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_vesselSeeds")
         vesselSeedsNode = slicer.mrmlScene.GetNodeByID(vesselSeedsID)
+        self.prepareVolumes()
+        self.prepareCandidatePath()
         if vesselSeedsNode and vesselSeedsNode.GetNumberOfFiducials():
           self.onConnectedComponentCalc()
         self.progressBar.value = 75
@@ -891,12 +905,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
             targetNode.GetNthFiducialPosition(0, posTarget)
             posDistal = numpy.array([0.0, 0.0, 0.0])
             distalNode.GetNthFiducialPosition(0, posDistal)
-            self.logic.prepareCandidatePath()
             if self.volumePrepared == False:
-              if self.logic.pathCandidatesModel.GetPolyData() and self.logic.pathCandidatesModel.GetPolyData().GetNumberOfPoints() == 0:
-                slicer.util.warningDisplay(
-                  "Ventricle definition is too far from the Kocher's point. Considering redefine the ventricle area.")
-                return False
               coneForVolumeClip = vtk.vtkConeSource()
               coneHeight = 100.0  # in millimeter
               coneForVolumeClip.SetHeight(coneHeight)
@@ -942,7 +951,89 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
               print "volume display ID", quarterVolume.GetDisplayNode().GetID()
               quarterVolume.GetDisplayNode().SetWindow(self.baseVolumeWindowValue)
               quarterVolume.GetDisplayNode().SetLevel(self.baseVolumeLevelValue)
-    return True    
+    return True
+
+  def prepareCandidatePath(self):
+    self.logic.interactionMode = "none"
+    targetNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_target")
+    distalNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_distal")
+    nasionNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_nasion")
+    if targetNodeID and distalNodeID and nasionNodeID:
+      targetNode = slicer.mrmlScene.GetNodeByID(targetNodeID)
+      distalNode = slicer.mrmlScene.GetNodeByID(distalNodeID)
+      nasionNode = slicer.mrmlScene.GetNodeByID(nasionNodeID)
+      if targetNode.GetNumberOfFiducials() and distalNode.GetNumberOfFiducials() and nasionNode.GetNumberOfFiducials():
+        posTarget = numpy.array([0.0, 0.0, 0.0])
+        targetNode.GetNthFiducialPosition(0, posTarget)
+        posDistal = numpy.array([0.0, 0.0, 0.0])
+        distalNode.GetNthFiducialPosition(0, posDistal)
+        posNasion = numpy.array([0.0, 0.0, 0.0])
+        nasionNode.GetNthFiducialPosition(0, posNasion)
+        direction = (numpy.array(posDistal) - numpy.array(posTarget))/numpy.linalg.norm(numpy.array(posDistal) - numpy.array(posTarget))
+        if self.logic.trajectoryProjectedMarker.GetNumberOfFiducials() == 0:
+          self.logic.trajectoryProjectedMarker.AddFiducial(0,0,0)
+        vesselModelWithMarginNodeID = self.logic.baseVolumeNode.GetAttribute(
+          "vtkMRMLScalarVolumeNode.rel_vesselnessWithMarginModel")
+        vesselModelWithMarginNode = slicer.mrmlScene.GetNodeByID(vesselModelWithMarginNodeID)
+        modelID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_model")
+        inputModelNode = slicer.mrmlScene.GetNodeByID(modelID)
+        surfacePolyData = inputModelNode.GetPolyData()
+        FiducialPointAlongVentricle = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
+        self.logic.calculateLineModelIntersect(surfacePolyData, posDistal+1e6*direction, posTarget-1e6*direction, FiducialPointAlongVentricle)
+        posEntry = numpy.array([0.0, 0.0, 0.0])
+        FiducialPointAlongVentricle.GetNthFiducialPosition(0,posEntry)
+        self.logic.cylinderMiddlePointNode.RemoveAllMarkups()
+        posCenter = numpy.array([(posTarget[0]+posDistal[0])/2.0, (posTarget[1]+posDistal[1])/2.0, (posTarget[2]+posDistal[2])/2.0])
+        self.logic.cylinderMiddlePointNode.AddFiducial(posCenter[0], posCenter[1], posCenter[2])
+        pathPlanningBasePoint = numpy.array(posTarget) + (numpy.array(posEntry) - numpy.array(posTarget)) * 1.2
+        self.logic.calculateCannulaTransform()
+        matrix = self.logic.transform.GetMatrix()
+        points = vtk.vtkPoints()
+        phiResolution = 5*numpy.pi/180.0
+        radiusResolution = 1.0
+        points.InsertNextPoint(posEntry)
+        distance2 = numpy.linalg.norm(numpy.array(posTarget) - numpy.array(posEntry))
+        distance1 = numpy.linalg.norm(numpy.array(posTarget) - numpy.array(posDistal))/2 # Divided by 2 is because, all the cylinder bottom are possible target points
+        self.logic.entryRadius = self.logic.cylinderRadius * distance2 / distance1
+        for radius in numpy.arange(radiusResolution, self.logic.entryRadius+radiusResolution, radiusResolution):
+          for angle in numpy.arange(phiResolution, numpy.pi, phiResolution):
+            point = matrix.MultiplyPoint(numpy.array([radius*math.cos(angle), radius*math.sin(angle),0,1]))
+            pointTranslated = [point[0]+pathPlanningBasePoint[0],point[1]+pathPlanningBasePoint[1],point[2]+pathPlanningBasePoint[2]]
+            points.InsertNextPoint(pointTranslated)
+          for angle in numpy.arange(numpy.pi, 2*numpy.pi, phiResolution):
+            point = matrix.MultiplyPoint(numpy.array([-radius * math.cos(angle), radius * math.sin(angle), 0, 1]))
+            pointTranslated = [point[0] + pathPlanningBasePoint[0], point[1] + pathPlanningBasePoint[1], point[2] + pathPlanningBasePoint[2]]
+            points.InsertNextPoint(pointTranslated)
+        self.logic.synthesizedData.SetPoints(points)
+        tempModel = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
+        tempModel.SetName("candicateCannula")
+        tempModel.SetAndObservePolyData(self.logic.synthesizedData)
+        numOfRef = self.logic.coronalReferenceCurveManager.curveFiducials.GetNumberOfFiducials()
+        if self.logic.synthesizedData.GetNumberOfPoints() and numOfRef >= 1:
+          # display all paths model
+          posKocher = [0.0,0.0,0.0]
+          self.logic.coronalReferenceCurveManager.curveFiducials.GetNthFiducialPosition(numOfRef-1,posKocher)
+          if not self.logic.pathCandidatesModel.GetPolyData():
+            polyData = vtk.vtkPolyData()
+            self.logic.pathCandidatesModel.SetAndObservePolyData(polyData)
+          self.logic.pathReceived, self.logic.nPathReceived, self.logic.apReceived, self.logic.minimumPoint, self.logic.minimumDistance, self.logic.maximumPoint, self.logic.maximumDistance = self.logic.PercutaneousApproachAnalysisLogic.makePaths(
+            self.logic.cylinderMiddlePointNode, None, 0, vesselModelWithMarginNode, tempModel)
+          self.logic.makePathMeetAllConditions(self.logic.pathReceived, self.logic.nPathReceived, self.logic.pathCandidatesModel.GetPolyData(),posKocher,
+                                         posNasion, surfacePolyData)
+          #self.logic.createCandidatesWithinKocherPoint(points, posCenter, self.logic.pathCandidatesModel.GetPolyData(), posKocher, posNasion, surfacePolyData)
+          self.logic.pathCandidatesModel.GetDisplayNode().SetVisibility(1)
+          self.logic.pathCandidatesModel.GetDisplayNode().SetSliceIntersectionOpacity(0.2)
+          if self.logic.nPathReceived<=0:
+            slicer.util.warningDisplay(
+              "No any cannula candidate exists here, considering redefine the ventricle area?")
+            distalNode.SetLocked(False)
+            targetNode.SetLocked(False)
+            return False
+          else:
+            return True
+    else:
+      return False
+    return False
 
   def onPlaceVesselSeed(self):
     slicer.mrmlScene.RemoveObserver(self.nodeAddedEventObserverID)
@@ -954,26 +1045,36 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
       if not self.logic.baseVolumeNode:
         slicer.util.warningDisplay("No case is selected, please create a case", windowTitle="")
       else:
-        if self.prepareVolumes():
+        if self.prepareVolumes() and self.prepareCandidatePath():
           #self.green_widget.sliceOrientation = 'Coronal' #provide coronal view at green widget
           if self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_vesselSeeds"):
             vesselSeedsNode = slicer.mrmlScene.GetNodeByID(
               self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_vesselSeeds"))
             self.logic.interactionMode = "vesselSeeds"
-            self.tabWidget.currentWidget().children()[1].setCurrentNode(vesselSeedsNode)
+            self.simpleMarkupsWidget.setCurrentNode(vesselSeedsNode)
             self.greenLayoutButton.click()    
     else:
       self.logic.interactionMode = "none"
-      simpleMarkupWidget = self.tabWidget.currentWidget().children()[1]
-      simpleMarkupWidget.markupsPlaceWidget().setPlaceModeEnabled(False)
+      self.simpleMarkupsWidget.markupsPlaceWidget().setPlaceModeEnabled(False)
       index = next((i for i, name in enumerate(self.tabWidgetChildrenName) if name == self.tabMainGroupBoxName), None)
       self.tabWidget.setCurrentIndex(index)
-      slicer.app.processEvents()
-      self.onConnectedComponentCalc()
       self.isInAlgorithmSteps = False
       self.conventionalLayoutButton.click()
     self.nodeAddedEventObserverID = slicer.mrmlScene.AddObserver(slicer.mrmlScene.NodeAddedEvent,
                                                                  self.onVolumeAddedNode)
+    pass
+
+  def onSegmentVesselWithSeeds(self):
+    slicer.mrmlScene.RemoveObserver(self.nodeAddedEventObserverID)
+    self.logic.interactionMode = "none"
+    self.simpleMarkupsWidget.markupsPlaceWidget().setPlaceModeEnabled(False)
+    self.onConnectedComponentCalc()
+    self.prepareCandidatePath()
+    #self.logic.pathCandidatesModel.SetDisplayVisibility(0)
+    self.isInAlgorithmSteps = False
+
+    self.nodeAddedEventObserverID = slicer.mrmlScene.AddObserver(slicer.mrmlScene.NodeAddedEvent,
+                                                               self.onVolumeAddedNode)
     pass
 
   def onCreateModel(self):
@@ -1294,7 +1395,14 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     if self.addCannulaTargetButton.isChecked():
       self.imageSlider.setValue(100.0)
       self.initialFieldsValue()
-      self.logic.startEditPlanningTarget()
+      targetNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_target")
+      distalNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_distal")
+      if targetNodeID and distalNodeID:
+        targetNode = slicer.mrmlScene.GetNodeByID(targetNodeID)
+        distalNode = slicer.mrmlScene.GetNodeByID(distalNodeID)
+        targetNode.SetLocked(False)
+        distalNode.SetLocked(False)
+        self.logic.startEditPlanningTarget()
     else:
       self.logic.placeWidget.setPlaceModeEnabled(False)
 
@@ -1304,19 +1412,10 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     self.initialFieldsValue()
     self.logic.startEditPlanningDistal()
 
-  def onGeneratePath(self):
-    slicer.mrmlScene.RemoveObserver(self.nodeAddedEventObserverID)
-    try:
-      self.logic.generatePath()
-    except ValueError:
-      slicer.util.warningDisplay(
-        "Vessel Margin Calculation error, volumes might not be suitable for calculation")
-    finally:
-      slicer.app.processEvents()
-      self.nodeAddedEventObserverID = slicer.mrmlScene.AddObserver(slicer.mrmlScene.NodeAddedEvent,
-                                                                 self.onVolumeAddedNode)
-      self.onSaveData()
-    
+  def onRelocatePathToKocher(self):
+    self.logic.relocateCannula(1)
+    self.logic.pathCandidatesModel.SetDisplayVisibility(1)
+
   def onCannulaModified(self, caller, event):
     self.lengthCannulaEdit.text = '%.2f' % self.logic.getCannulaLength()
 
@@ -1695,6 +1794,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
     self.cylinderMiddlePointNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
     self.synthesizedData = vtk.vtkPolyData()
     ##
+    self.pathReceived = None
     self.pathCandidatesModel = None
     self.pathNavigationModel = None
     self.cylinderInteractor = None
@@ -2100,105 +2200,8 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
         rotationAxis = numpy.cross(numpy.array([0, 0, 1.0]), cannulaDirection)
         self.transform.Identity()
         self.transform.RotateWXYZ(angle * 180.0 / numpy.pi, rotationAxis[0], rotationAxis[1], rotationAxis[2])
-  
-  def prepareCandidatePath(self):
-    self.interactionMode = "none"
-    targetNodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_target")
-    distalNodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_distal")
-    if targetNodeID and distalNodeID:
-      targetNode = slicer.mrmlScene.GetNodeByID(targetNodeID)
-      distalNode = slicer.mrmlScene.GetNodeByID(distalNodeID)
-      if targetNode.GetNumberOfFiducials() and distalNode.GetNumberOfFiducials():
-        posTarget = numpy.array([0.0, 0.0, 0.0])
-        targetNode.GetNthFiducialPosition(0, posTarget)
-        posDistal = numpy.array([0.0, 0.0, 0.0])
-        distalNode.GetNthFiducialPosition(0, posDistal)
-        direction = (numpy.array(posDistal) - numpy.array(posTarget))/numpy.linalg.norm(numpy.array(posDistal) - numpy.array(posTarget))
-        if self.trajectoryProjectedMarker.GetNumberOfFiducials() == 0:
-          self.trajectoryProjectedMarker.AddFiducial(0,0,0)
-        modelID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_model")  
-        inputModelNode = slicer.mrmlScene.GetNodeByID(modelID)
-        surfacePolyData = inputModelNode.GetPolyData()
-        FiducialPointAlongVentricle = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
-        self.calculateLineModelIntersect(surfacePolyData, posDistal+1e6*direction, posTarget-1e6*direction, FiducialPointAlongVentricle)
-        posEntry = numpy.array([0.0, 0.0, 0.0])
-        FiducialPointAlongVentricle.GetNthFiducialPosition(0,posEntry)
-        self.cylinderMiddlePointNode.RemoveAllMarkups()
-        posCenter = numpy.array([(posTarget[0]+posDistal[0])/2.0, (posTarget[1]+posDistal[1])/2.0, (posTarget[2]+posDistal[2])/2.0])
-        self.cylinderMiddlePointNode.AddFiducial(posCenter[0], posCenter[1], posCenter[2])
-        pathPlanningBasePoint = numpy.array(posTarget) + (numpy.array(posEntry) - numpy.array(posTarget)) * 1.2
-        self.calculateCannulaTransform()
-        matrix = self.transform.GetMatrix()
-        points = vtk.vtkPoints()
-        phiResolution = 5*numpy.pi/180.0
-        radiusResolution = 1.0
-        points.InsertNextPoint(posEntry)
-        distance2 = numpy.linalg.norm(numpy.array(posTarget) - numpy.array(posEntry))
-        distance1 = numpy.linalg.norm(numpy.array(posTarget) - numpy.array(posDistal))/2 # Divided by 2 is because, all the cylinder bottom are possible target points
-        self.entryRadius = self.cylinderRadius * distance2 / distance1
-        for radius in numpy.arange(radiusResolution, self.entryRadius+radiusResolution, radiusResolution):
-          for angle in numpy.arange(phiResolution, numpy.pi, phiResolution):
-            point = matrix.MultiplyPoint(numpy.array([radius*math.cos(angle), radius*math.sin(angle),0,1]))
-            pointTranslated = [point[0]+pathPlanningBasePoint[0],point[1]+pathPlanningBasePoint[1],point[2]+pathPlanningBasePoint[2]]
-            points.InsertNextPoint(pointTranslated)
-            
-          for angle in numpy.arange(numpy.pi, 2*numpy.pi, phiResolution):
-            point = matrix.MultiplyPoint(numpy.array([-radius * math.cos(angle), radius * math.sin(angle), 0, 1]))
-            pointTranslated = [point[0] + pathPlanningBasePoint[0], point[1] + pathPlanningBasePoint[1], point[2] + pathPlanningBasePoint[2]]
-            points.InsertNextPoint(pointTranslated)
 
-        self.synthesizedData.SetPoints(points) 
-        numOfRef = self.coronalReferenceCurveManager.curveFiducials.GetNumberOfFiducials()
-        if self.synthesizedData.GetNumberOfPoints() and numOfRef >= 1:
-          # display all paths model
-          posKocher = [0.0,0.0,0.0]
-          self.coronalReferenceCurveManager.curveFiducials.GetNthFiducialPosition(numOfRef-1,posKocher)
-          if not self.pathCandidatesModel.GetPolyData():
-            polyData = vtk.vtkPolyData()
-            self.pathCandidatesModel.SetAndObservePolyData(polyData)
-          self.createCandidatesWithinKocherPoint(points, posCenter, self.pathCandidatesModel.GetPolyData(), posKocher, surfacePolyData)
-          self.pathCandidatesModel.GetDisplayNode().SetVisibility(1)
-          self.pathCandidatesModel.GetDisplayNode().SetSliceIntersectionOpacity(0.2)
-          
-        
-  def generatePath(self):
-    self.interactionMode = "none"
-    targetNodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_target")
-    distalNodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_distal")
-    nasionNodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_nasion")
-    if targetNodeID and distalNodeID and nasionNodeID:
-      targetNode = slicer.mrmlScene.GetNodeByID(targetNodeID)
-      distalNode = slicer.mrmlScene.GetNodeByID(distalNodeID)
-      nasionNode = slicer.mrmlScene.GetNodeByID(nasionNodeID)
-      if targetNode.GetNumberOfFiducials() and distalNode.GetNumberOfFiducials() and nasionNode.GetNumberOfFiducials():
-        targetNode.SetLocked(True)
-        distalNode.SetLocked(True)
-        posNasion = numpy.array([0.0, 0.0, 0.0])
-        nasionNode.GetNthFiducialPosition(0, posNasion)
-        tempModel = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
-        tempModel.SetName("candicateCannula")
-        tempModel.SetAndObservePolyData(self.synthesizedData)
-        vesselModelWithMarginNodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_vesselnessWithMarginModel")
-        vesselModelWithMarginNode = slicer.mrmlScene.GetNodeByID(vesselModelWithMarginNodeID)
-        modelID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_model")  
-        inputModelNode = slicer.mrmlScene.GetNodeByID(modelID)
-        surfacePolyData = inputModelNode.GetPolyData()
-        if self.synthesizedData.GetNumberOfPoints() and (vesselModelWithMarginNode.GetAttribute("vtkMRMLModelNode.modelCreated") == "True"):
-
-          self.pathReceived, self.nPathReceived, self.apReceived, self.minimumPoint, self.minimumDistance, self.maximumPoint, self.maximumDistance = self.PercutaneousApproachAnalysisLogic.makePaths(
-            self.cylinderMiddlePointNode, None, 0, vesselModelWithMarginNode, tempModel)
-          # display all paths model
-          self.makePathMeetAllConditions(self.pathReceived, self.nPathReceived, self.pathCandidatesModel.GetPolyData(), posNasion, surfacePolyData)
-          self.pathCandidatesModel.GetDisplayNode().SetVisibility(1)
-          if self.nPathReceived>0:
-            self.relocateCannula(self.pathReceived, 1)
-          else:
-            slicer.util.warningDisplay(
-              "No any cannula candidate exists here, considering redefine the ventricle area?")
-            distalNode.SetLocked(False)
-            targetNode.SetLocked(False)
-
-  def makePath(self, path, approachablePoints, polyData):
+  def makeNavigationLines(self, path, approachablePoints, polyData):
     points = vtk.vtkPoints()
     polyData.SetPoints(points)
 
@@ -2263,7 +2266,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
     # Create model node
     pass
 
-  def makePathMeetAllConditions(self, path, approachablePoints, polyData, posNasion, surfacePolyData):
+  def makePathMeetAllConditions(self, path, approachablePoints, polyData, posKocher, posNasion, surfacePolyData):
 
     trimmedPath = []
     points = vtk.vtkPoints()
@@ -2290,8 +2293,6 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
     subId = vtk.mutable(0)
     numOfRef = self.coronalReferenceCurveManager.curveFiducials.GetNumberOfFiducials()
     if approachablePoints != 0 and numOfRef >=1:
-      posKocher = [0.0, 0.0, 0.0]
-      self.coronalReferenceCurveManager.curveFiducials.GetNthFiducialPosition(numOfRef - 1, posKocher)
       for pointIndex in range(1, len(path), 2):
           hasIntersection = locator.IntersectWithLine(path[pointIndex], path[pointIndex - 1], 1e-2, t, x,
                                                     pcoords, subId)
@@ -2312,8 +2313,8 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
     self.nPathReceived = int(len(trimmedPath)/2)
     pass
 
-  def relocateCannula(self, pathReceived, optimizationMethod=1):
-    if pathReceived:
+  def relocateCannula(self, optimizationMethod=1):
+    if self.pathReceived:
       #self.cannulaManager.curveFiducials.RemoveAllMarkups()
       posTarget = numpy.array([0.0] * 3)
       self.cylinderManager.getFirstPoint(posTarget)
@@ -2323,13 +2324,13 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
       angleCalc =numpy.pi
       if optimizationMethod == 0: # the cannula is relocated so that its direction is closer to the ventricle center
         optimizedEntry = numpy.array([])
-        for pointIndex in range(1, len(pathReceived),2):
-          direction2 = numpy.array(pathReceived[pointIndex]) - numpy.array(pathReceived[pointIndex-1])
+        for pointIndex in range(1, len(self.pathReceived),2):
+          direction2 = numpy.array(self.pathReceived[pointIndex]) - numpy.array(self.pathReceived[pointIndex-1])
           direction2Norm = direction2/numpy.linalg.norm(direction2)
           angle = math.acos(numpy.dot(direction1Norm, direction2Norm))
           if angle < angleCalc:
             angleCalc = angle
-            optimizedEntry = numpy.array(pathReceived[pointIndex])
+            optimizedEntry = numpy.array(self.pathReceived[pointIndex])
         if optimizedEntry.any():
           posEntry = numpy.array([0.0] * 3)
           self.trajectoryProjectedMarker.GetNthFiducialPosition(0, posEntry)
@@ -2356,20 +2357,20 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
             distanceMin = 1e20
             minIndex = 1
             if numOfRef >= 1:
-              posRef = [0.0,0.0,0.0]
-              self.coronalReferenceCurveManager.curveFiducials.GetNthFiducialPosition(numOfRef-1,posRef)
-              for pointIndex in range(1, len(pathReceived),2):
-                hasIntersection = locator.IntersectWithLine(pathReceived[pointIndex], pathReceived[pointIndex-1], 1e-2, t, x, pcoords, subId)
+              posKocher = [0.0,0.0,0.0]
+              self.coronalReferenceCurveManager.curveFiducials.GetNthFiducialPosition(numOfRef-1,posKocher)
+              for pointIndex in range(1, len(self.pathReceived),2):
+                hasIntersection = locator.IntersectWithLine(self.pathReceived[pointIndex], self.pathReceived[pointIndex-1], 1e-2, t, x, pcoords, subId)
                 if hasIntersection>0:
-                  if distanceMin > numpy.linalg.norm(numpy.array(posRef)-numpy.array(x)):
-                    distanceMin = numpy.linalg.norm(numpy.array(posRef)-numpy.array(x))
+                  if distanceMin > numpy.linalg.norm(numpy.array(posKocher)-numpy.array(x)):
+                    distanceMin = numpy.linalg.norm(numpy.array(posKocher)-numpy.array(x))
                     minIndex = pointIndex
               self.cannulaManager.curveFiducials.RemoveAllMarkups()
               self.cannulaManager.curveFiducials.AddFiducial(0, 0, 0)
               self.cannulaManager.curveFiducials.AddFiducial(0, 0, 0)
-              self.cannulaManager.curveFiducials.SetNthFiducialPositionFromArray(0, pathReceived[minIndex-1])
-              self.cannulaManager.curveFiducials.SetNthFiducialPositionFromArray(1, pathReceived[minIndex])
-              direction2 = numpy.array(pathReceived[minIndex]) - numpy.array(pathReceived[minIndex-1])
+              self.cannulaManager.curveFiducials.SetNthFiducialPositionFromArray(0, self.pathReceived[minIndex-1])
+              self.cannulaManager.curveFiducials.SetNthFiducialPositionFromArray(1, self.pathReceived[minIndex])
+              direction2 = numpy.array(self.pathReceived[minIndex]) - numpy.array(self.pathReceived[minIndex-1])
               direction2Norm = direction2/numpy.linalg.norm(direction2)
               angleCalc = math.acos(numpy.dot(direction1Norm, direction2Norm))
       self.activeTrajectoryMarkup = 1
@@ -2379,6 +2380,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
       posMiddle = (posTarget+posDistal)/2
       posBottom = posMiddle+numpy.linalg.norm(posMiddle - posDistal)/math.cos(angleCalc)*(posMiddle-posProject)/numpy.linalg.norm(posMiddle - posProject)
       self.cannulaManager.curveFiducials.SetNthFiducialPositionFromArray(0, posBottom)
+      self.cannulaManager.curveFiducials.SetNthMarkupLocked(0,True)
       self.cannulaManager.curveFiducials.SetNthFiducialPositionFromArray(1, posProject)
       self.trajectoryProjectedMarker.RemoveAllMarkups()
     pass
@@ -3545,7 +3547,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
               if not self.pathNavigationModel.GetPolyData():
                 polyData = vtk.vtkPolyData()
                 self.pathNavigationModel.SetAndObservePolyData(polyData)
-              self.makePath(pathNavigationPoints, 3, self.pathNavigationModel.GetPolyData())
+              self.makeNavigationLines(pathNavigationPoints, 3, self.pathNavigationModel.GetPolyData())
               self.pathNavigationModel.GetDisplayNode().SetVisibility(1)
               return 1
             else:
