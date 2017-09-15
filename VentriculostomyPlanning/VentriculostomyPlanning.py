@@ -323,22 +323,16 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     self.tabMarkupPlacementGroupBoxLayout = qt.QVBoxLayout()
     self.tabMarkupPlacementGroupBox.setLayout(self.tabMarkupPlacementGroupBoxLayout)
     vesselThresholdLabel = qt.QLabel('Vessel Threshold')
-    thresholdMin = qt.QLabel('50')
-    thresholdMax = qt.QLabel('300')
-    self.currentThresholdValue = qt.QLabel('100')
     vesselThresholdLayout = qt.QHBoxLayout()
     self.vesselThresholdGroupBox = qt.QGroupBox()
     self.vesselThresholdGroupBox.setLayout(vesselThresholdLayout)
-    self.vesselThresholdSlider = qt.QSlider(qt.Qt.Horizontal)
-    self.vesselThresholdSlider.setMinimum(50)
-    self.vesselThresholdSlider.setMaximum(300)
-    self.vesselThresholdSlider.setValue(100)
-    self.vesselThresholdSlider.connect('valueChanged(int)', self.onChangeThresholdValue)
+    self.rangeThresholdWidget = slicer.qMRMLRangeWidget()
+    self.rangeThresholdWidget.minimum = 50
+    self.rangeThresholdWidget.maximum = 400
+    self.rangeThresholdWidget.setValues(100,300)
+    self.rangeThresholdWidget.connect('valuesChanged(double, double)', self.onChangeThresholdValues)
     vesselThresholdLayout.addWidget(vesselThresholdLabel)
-    vesselThresholdLayout.addWidget(thresholdMin)
-    vesselThresholdLayout.addWidget(self.vesselThresholdSlider)
-    vesselThresholdLayout.addWidget(thresholdMax)
-    vesselThresholdLayout.addWidget(self.currentThresholdValue)
+    vesselThresholdLayout.addWidget(self.rangeThresholdWidget)
     self.segmentVesselWithSeedsButton = self.createButton(title="",
                                                 toolTip="Segment the vessel based on threshold and seeds.",
                                                 enabled=True,
@@ -346,7 +340,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
                                                 icon=self.createIcon("startVesselSegment.png", self.scriptDirectory),
                                                 iconSize=qt.QSize(self.buttonHeight*0.8, self.buttonWidth*0.8))
     self.segmentVesselWithSeedsButton.connect('clicked(bool)', self.onSegmentVesselWithSeeds)
-    vesselThresholdLayout.addWidget(self.currentThresholdValue)
+    #vesselThresholdLayout.addWidget(self.currentLowerThresholdValue)
     vesselThresholdLayout.addWidget(self.segmentVesselWithSeedsButton)
     self.tabMarkupPlacementGroupBoxLayout.addWidget(self.vesselThresholdGroupBox)
 
@@ -738,9 +732,12 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         self.logic.enableRelatedVolume("vtkMRMLScalarVolumeNode.rel_quarterVolume", "quarterVolume")
         self.logic.enableRelatedVolume("vtkMRMLScalarVolumeNode.rel_vesselnessVolume", "vesselnessVolume")
         self.logic.enableRelatedVariables("vtkMRMLScalarVolumeNode.rel_cylinderRadius", "cylinderRadius")
-        self.logic.enableRelatedVariables("vtkMRMLScalarVolumeNode.rel_vesselThreshold", "vesselThreshold")
+        self.logic.enableRelatedVariables("vtkMRMLScalarVolumeNode.rel_vesselLowerThreshold", "vesselLowerThreshold")
+        self.logic.enableRelatedVariables("vtkMRMLScalarVolumeNode.rel_vesselUpperThreshold", "vesselUpperThreshold")
         self.logic.enableRelatedVariables("vtkMRMLScalarVolumeNode.rel_posteriorMargin", "posteriorMargin")
-        self.vesselThresholdSlider.setValue(self.logic.vesselThreshold)
+        self.rangeThresholdWidget.setValues(self.logic.vesselLowerThreshold, self.logic.vesselUpperThreshold)
+        vesselSeedsNodelID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_vesselSeeds")
+        self.simpleMarkupsWidget.setCurrentNode(slicer.mrmlScene.GetNodeByID(vesselSeedsNodelID))
         self.posteriorMarginEdit.setText(self.logic.posteriorMargin)
         self.logic.enableEventObserver()
         self.setReverseViewButton.cannulaNode = slicer.mrmlScene.GetNodeByID(self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_cannula"))
@@ -863,10 +860,11 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     self.skullNormToCoronalAngleEdit.text = '--'
 
 
-  def onChangeThresholdValue(self, sliderValue):
-    self.logic.vesselThreshold = sliderValue
-    self.currentThresholdValue.setText(str(sliderValue))
-    self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_vesselThreshold", str(sliderValue))
+  def onChangeThresholdValues(self, sliderLowerValue, sliderUpperValue):
+    self.logic.vesselLowerThreshold = sliderLowerValue
+    self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_vesselLowerThreshold", str(sliderLowerValue))
+    self.logic.vesselUpperThreshold = sliderUpperValue
+    self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_vesselUpperThreshold", str(sliderUpperValue))
 
   def onChangePosteriorMargin(self, value):
     self.logic.posteriorMargin = value
@@ -1817,7 +1815,8 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
     self.topPoint = []
     self.sufaceModelThreshold = -500.0
     self.distanceMapThreshold = 100
-    self.vesselThreshold = 100
+    self.vesselLowerThreshold = 100
+    self.vesselUpperThreshold = 300
     self.venousMargin = 10.0 #in mm
     self.minimalVentricleLen = 10.0 # in mm
     self.yawAngle = 0.0
@@ -2644,8 +2643,8 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
           vesselSeedsNode.GetNthFiducialPosition(iSeed, posRAS)
           posIJK = matrix.MultiplyFloatPoint([posRAS[0], posRAS[1], posRAS[2], 1.0])
           self.connectedComponentFilter.AddSeed([int(posIJK[0]),int(posIJK[1]),int(posIJK[2])])
-        self.connectedComponentFilter.SetLower(self.vesselThreshold)
-        self.connectedComponentFilter.SetUpper(1000000.0)
+        self.connectedComponentFilter.SetLower(self.vesselLowerThreshold)
+        self.connectedComponentFilter.SetUpper(self.vesselUpperThreshold)
         self.connectedComponentFilter.SetConnectivity(self.connectedComponentFilter.FullConnectivity)
         connectedImage = self.connectedComponentFilter.Execute(oriImage)
         sitkUtils.PushToSlicer(connectedImage, "connectedImage", 0, True)
