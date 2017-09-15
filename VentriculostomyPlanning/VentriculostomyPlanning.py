@@ -155,7 +155,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     # Venous model calculation and margin setting
     venousMarginConfigLayout = qt.QHBoxLayout()
     appSettingLayout.addRow(venousMarginConfigLayout)
-    venousMarginLabel = self.createLabel('Venous Safty Margin: ')
+    venousMarginLabel = self.createLabel('Venous Safety Margin: ')
     venousMarginConfigLayout.addWidget(venousMarginLabel)
     self.venousMarginEdit = self.createLineEdit(title="", text='10.0', readOnly=False, frame=True, maxLength = 6,
                                                 styleSheet="QLineEdit { background:transparent; }",
@@ -168,7 +168,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     # Posterior margin distance setting
     posteriorMarginConfigLayout = qt.QHBoxLayout()
     appSettingLayout.addRow(posteriorMarginConfigLayout)
-    posteriorMarginLabel = self.createLabel('Posterior Safty Margin: ')
+    posteriorMarginLabel = self.createLabel('Posterior Safety Margin: ')
     posteriorMarginConfigLayout.addWidget(posteriorMarginLabel)
     self.posteriorMarginEdit = self.createLineEdit(title="", text='60.0', readOnly=False, frame=True, maxLength=6,
                                                 styleSheet="QLineEdit { background:transparent; }",
@@ -515,8 +515,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     self.layout.addStretch(1)
     self.setBackgroundAndForegroundIDs(foregroundVolumeID=None,
                                        backgroundVolumeID=None)
-    # Refresh Apply button state
-    #self.onSelect(self.inputVolumeSelector.currentNode())
     self.initialNodesIDList = []
     allNodes = slicer.mrmlScene.GetNodes()
     for nodeIndex in range(allNodes.GetNumberOfItems()):
@@ -607,9 +605,11 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     # When we are loading the cases, though the slicer.mrmlScene.NodeAddedEvent is removed, sometimes this function is still triggered.
     # We use the flag isLoadingCase to make sure it is not called.
     slicer.app.processEvents()
+    if callData.IsA("vtkMRMLScalarVolumeDisplayNode"):
+      callData.SetAutoWindowLevel(False)
+      callData.SetWindow(self.baseVolumeWindowValue)
+      callData.SetLevel(self.baseVolumeLevelValue)
     if callData.IsA("vtkMRMLVolumeNode") and (not self.isLoadingCase) and (not self.isInAlgorithmSteps):
-      volumeName = callData.GetName()
-      #self.importedNodeIDs.append(callData.GetID())
       if self.onSaveDicomFiles():
         self.SerialAssignBox.AppendVolumeNode(callData)
         self.initialNodesIDList.append(callData.GetID())
@@ -828,8 +828,11 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     self.logic.skullNormToCoronalAngle = "--"
     self.logic.cannulaToNormAngle = "--"
     self.logic.cannulaToCoronalAngle = "--"
-    self.logic.pathCandidatesModel.SetDisplayVisibility(0)
-    if self.logic.createPlanningLine():
+    if self.addVesselSeedButton.isChecked():
+      self.addVesselSeedButton.click()
+      slicer.app.processEvents()
+    if self.logic.baseVolumeNode and self.logic.createPlanningLine():
+      self.logic.pathCandidatesModel.SetDisplayVisibility(0)
       self.logic.calcPitchYawAngles()
       self.logic.calculateDistanceToKocher()
       self.lengthSagittalPlanningLineEdit.text = '%.1f' % self.logic.getSagittalPlanningLineLength()
@@ -842,7 +845,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         self.cannulaToCoronalAngleEdit.text = '%.1f' % self.logic.cannulaToCoronalAngle
         self.skullNormToSagittalAngleEdit.text = '%.1f' % self.logic.skullNormToSaggitalAngle
         self.skullNormToCoronalAngleEdit.text = '%.1f' % self.logic.skullNormToCoronalAngle
-    if self.logic.baseVolumeNode:
       cannulaNode = slicer.mrmlScene.GetNodeByID(self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_cannula"))
       cannulaNode.AddObserver(cannulaNode.PointStartInteractionEvent, self.onResetPlanningOutput)
     pass
@@ -949,6 +951,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
             slicer.app.processEvents()
             if quarterVolume.GetDisplayNode():
               print "volume display ID", quarterVolume.GetDisplayNode().GetID()
+              quarterVolume.GetDisplayNode().SetAutoWindowLevel(False)
               quarterVolume.GetDisplayNode().SetWindow(self.baseVolumeWindowValue)
               quarterVolume.GetDisplayNode().SetLevel(self.baseVolumeLevelValue)
     return True
@@ -1392,7 +1395,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
 
   # Event handlers for trajectory
   def onEditPlanningTarget(self):
-    if self.addCannulaTargetButton.isChecked():
+    if self.logic.baseVolumeNode and self.addCannulaTargetButton.isChecked():
       self.imageSlider.setValue(100.0)
       self.initialFieldsValue()
       targetNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_target")
@@ -1413,8 +1416,9 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     self.logic.startEditPlanningDistal()
 
   def onRelocatePathToKocher(self):
-    self.logic.relocateCannula(1)
-    self.logic.pathCandidatesModel.SetDisplayVisibility(1)
+    if self.logic.baseVolumeNode:
+      self.logic.relocateCannula(1)
+      self.logic.pathCandidatesModel.SetDisplayVisibility(1)
 
   def onCannulaModified(self, caller, event):
     self.lengthCannulaEdit.text = '%.2f' % self.logic.getCannulaLength()
