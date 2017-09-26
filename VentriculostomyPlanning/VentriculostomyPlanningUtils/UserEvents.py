@@ -8,3 +8,4 @@ class VentriculostomyUserEvents(object):
   SetSliceViewerEvent = vtk.vtkCommand.UserEvent + 154
   SaveModifiedFiducialEvent = vtk.vtkCommand.UserEvent + 155
   VentricleCylinderModified = vtk.vtkCommand.UserEvent + 156
+  ReverseViewClicked = vtk.vtkCommand.UserEvent + 157

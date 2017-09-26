@@ -21,13 +21,11 @@ from VentriculostomyPlanningUtils.PopUpMessageBox import SerialAssignMessageBox
 from VentriculostomyPlanningUtils.UserEvents import VentriculostomyUserEvents
 from VentriculostomyPlanningUtils.UsefulFunctions import UsefulFunctions
 from VentriculostomyPlanningUtils.VentriclostomyButtons import GreenSliceLayoutButton, ConventionalSliceLayoutButton, ReverseViewOnCannulaButton, ScreenShotButton
-from SlicerDevelopmentToolboxUtils.buttons import WindowLevelEffectsButton
+from SlicerDevelopmentToolboxUtils.buttons import WindowLevelEffectsButton, FourUpLayoutButton
 from SlicerDevelopmentToolboxUtils.mixins import ModuleWidgetMixin, ModuleLogicMixin
 from shutil import copyfile
 from os.path import basename
 from os import listdir
-import ScreenCapture
-
 from abc import ABCMeta, abstractmethod
 import datetime
 #
@@ -79,6 +77,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     self.jsonFile = ""
     self.isLoadingCase = False
     self.isInAlgorithmSteps = False
+    self.isReverseView = False
     self.progressBar = slicer.util.createProgressDialog()
     self.progressBar.close()
     self.red_widget = slicer.app.layoutManager().sliceWidget("Red")
@@ -227,12 +226,13 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     self.ventricleVolumeNameLabel.setMaxLength(50)
     inputVolumeLayout.addWidget(ventricleVolumeLabel,0,2)
     inputVolumeLayout.addWidget(self.ventricleVolumeNameLabel,0,3)
-    self.showVolumeTable = self.createButton(title = "Show Table", maximumHeight = 35, maximumWidth = 80, toolTip = "Show the table of volumes for assignment.", enabled = True)
+    self.showVolumeTable = self.createButton(title = "Show Table", styleSheet="QPushButton { background:white; }", maximumHeight = 35, maximumWidth = 80, toolTip = "Show the table of volumes for assignment.", enabled = True)
     self.showVolumeTable.connect('clicked(bool)', self.onShowVolumeTable)
     inputVolumeLayout.addWidget(self.showVolumeTable,0,4)
 
     self.importedNodeIDs= []
     self.nodeAddedEventObserverID = slicer.mrmlScene.AddObserver(slicer.mrmlScene.NodeAddedEvent, self.onVolumeAddedNode)
+    self.reverseViewClickedEventObserverID =  slicer.mrmlScene.AddObserver(VentriculostomyUserEvents.ReverseViewClicked, self.responseToReverseView)
     self.scriptDirectory = os.path.join(os.path.dirname(os.path.realpath(__file__)),"Resources", "icons")
 
 
@@ -374,14 +374,16 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     self.setWindowLevelButton = WindowLevelEffectsButton()
     self.greenLayoutButton = GreenSliceLayoutButton()
     self.conventionalLayoutButton = ConventionalSliceLayoutButton()
+    self.fourUpLayoutButton = FourUpLayoutButton()
     self.viewSubGroupBoxLayout.addWidget(ventricleVolumeLabel)
     self.screenShotButton = ScreenShotButton()
     self.setReverseViewButton = ReverseViewOnCannulaButton()
-    self.viewGroupBoxLayout.addWidget(self.setReverseViewButton,0, 0)
-    self.viewGroupBoxLayout.addWidget(self.greenLayoutButton, 0, 1)
-    self.viewGroupBoxLayout.addWidget(self.conventionalLayoutButton, 0, 2)
-    self.viewGroupBoxLayout.addWidget(self.screenShotButton, 0, 3)
-    self.viewGroupBoxLayout.addWidget(self.setWindowLevelButton, 0, 4)
+    self.viewGroupBoxLayout.addWidget(self.greenLayoutButton, 0, 0)
+    self.viewGroupBoxLayout.addWidget(self.conventionalLayoutButton, 0, 1)
+    self.viewGroupBoxLayout.addWidget(self.fourUpLayoutButton, 0, 2)
+    self.viewGroupBoxLayout.addWidget(self.setReverseViewButton, 0, 3)
+    self.viewGroupBoxLayout.addWidget(self.screenShotButton, 0, 4)
+    self.viewGroupBoxLayout.addWidget(self.setWindowLevelButton, 0, 5)
     self.viewGroupBoxLayout.addWidget(venousVolumeLabel)
     self.viewGroupBoxLayout.addWidget(self.imageSlider)
     self.viewGroupBoxLayout.addWidget(ventricleVolumeLabel)
@@ -578,6 +580,31 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
       self.SerialAssignBox.Clear()
     pass
 
+  def responseToReverseView(self, node, eventID):
+    if self.isReverseView == False:
+      self.isReverseView = True
+      self.logic.enableRelatedMarkups("vtkMRMLScalarVolumeNode.rel_nasion", "nasion", visibility=False)
+      self.logic.enableRelatedMarkups("vtkMRMLScalarVolumeNode.rel_kocher", "kocher", visibility=False)
+      self.logic.enableRelatedMarkups("vtkMRMLScalarVolumeNode.rel_sagittalPoint", "sagittalPoint", visibility=False)
+      self.logic.enableRelatedMarkups("vtkMRMLScalarVolumeNode.rel_target", "target", visibility=False)
+      self.logic.enableRelatedMarkups("vtkMRMLScalarVolumeNode.rel_distal", "distal", visibility=False)
+      self.logic.enableRelatedMarkups("vtkMRMLScalarVolumeNode.rel_vesselSeeds", "vesselSeeds", visibility=False)
+      self.logic.enableRelatedMarkups("vtkMRMLScalarVolumeNode.rel_cannula", "cannula", visibility=False)
+      self.logic.enableRelatedMarkups("vtkMRMLScalarVolumeNode.rel_cylinderMarker", "cylinderMarker", visibility=False)
+      self.logic.pathCandidatesModel.SetDisplayVisibility(0)
+    else:
+      self.isReverseView = False
+      self.logic.enableRelatedMarkups("vtkMRMLScalarVolumeNode.rel_nasion", "nasion", visibility=True)
+      self.logic.enableRelatedMarkups("vtkMRMLScalarVolumeNode.rel_kocher", "kocher", visibility=True)
+      self.logic.enableRelatedMarkups("vtkMRMLScalarVolumeNode.rel_sagittalPoint", "sagittalPoint", visibility=True)
+      self.logic.enableRelatedMarkups("vtkMRMLScalarVolumeNode.rel_target", "target", visibility=True)
+      self.logic.enableRelatedMarkups("vtkMRMLScalarVolumeNode.rel_distal", "distal", visibility=True)
+      self.logic.enableRelatedMarkups("vtkMRMLScalarVolumeNode.rel_vesselSeeds", "vesselSeeds", visibility=True)
+      self.logic.enableRelatedMarkups("vtkMRMLScalarVolumeNode.rel_cannula", "cannula", visibility=True)
+      self.logic.enableRelatedMarkups("vtkMRMLScalarVolumeNode.rel_cylinderMarker", "cylinderMarker", visibility=True)
+      self.logic.pathCandidatesModel.SetDisplayVisibility(1)
+    pass
+
   def updateFromLogic(self, EventID):
     if EventID == VentriculostomyUserEvents.ResetButtonEvent:
       self.onResetButtons()
@@ -636,12 +663,14 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
       callData.SetLevel(self.baseVolumeLevelValue)
     if callData.IsA("vtkMRMLVolumeNode") and (not self.isLoadingCase) and (not self.isInAlgorithmSteps):
       if self.onSaveDicomFiles():
+        self.showVolumeTable.setStyleSheet("QPushButton { background:red; }")
         self.SerialAssignBox.AppendVolumeNode(callData)
         self.initialNodesIDList.append(callData.GetID())
 
         #the setForegroundVolume will not work, because the slicerapp triggers the SetBackgroundVolume after the volume is loaded
   def onShowVolumeTable(self):
     userAction = self.SerialAssignBox.ShowVolumeTable()
+    self.showVolumeTable.setStyleSheet("QPushButton { background:white; }")
     if userAction == 0:
       if (not self.logic.baseVolumeNode == self.SerialAssignBox.volumesCheckedDict.get("Venous")) or (not self.logic.ventricleVolume == self.SerialAssignBox.volumesCheckedDict.get("Ventricle")):
         userSelectValid = False
@@ -857,37 +886,10 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         self.logic.appendPlanningTimeStampToJson(self.jsonFile, "EndPreprocessing",
                                                  datetime.datetime.now().time().isoformat())
         self.imageSlider.setValue(100.0)
+      self.logic.placeWidget.setPlaceModeEnabled(False)
       qt.QApplication.restoreOverrideCursor()  
     self.nodeAddedEventObserverID = slicer.mrmlScene.AddObserver(slicer.mrmlScene.NodeAddedEvent,
                                                                  self.onVolumeAddedNode)
-    pass
-
-  def onCreatePlanningLine(self):
-    self.logic.pitchAngle="--"
-    self.logic.yawAngle = "--"
-    self.logic.skullNormToSaggitalAngle = "--"
-    self.logic.skullNormToCoronalAngle = "--"
-    self.logic.cannulaToNormAngle = "--"
-    self.logic.cannulaToCoronalAngle = "--"
-    if self.addVesselSeedButton.isChecked():
-      self.addVesselSeedButton.click()
-      slicer.app.processEvents()
-    if self.logic.baseVolumeNode and self.logic.createPlanningLine():
-      self.logic.pathCandidatesModel.SetDisplayVisibility(0)
-      self.logic.calcPitchYawAngles()
-      self.logic.calculateDistanceToKocher()
-      self.lengthSagittalPlanningLineEdit.text = '%.1f' % self.logic.getSagittalPlanningLineLength()
-      self.lengthCoronalPlanningLineEdit.text = '%.1f' % self.logic.getCoronalPlanningLineLength()
-      self.distanceKocherPointEdit.text = '%.1f' % self.logic.kocherDistance
-      self.pitchAngleEdit.text = '%.1f' % self.logic.pitchAngle
-      self.yawAngleEdit.text = '%.1f' % (-self.logic.yawAngle)
-      if self.logic.calcCannulaAngles():
-        self.cannulaToNormAngleEdit.text = '%.1f' % self.logic.cannulaToNormAngle
-        self.cannulaToCoronalAngleEdit.text = '%.1f' % self.logic.cannulaToCoronalAngle
-        self.skullNormToSagittalAngleEdit.text = '%.1f' % self.logic.skullNormToSaggitalAngle
-        self.skullNormToCoronalAngleEdit.text = '%.1f' % self.logic.skullNormToCoronalAngle
-      cannulaNode = slicer.mrmlScene.GetNodeByID(self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_cannula"))
-      cannulaNode.AddObserver(cannulaNode.PointStartInteractionEvent, self.onResetPlanningOutput)
     pass
 
   @vtk.calldata_type(vtk.VTK_INT)
@@ -1000,6 +1002,9 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
             self.setBackgroundAndForegroundIDs(foregroundVolumeID=self.logic.ventricleVolume.GetID(),
                                                backgroundVolumeID=quarterVolume.GetID(), fitToSlice=True)
             self.logic.updateSliceViewBasedOnPoints(posTarget, posDistal)
+            self.green_widget.fitSliceToBackground()
+            greenSliceNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSliceNodeGreen")
+            greenSliceNode.SetFieldOfView(self.green_widget.width / 3, self.green_widget.height / 3, 0.5)
             slicer.app.processEvents()
             if quarterVolume.GetDisplayNode():
               print "volume display ID", quarterVolume.GetDisplayNode().GetID()
@@ -1009,7 +1014,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     return True
 
   def prepareCandidatePath(self):
-    self.logic.interactionMode = "none"
+    self.logic.interactionMode = "None"
     targetNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_target")
     distalNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_distal")
     nasionNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_nasion")
@@ -1090,15 +1095,56 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
       return False
     return False
 
+  def deactivateOtherButtons(self, currentButton=None):
+    for childWidget in self.mainGUIGroupBox.children():
+      if childWidget.className() == "QPushButton" and (not childWidget == currentButton):
+        if childWidget.checked:
+          childWidget.click()
+          slicer.app.processEvents()
+    pass
+
+  def onCreatePlanningLine(self):
+    self.logic.pitchAngle="--"
+    self.logic.yawAngle = "--"
+    self.logic.skullNormToSaggitalAngle = "--"
+    self.logic.skullNormToCoronalAngle = "--"
+    self.logic.cannulaToNormAngle = "--"
+    self.logic.cannulaToCoronalAngle = "--"
+    self.deactivateOtherButtons(currentButton=self.createPlanningLineButton)
+    if not self.logic.baseVolumeNode:
+      slicer.util.warningDisplay("No case is selected, please select the case in the combox", windowTitle="")
+      self.deactivateOtherButtons()
+    else:
+      if self.logic.createPlanningLine():
+        self.logic.pathCandidatesModel.SetDisplayVisibility(0)
+        self.logic.calcPitchYawAngles()
+        self.logic.calculateDistanceToKocher()
+        self.lengthSagittalPlanningLineEdit.text = '%.1f' % self.logic.getSagittalPlanningLineLength()
+        self.lengthCoronalPlanningLineEdit.text = '%.1f' % self.logic.getCoronalPlanningLineLength()
+        self.distanceKocherPointEdit.text = '%.1f' % self.logic.kocherDistance
+        self.pitchAngleEdit.text = '%.1f' % self.logic.pitchAngle
+        self.yawAngleEdit.text = '%.1f' % (-self.logic.yawAngle)
+        if self.logic.calcCannulaAngles():
+          self.cannulaToNormAngleEdit.text = '%.1f' % self.logic.cannulaToNormAngle
+          self.cannulaToCoronalAngleEdit.text = '%.1f' % self.logic.cannulaToCoronalAngle
+          self.skullNormToSagittalAngleEdit.text = '%.1f' % self.logic.skullNormToSaggitalAngle
+          self.skullNormToCoronalAngleEdit.text = '%.1f' % self.logic.skullNormToCoronalAngle
+        cannulaNode = slicer.mrmlScene.GetNodeByID(self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_cannula"))
+        cannulaNode.AddObserver(cannulaNode.PointStartInteractionEvent, self.onResetPlanningOutput)
+    pass
+
+
   def onPlaceVesselSeed(self):
     slicer.mrmlScene.RemoveObserver(self.nodeAddedEventObserverID)
     self.imageSlider.setValue(0.0)
     if self.addVesselSeedButton.isChecked():
+      self.deactivateOtherButtons(currentButton=self.addVesselSeedButton)
       index = next((i for i, name in enumerate(self.tabWidgetChildrenName) if name == self.tabMarkupsName), None)
       self.tabWidget.setCurrentIndex(index)
       self.isInAlgorithmSteps = True
       if not self.logic.baseVolumeNode:
-        slicer.util.warningDisplay("No case is selected, please create a case", windowTitle="")
+        slicer.util.warningDisplay("No case is selected, please select the case in the combox", windowTitle="")
+        self.deactivateOtherButtons()
       else:
         if self.prepareVolumes() and self.prepareCandidatePath():
           #self.green_widget.sliceOrientation = 'Coronal' #provide coronal view at green widget
@@ -1109,7 +1155,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
             self.simpleMarkupsWidget.setCurrentNode(vesselSeedsNode)
             self.greenLayoutButton.click()    
     else:
-      self.logic.interactionMode = "none"
+      self.logic.interactionMode = "None"
       self.simpleMarkupsWidget.markupsPlaceWidget().setPlaceModeEnabled(False)
       index = next((i for i, name in enumerate(self.tabWidgetChildrenName) if name == self.tabMainGroupBoxName), None)
       self.tabWidget.setCurrentIndex(index)
@@ -1121,7 +1167,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
 
   def onSegmentVesselWithSeeds(self):
     slicer.mrmlScene.RemoveObserver(self.nodeAddedEventObserverID)
-    self.logic.interactionMode = "none"
+    self.logic.interactionMode = "None"
     self.simpleMarkupsWidget.markupsPlaceWidget().setPlaceModeEnabled(False)
     self.onConnectedComponentCalc()
     self.prepareCandidatePath()
@@ -1163,8 +1209,10 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
 
   def onSelectNasionPoint(self):
     if self.selectNasionButton.isChecked():
+      self.deactivateOtherButtons(currentButton=self.selectNasionButton)
       if not self.logic.baseVolumeNode:
         slicer.util.warningDisplay("No case is selected, please select the case in the combox", windowTitle="")
+        self.deactivateOtherButtons()
       else:
         outputModelNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_model")
         if outputModelNodeID:
@@ -1184,8 +1232,10 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
 
   def onSelectSagittalPoint(self):
     if self.selectSagittalButton.isChecked():
+      self.deactivateOtherButtons(currentButton=self.selectSagittalButton)
       if not self.logic.baseVolumeNode:
         slicer.util.warningDisplay("No case is selected, please select the case in the combox", windowTitle="")
+        self.deactivateOtherButtons()
       else:
         outputModelNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_model")
         if outputModelNodeID:
@@ -1340,7 +1390,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         slicer.mrmlScene.RemoveObserver(self.nodeAddedEventObserverID)
         try:
           self.logic.calculateConnectedComponent(quarterVolumeNode, vesselSeedsNode, vesselnessModelNode)
-        except ValueError:
+        except ValueError or TypeError:
           slicer.util.warningDisplay(
             "Vessel Margin Calculation error, volumes might not be suitable for calculation")
         finally:
@@ -1374,7 +1424,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         outputTubeFile = os.path.join(self.slicerCaseWidget.outputDir, "OutputTubeTree")
         try:
           self.logic.calculateVenousVesselness(quarterVolumeNode, vesselnessVolumeNode, vesselSeedsNode, outputTubeFile, vesselnessModelNode)
-        except ValueError:
+        except ValueError or TypeError:
           slicer.util.warningDisplay(
             "Vessel Margin Calculation error, volumes might not be suitable for calculation")
         finally:
@@ -1401,7 +1451,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         self.logic.calculateConnectedCompWithMargin()
         #self.logic.calculateVesselWithMargin()
         #self.logic.calculateGrayScaleWithMargin()
-      except ValueError:
+      except ValueError or TypeError:
         slicer.util.warningDisplay(
           "Vessel Margin Calculation error, volumes might not be suitable for calculation")
       finally:
@@ -1447,19 +1497,27 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
 
   # Event handlers for trajectory
   def onEditPlanningTarget(self):
-    if self.logic.baseVolumeNode and self.addCannulaTargetButton.isChecked():
-      self.imageSlider.setValue(100.0)
-      self.initialFieldsValue()
-      targetNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_target")
-      distalNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_distal")
-      if targetNodeID and distalNodeID:
-        targetNode = slicer.mrmlScene.GetNodeByID(targetNodeID)
-        distalNode = slicer.mrmlScene.GetNodeByID(distalNodeID)
-        targetNode.SetLocked(False)
-        distalNode.SetLocked(False)
-        self.setBackgroundAndForegroundIDs(foregroundVolumeID=self.logic.ventricleVolume.GetID(), backgroundVolumeID=self.logic.baseVolumeNode.GetID(), fitToSlice=False
-                                           )
-        self.logic.startEditPlanningTarget()
+    if self.addCannulaTargetButton.isChecked():
+      self.deactivateOtherButtons(currentButton=self.addCannulaTargetButton)
+      if not self.logic.baseVolumeNode:
+        slicer.util.warningDisplay("No case is selected, please select the case in the combox", windowTitle="")
+        self.deactivateOtherButtons()
+      else:
+        self.imageSlider.setValue(100.0)
+        self.initialFieldsValue()
+        targetNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_target")
+        distalNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_distal")
+        if targetNodeID and distalNodeID:
+          targetNode = slicer.mrmlScene.GetNodeByID(targetNodeID)
+          distalNode = slicer.mrmlScene.GetNodeByID(distalNodeID)
+          targetNode.SetLocked(False)
+          distalNode.SetLocked(False)
+          self.setBackgroundAndForegroundIDs(foregroundVolumeID=self.logic.ventricleVolume.GetID(), backgroundVolumeID=self.logic.baseVolumeNode.GetID(), fitToSlice=True
+                                             )
+          self.fourUpLayoutButton.click()
+          self.logic.setSliceForCylinder()
+          self.logic.pathCandidatesModel.SetDisplayVisibility(0)
+          self.logic.startEditPlanningTarget()
     else:
       self.logic.placeWidget.setPlaceModeEnabled(False)
 
@@ -1470,7 +1528,10 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     self.logic.startEditPlanningDistal()
 
   def onRelocatePathToKocher(self):
-    if self.logic.baseVolumeNode:
+    if not self.logic.baseVolumeNode:
+      slicer.util.warningDisplay("No case is selected, please select the case in the combox", windowTitle="")
+      self.deactivateOtherButtons()
+    else:
       self.logic.relocateCannula(1)
       self.logic.pathCandidatesModel.SetDisplayVisibility(1)
 
@@ -1891,7 +1952,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
     self.entryRadius = 25.0
     self.transform = vtk.vtkTransform()
     self.placeWidget = slicer.qSlicerMarkupsPlaceWidget()
-    self.interactionMode = "none"
+    self.interactionMode = "None"
 
   def enableAuxilaryNodes(self):
     # Create display node
@@ -2065,39 +2126,32 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
     shiftX = 20
     shiftY = -40
     shiftZ = 50
-    if self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_nasion"):
-      nasionNode = slicer.mrmlScene.GetNodeByID(self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_nasion"))
-      if (nasionNode.GetNumberOfFiducials() == 1):
-        posNasion = numpy.array([0.0, 0.0, 0.0])
-        nasionNode.GetNthFiducialPosition(0, posNasion)
-        posTarget = numpy.array([posNasion[0]+shiftX,posNasion[1]+shiftY, posNasion[2]+shiftZ])
-        direction = numpy.array([1,1,0])
-        #posDistal = numpy.array([posTarget[0]-40, posTarget[1]-40, posTarget[2]])
-        redSliceNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSliceNodeRed")
-        yellowSliceNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSliceNodeYellow")
-        greenSliceNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSliceNodeGreen")
-        self.updateSliceViewBasedOnPoints(posTarget, posTarget+direction)
-        lm = slicer.app.layoutManager()
-        sliceLogics = lm.mrmlSliceLogics()
-        for n in range(sliceLogics.GetNumberOfItems()):
-          sliceLogic = sliceLogics.GetItemAsObject(n)
-          sliceWidget = lm.sliceWidget(sliceLogic.GetName())
-          if (sliceWidget.objectName == 'qMRMLSliceWidgetRed'):
-            redSliceNode.SetFieldOfView(sliceWidget.width/3, sliceWidget.height/3, 0.5)
-          if (sliceWidget.objectName == 'qMRMLSliceWidgetYellow'):
-            yellowSliceNode.SetFieldOfView(sliceWidget.width/3, sliceWidget.height/3, 0.5)
-          if (sliceWidget.objectName == 'qMRMLSliceWidgetGreen'):
-            greenSliceNode.SetFieldOfView(sliceWidget.width/3, sliceWidget.height/3, 0.5)
-        
+    nasionNode = slicer.mrmlScene.GetNodeByID(self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_nasion"))
+    if (nasionNode.GetNumberOfFiducials() == 1):
+      posNasion = numpy.array([0.0, 0.0, 0.0])
+      nasionNode.GetNthFiducialPosition(0, posNasion)
+      posTarget = numpy.array([posNasion[0] + shiftX, posNasion[1] + shiftY, posNasion[2] + shiftZ])
+      direction = numpy.array([1, 1, 0])
+      # posDistal = numpy.array([posTarget[0]-40, posTarget[1]-40, posTarget[2]])
+      redSliceNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSliceNodeRed")
+      redSliceNode.SetOrientation("Axial")
+      yellowSliceNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSliceNodeYellow")
+      yellowSliceNode.SetOrientation("Sagittal")
+      greenSliceNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSliceNodeGreen")
+      greenSliceNode.SetOrientation("Coronal")
+      self.updateSliceViewBasedOnPoints(posTarget, posTarget + direction)
+      lm = slicer.app.layoutManager()
+      sliceLogics = lm.mrmlSliceLogics()
+      for n in range(sliceLogics.GetNumberOfItems()):
+        sliceLogic = sliceLogics.GetItemAsObject(n)
+        sliceWidget = lm.sliceWidget(sliceLogic.GetName())
+        if (sliceWidget.objectName == 'qMRMLSliceWidgetRed'):
+          redSliceNode.SetFieldOfView(sliceWidget.width / 3, sliceWidget.height / 3, 0.5)
+        if (sliceWidget.objectName == 'qMRMLSliceWidgetYellow'):
+          yellowSliceNode.SetFieldOfView(sliceWidget.width / 3, sliceWidget.height / 3, 0.5)
+        if (sliceWidget.objectName == 'qMRMLSliceWidgetGreen'):
+          greenSliceNode.SetFieldOfView(sliceWidget.width / 3, sliceWidget.height / 3, 0.5)
     pass
-  
-  def initialSlicesOrientation(self):
-    redSliceNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSliceNodeRed")
-    redSliceNode.SetOrientation("Axial")    
-    yellowSliceNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSliceNodeYellow")
-    yellowSliceNode.SetOrientation("Sagittal") 
-    greenSliceNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSliceNodeGreen")
-    greenSliceNode.SetOrientation("Coronal") 
     
   def startEditPlanningTarget(self):
     if self.baseVolumeNode:
@@ -2702,7 +2756,10 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
           posRAS = [0.0,0.0,0.0]
           vesselSeedsNode.GetNthFiducialPosition(iSeed, posRAS)
           posIJK = matrix.MultiplyFloatPoint([posRAS[0], posRAS[1], posRAS[2], 1.0])
-          self.connectedComponentFilter.AddSeed([int(posIJK[0]),int(posIJK[1]),int(posIJK[2])])
+          if int(posIJK[0])>=0 and int(posIJK[1]) >=0 and int(posIJK[2])>=0:
+            self.connectedComponentFilter.AddSeed([int(posIJK[0]),int(posIJK[1]),int(posIJK[2])])
+          else:
+            slicer.util.warningDisplay("Current seed"+ str(vesselSeedsNode.GetNthFiducialLabel(iSeed)) + " is out of the image")
         self.connectedComponentFilter.SetLower(self.vesselLowerThreshold)
         self.connectedComponentFilter.SetUpper(self.vesselUpperThreshold)
         self.connectedComponentFilter.SetConnectivity(self.connectedComponentFilter.FullConnectivity)
@@ -2810,8 +2867,6 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
     markupsNode = None
     if enabledAttributeID and slicer.mrmlScene.GetNodeByID(enabledAttributeID):
       markupsNode = slicer.mrmlScene.GetNodeByID(enabledAttributeID)
-      if markupsNode and markupsNode.GetDisplayNode() and visibility:
-        markupsNode.GetDisplayNode().SetVisibility(1)
     else:
       markupsNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
       markupsNode.SetName(markupsName)
@@ -2821,6 +2876,8 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
       slicer.mrmlScene.AddNode(markupsDisplayNode)
       markupsNode.SetAndObserveDisplayNodeID(markupsDisplayNode.GetID())
       self.baseVolumeNode.SetAttribute(attributeName, markupsNode.GetID())
+    if markupsNode and markupsNode.GetDisplayNode():
+      markupsNode.GetDisplayNode().SetVisibility(visibility)
     return markupsNode
 
 
@@ -3059,7 +3116,8 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
       self.endVentricleCylinderDefinition()
       self.endModifiyCylinder()
       self.update_observers(VentriculostomyUserEvents.ResetButtonEvent)
-    self.update_observers(VentriculostomyUserEvents.SaveModifiedFiducialEvent)
+    if not self.interactionMode == "None":
+      self.update_observers(VentriculostomyUserEvents.SaveModifiedFiducialEvent)
     pass
 
   def selectNasionPointNode(self, modelNode, initPoint = None):
@@ -3119,6 +3177,9 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
         self.cylinderInteractor.SetNthFiducialLabel(0,"")
         self.cylinderInteractor.SetDisplayVisibility(1)
         self.update_observers(VentriculostomyUserEvents.VentricleCylinderModified)
+        if numpy.linalg.norm(numpy.array(posDistal)-numpy.array(posTarget)) < (self.minimalVentricleLen * 0.999):
+          slicer.util.warningDisplay(
+            "The define ventricle horn is too short, distal point is automatically modified to make length longer than 10.0 mm")
     pass
   
   def ReleaseLeftButton(self):
@@ -3147,15 +3208,8 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
           targetNode.GetNthFiducialPosition(0, posTarget)
           posDistal = numpy.array([0.0, 0.0, 0.0])
           distalNode.GetNthFiducialPosition(0, posDistal)
-          if numpy.linalg.norm(posDistal - posTarget) < (self.minimalVentricleLen * 0.999):
-            slicer.util.warningDisplay(
-              "The define ventricle horn is too short, distal point is automatically modified to make length longer than 10.0 mm")
-            posDistalNew = (posDistal - posTarget) / numpy.linalg.norm(
-              posDistal - posTarget) * self.minimalVentricleLen + posTarget
-            distalNode.SetNthFiducialPositionFromArray(0, posDistalNew)
-            posDistal = posDistalNew
-            self.ReleaseLeftButton()
-            self.interactionMode = "none"
+            #self.ReleaseLeftButton()
+            #self.interactionMode = "None"
           if self.cylinderManager.curveFiducials.GetNumberOfFiducials():
             self.cylinderManager.curveFiducials.RemoveAllMarkups()
           self.cylinderManager.curveFiducials.AddFiducial(posTarget[0], posTarget[1], posTarget[2])

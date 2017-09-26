@@ -1,5 +1,6 @@
 import slicer, vtk
 from ctk import ctkAxesWidget
+from VentriculostomyPlanningUtils.UserEvents import VentriculostomyUserEvents
 from SlicerDevelopmentToolboxUtils.buttons import LayoutButton, CheckableIconButton, BasicIconButton
 import os
 import qt
@@ -167,6 +168,7 @@ class ReverseViewOnCannulaButton(CheckableIconButton):
           self.camera.SetPosition(self.cameraReversePos)
           threeDView.zoomIn()  # to refresh the 3D viewer, when the view position is inside the skull model, the model is not rendered,
           threeDView.zoomOut()  # Zoom in and out will refresh the viewer
+        slicer.mrmlScene.InvokeEvent(VentriculostomyUserEvents.ReverseViewClicked)
       else:
         displayManagers = vtk.vtkCollection()
         threeDView.getDisplayableManagers(displayManagers)
@@ -177,3 +179,4 @@ class ReverseViewOnCannulaButton(CheckableIconButton):
         self.camera.SetPosition(self.cameraPos)
         threeDView.zoomIn()  # to refresh the 3D viewer, when the view position is inside the skull model, the model is not rendered,
         threeDView.zoomOut()  # Zoom in and out will refresh the viewer
+        slicer.mrmlScene.InvokeEvent(VentriculostomyUserEvents.ReverseViewClicked)

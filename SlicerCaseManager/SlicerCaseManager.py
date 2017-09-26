@@ -2,7 +2,6 @@ import os
 import csv, re, numpy, json, ast, re
 import shutil, datetime, logging
 import ctk, vtk, qt, slicer, inspect
-from collections import OrderedDict
 from functools import wraps
 
 from slicer.ScriptedLoadableModule import *
