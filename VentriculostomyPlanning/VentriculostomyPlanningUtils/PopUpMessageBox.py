@@ -188,3 +188,16 @@ class SerialAssignMessageBox(qt.QMessageBox):
 #a = SerialAssignMessageBox()
 #a.SetAssignTableWithVolumes(volumes)
 #a.ShowVolumeTable()
+
+
+class SagittalCorrectionMessageBox(qt.QMessageBox):
+  def __init__(self):
+    qt.QMessageBox.__init__(self)
+    self.setWindowTitle('SagittalCorrectionBox')
+    self.setText("Confirm if sagittal plane correction is needed")
+    self.confirmButton = qt.QPushButton('Confirm')
+    self.cancelButton = qt.QPushButton('Cancel')
+    self.addButton(self.confirmButton, qt.QMessageBox.YesRole)
+    self.addButton(self.cancelButton, qt.QMessageBox.RejectRole)
+    self.confirmButton.setEnabled(True)
+    self.cancelButton.setEnabled(True)

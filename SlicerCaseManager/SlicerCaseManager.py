@@ -10,7 +10,6 @@ from SlicerDevelopmentToolboxUtils.helpers import WatchBoxAttribute
 from SlicerDevelopmentToolboxUtils.mixins import ModuleWidgetMixin, ModuleLogicMixin
 from SlicerDevelopmentToolboxUtils.constants import DICOMTAGS
 
-
 def onReturnProcessEvents(func):
   @wraps(func)
   def wrapper(*args, **kwargs):
