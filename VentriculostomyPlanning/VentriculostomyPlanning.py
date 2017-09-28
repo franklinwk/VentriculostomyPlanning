@@ -592,7 +592,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     pass
 
   def volumeLoadTimeOutHandle(self):
-    print "watch dog activated"
     self.watchDog.stop()
     self.onShowVolumeTable()
 
@@ -1119,7 +1118,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
             greenSliceNode.SetFieldOfView(self.green_widget.width/2, self.green_widget.height/2, 0.5)
             slicer.app.processEvents()
             if quarterVolume.GetDisplayNode():
-              print "volume display ID", quarterVolume.GetDisplayNode().GetID()
               quarterVolume.GetDisplayNode().SetAutoWindowLevel(False)
               quarterVolume.GetDisplayNode().SetWindow(self.baseVolumeWindowValue)
               quarterVolume.GetDisplayNode().SetLevel(self.baseVolumeLevelValue)
@@ -2069,6 +2067,9 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
     self.distanceMapFilter = sitk.SignedMaurerDistanceMapImageFilter()
     self.distanceMapFilter.SquaredDistanceOff()
     self.connectedComponentFilter = sitk.ConnectedThresholdImageFilter()
+    self.connectedComponentFilter.SetConnectivity(self.connectedComponentFilter.FullConnectivity)
+    self.thresholdeFactor = 0.75
+    self.addImageFilter = sitk.AddImageFilter()
     self.baseVolumeNode = None
     self.ventricleVolume = None
     self.functions = UsefulFunctions()
@@ -2354,6 +2355,8 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
     imageCollection = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLScalarVolumeNode", "connectedImage")
     if imageCollection:
       connectedImageNode = imageCollection.GetItemAsObject(0)
+      if connectedImageNode == None:
+        return None
       if not connectedImageNode.GetImageData():
         slicer.util.warningDisplay("vessel was not segmented yet, abort current procedure")
         return None
@@ -2870,19 +2873,24 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
         matrix = vtk.vtkMatrix4x4()
         inputVolumeNode.GetRASToIJKMatrix(matrix)
         self.connectedComponentFilter.ClearSeeds()
+        connectedImageTotal = sitk.Image(oriImage.GetWidth(), oriImage.GetHeight(), oriImage.GetDepth(),oriImage.GetPixelID())
+        connectedImageTotal.SetOrigin(oriImage.GetOrigin())
+        connectedImageTotal.SetSpacing(oriImage.GetSpacing())
         for iSeed in range(vesselSeedsNode.GetNumberOfFiducials()):
           posRAS = [0.0,0.0,0.0]
           vesselSeedsNode.GetNthFiducialPosition(iSeed, posRAS)
           posIJK = matrix.MultiplyFloatPoint([posRAS[0], posRAS[1], posRAS[2], 1.0])
+          self.connectedComponentFilter.ClearSeeds()
           if int(posIJK[0])>=0 and int(posIJK[1]) >=0 and int(posIJK[2])>=0:
             self.connectedComponentFilter.AddSeed([int(posIJK[0]),int(posIJK[1]),int(posIJK[2])])
           else:
             slicer.util.warningDisplay("Current seed"+ str(vesselSeedsNode.GetNthFiducialLabel(iSeed)) + " is out of the image")
-        self.connectedComponentFilter.SetLower(self.vesselLowerThreshold)
-        self.connectedComponentFilter.SetUpper(self.vesselUpperThreshold)
-        self.connectedComponentFilter.SetConnectivity(self.connectedComponentFilter.FullConnectivity)
-        connectedImage = self.connectedComponentFilter.Execute(oriImage)
-        sitkUtils.PushToSlicer(connectedImage, "connectedImage", 0, True)
+          voxelValue = oriImage.GetPixel(int(posIJK[0]),int(posIJK[1]), int(posIJK[2]))
+          self.connectedComponentFilter.SetLower(voxelValue*self.thresholdeFactor)
+          self.connectedComponentFilter.SetUpper(800)
+          connectedImage = sitk.Cast(self.connectedComponentFilter.Execute(oriImage), sitk.sitkInt16)
+          connectedImageTotal = self.addImageFilter.Execute(connectedImage, connectedImageTotal)
+        sitkUtils.PushToSlicer(connectedImageTotal, "connectedImage", 0, True)
         imageCollection = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLScalarVolumeNode", "connectedImage")
         if imageCollection:
           connectedImageNode = imageCollection.GetItemAsObject(0)
