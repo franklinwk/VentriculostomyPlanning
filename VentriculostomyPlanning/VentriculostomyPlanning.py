@@ -341,14 +341,15 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     self.tabMarkupPlacementGroupBox = qt.QGroupBox()
     self.tabMarkupPlacementGroupBoxLayout = qt.QVBoxLayout()
     self.tabMarkupPlacementGroupBox.setLayout(self.tabMarkupPlacementGroupBoxLayout)
-    vesselThresholdLabel = qt.QLabel('Vessel Threshold')
+    vesselThresholdLabel = qt.QLabel('Vessel Threshold factor')
     vesselThresholdLayout = qt.QHBoxLayout()
     self.vesselThresholdGroupBox = qt.QGroupBox()
     self.vesselThresholdGroupBox.setLayout(vesselThresholdLayout)
     self.rangeThresholdWidget = slicer.qMRMLRangeWidget()
-    self.rangeThresholdWidget.minimum = 50
-    self.rangeThresholdWidget.maximum = 900
-    self.rangeThresholdWidget.setValues(100,300)
+    self.rangeThresholdWidget.minimum = 0.01
+    self.rangeThresholdWidget.maximum = 1
+    self.rangeThresholdWidget.singleStep = 0.05
+    self.rangeThresholdWidget.setValues(0.75,1)
     self.rangeThresholdWidget.connect('valuesChanged(double, double)', self.onChangeThresholdValues)
     vesselThresholdLayout.addWidget(vesselThresholdLabel)
     vesselThresholdLayout.addWidget(self.rangeThresholdWidget)
@@ -816,15 +817,16 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         self.logic.enableRelatedVariables("vtkMRMLScalarVolumeNode.rel_venousMargin", "venousMargin")
         self.logic.enableRelatedVariables("vtkMRMLScalarVolumeNode.rel_surfaceModelThreshold", "surfaceModelThreshold")
         self.logic.enableRelatedVariables("vtkMRMLScalarVolumeNode.rel_cylinderRadius", "cylinderRadius")
-        self.logic.enableRelatedVariables("vtkMRMLScalarVolumeNode.rel_vesselLowerThreshold", "vesselLowerThreshold")
-        self.logic.enableRelatedVariables("vtkMRMLScalarVolumeNode.rel_vesselUpperThreshold", "vesselUpperThreshold")
+        self.logic.enableRelatedVariables("vtkMRMLScalarVolumeNode.rel_thresholdProgressiveFactor", "thresholdProgressiveFactor")
         self.logic.enableRelatedVariables("vtkMRMLScalarVolumeNode.rel_posteriorMargin", "posteriorMargin")
         self.logic.enableRelatedVariables("vtkMRMLScalarVolumeNode.rel_needSagittalCorrection", "needSagittalCorrection")
-        if self.rangeThresholdWidget.minimum >= self.logic.vesselLowerThreshold:
-          self.rangeThresholdWidget.minimum = self.logic.vesselLowerThreshold-50
-        if self.rangeThresholdWidget.maximum <= self.logic.vesselUpperThreshold:
-          self.rangeThresholdWidget.maximum = self.logic.vesselUpperThreshold+100
-        self.rangeThresholdWidget.setValues(self.logic.vesselLowerThreshold, self.logic.vesselUpperThreshold)
+        self.logic.enableRelatedVariables("vtkMRMLScalarVolumeNode.rel_venousMedianValue",
+                                          "venousMedianValue")
+        self.logic.enableRelatedVariables("vtkMRMLScalarVolumeNode.rel_venousMaxValue",
+                                          "venousMaxValue")
+        if self.rangeThresholdWidget.minimum >= self.logic.thresholdProgressiveFactor:
+          self.rangeThresholdWidget.minimum = self.logic.thresholdProgressiveFactor*0.9
+        self.rangeThresholdWidget.setValues(self.logic.thresholdProgressiveFactor, 1.0)
         vesselSeedsNodelID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_vesselSeeds")
         self.simpleMarkupsWidget.setCurrentNode(slicer.mrmlScene.GetNodeByID(vesselSeedsNodelID))
         self.kocherMarginEdit.setText(self.logic.kocherMargin)
@@ -1019,10 +1021,12 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
 
   def onChangeThresholdValues(self, sliderLowerValue, sliderUpperValue):
     if self.logic.baseVolumeNode:
-      self.logic.vesselLowerThreshold = sliderLowerValue
-      self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_vesselLowerThreshold", str(sliderLowerValue))
-      self.logic.vesselUpperThreshold = sliderUpperValue
-      self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_vesselUpperThreshold", str(sliderUpperValue))
+      self.logic.thresholdProgressiveFactor = sliderLowerValue
+      self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_thresholdProgressiveFactor", str(sliderLowerValue))
+      #self.logic.vesselLowerThreshold = sliderLowerValue
+      #self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_vesselLowerThreshold", str(sliderLowerValue))
+      #self.logic.vesselUpperThreshold = sliderUpperValue
+      #self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_vesselUpperThreshold", str(sliderUpperValue))
 
   def onChangePosteriorMargin(self, value):
     if self.logic.baseVolumeNode:
@@ -1121,6 +1125,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
               quarterVolume.GetDisplayNode().SetAutoWindowLevel(False)
               quarterVolume.GetDisplayNode().SetWindow(self.baseVolumeWindowValue)
               quarterVolume.GetDisplayNode().SetLevel(self.baseVolumeLevelValue)
+      slicer.app.processEvents()
       self.nodeAddedEventObserverID = slicer.mrmlScene.AddObserver(slicer.mrmlScene.NodeAddedEvent,
                                                                    self.onVolumeAddedNode)
     return True
@@ -2068,8 +2073,11 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
     self.distanceMapFilter.SquaredDistanceOff()
     self.connectedComponentFilter = sitk.ConnectedThresholdImageFilter()
     self.connectedComponentFilter.SetConnectivity(self.connectedComponentFilter.FullConnectivity)
-    self.thresholdeFactor = 0.75
+    self.thresholdProgressiveFactor = 0.2
     self.addImageFilter = sitk.AddImageFilter()
+    self.statsFilter = sitk.LabelStatisticsImageFilter()
+    self.venousMedianValue = -10000
+    self.venousMaxValue = -10000
     self.baseVolumeNode = None
     self.ventricleVolume = None
     self.functions = UsefulFunctions()
@@ -2079,8 +2087,6 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
     self.topPoint = []
     self.surfaceModelThreshold = -500.0
     self.distanceMapThreshold = 100
-    self.vesselLowerThreshold = 100
-    self.vesselUpperThreshold = 800
     self.venousMargin = 10.0 #in mm
     self.minimalVentricleLen = 10.0 # in mm
     self.yawAngle = 0.0
@@ -2163,6 +2169,8 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
       self.ROINode = None
     self.baseVolumeNode = None
     self.ventricleVolume = None
+    self.venousMedianValue = -10000
+    self.venousMaxValue = -10000
 
   def appendPlanningTimeStampToJson(self, JSONFile, parameterName, value):
     data = {}
@@ -2707,16 +2715,23 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
 
     if self.ventricleVolume == None:
       return
-    if outputModelNode.GetAttribute("vtkMRMLModelNode.modelCreated") == "False":
+    if outputModelNode.GetAttribute("vtkMRMLModelNode.modelCreated") == "False" \
+        or float(self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_venousMedianValue"))<thresholdValue \
+        or float(self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_venousMaxValue"))<thresholdValue :
       resampleFilter = sitk.ResampleImageFilter()
-      originImage = sitk.Cast(sitkUtils.PullFromSlicer(self.ventricleVolume.GetID()), sitk.sitkInt16)
+      ventricleImage = sitk.Cast(sitkUtils.PullFromSlicer(self.ventricleVolume.GetID()), sitk.sitkInt16)
+      venousImage = sitk.Cast(sitkUtils.PullFromSlicer(self.baseVolumeNode.GetID()), sitk.sitkInt16)
       self.samplingFactor = 2
-      resampleFilter.SetSize(numpy.array(originImage.GetSize())/self.samplingFactor)
-      resampleFilter.SetOutputSpacing(numpy.array(originImage.GetSpacing())*self.samplingFactor)
-      resampleFilter.SetOutputOrigin(numpy.array(originImage.GetOrigin()))
-      resampledImage = resampleFilter.Execute(originImage)
+      resampleFilter.SetSize(numpy.array(ventricleImage.GetSize())/self.samplingFactor)
+      resampleFilter.SetOutputSpacing(numpy.array(ventricleImage.GetSpacing())*self.samplingFactor)
+      resampleFilter.SetOutputOrigin(numpy.array(ventricleImage.GetOrigin()))
+      resampledImage = resampleFilter.Execute(ventricleImage)
+      resampledVenousImage = resampleFilter.Execute(venousImage)
       thresholdFilter = sitk.BinaryThresholdImageFilter()
       thresholdImage = thresholdFilter.Execute(resampledImage,thresholdValue,10000,1,0)
+      self.statsFilter.Execute(resampledVenousImage, thresholdImage)
+      self.venousMaxValue = self.statsFilter.GetMaximum(1)
+      self.venousMedianValue = self.statsFilter.GetMedian(1)
       padFilter = sitk.ConstantPadImageFilter()
       padFilter.SetPadLowerBound([10, 10, 10])
       paddedImage = padFilter.Execute(thresholdImage)
@@ -2731,7 +2746,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
       erodeFilter.SetForegroundValue(1)
       erodedImage = erodeFilter.Execute(dilatedImage)
       fillHoleFilter = sitk.BinaryFillholeImageFilter()
-      holefilledImage = fillHoleFilter.Execute(erodedImage)
+      holefilledImage= fillHoleFilter.Execute(erodedImage)
       sitkUtils.PushToSlicer(holefilledImage, "holefilledImage", 0, True)
       imageCollection = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLScalarVolumeNode","holefilledImage")
       if imageCollection:
@@ -2876,6 +2891,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
         connectedImageTotal = sitk.Image(oriImage.GetWidth(), oriImage.GetHeight(), oriImage.GetDepth(),oriImage.GetPixelID())
         connectedImageTotal.SetOrigin(oriImage.GetOrigin())
         connectedImageTotal.SetSpacing(oriImage.GetSpacing())
+        connectedImageTotal.SetDirection(oriImage.GetDirection())
         for iSeed in range(vesselSeedsNode.GetNumberOfFiducials()):
           posRAS = [0.0,0.0,0.0]
           vesselSeedsNode.GetNthFiducialPosition(iSeed, posRAS)
@@ -2883,13 +2899,20 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
           self.connectedComponentFilter.ClearSeeds()
           if int(posIJK[0])>=0 and int(posIJK[1]) >=0 and int(posIJK[2])>=0:
             self.connectedComponentFilter.AddSeed([int(posIJK[0]),int(posIJK[1]),int(posIJK[2])])
+            voxelValue = oriImage.GetPixel(int(posIJK[0]), int(posIJK[1]), int(posIJK[2]))
+            venousMaxValueAdjusted = self.venousMaxValue
+            if self.venousMaxValue > 800:
+              venousMaxValueAdjusted = 800
+            voxelValuefactor = math.pow(
+              1 - (voxelValue - self.venousMedianValue) / (venousMaxValueAdjusted - self.venousMedianValue), 3) * (
+                               1 - self.thresholdProgressiveFactor) + self.thresholdProgressiveFactor
+            print voxelValue, voxelValuefactor
+            self.connectedComponentFilter.SetLower(voxelValue * voxelValuefactor)
+            self.connectedComponentFilter.SetUpper(800)
+            connectedImage = sitk.Cast(self.connectedComponentFilter.Execute(oriImage), sitk.sitkInt16)
+            connectedImageTotal = self.addImageFilter.Execute(connectedImage, connectedImageTotal)
           else:
             slicer.util.warningDisplay("Current seed"+ str(vesselSeedsNode.GetNthFiducialLabel(iSeed)) + " is out of the image")
-          voxelValue = oriImage.GetPixel(int(posIJK[0]),int(posIJK[1]), int(posIJK[2]))
-          self.connectedComponentFilter.SetLower(voxelValue*self.thresholdeFactor)
-          self.connectedComponentFilter.SetUpper(800)
-          connectedImage = sitk.Cast(self.connectedComponentFilter.Execute(oriImage), sitk.sitkInt16)
-          connectedImageTotal = self.addImageFilter.Execute(connectedImage, connectedImageTotal)
         sitkUtils.PushToSlicer(connectedImageTotal, "connectedImage", 0, True)
         imageCollection = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLScalarVolumeNode", "connectedImage")
         if imageCollection:
