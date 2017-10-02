@@ -105,6 +105,7 @@ class ReverseViewOnCannulaButton(CheckableIconButton):
   @cannulaNode.setter
   def cannulaNode(self,value):
     self._cannulaNode = value
+    self.cameraReversePos = None
 
   def __init__(self, text="", parent=None, **kwargs):
     super(ReverseViewOnCannulaButton, self).__init__(text, parent, **kwargs)
@@ -141,7 +142,6 @@ class ReverseViewOnCannulaButton(CheckableIconButton):
       layoutManager = slicer.app.layoutManager()
       threeDView = layoutManager.threeDWidget(0).threeDView()
       if checked == True and self.calculateAnglesBasedOnCannula():
-        #self.setReverseViewButton.setText("  Reset View     ")
         displayManagers = vtk.vtkCollection()
         threeDView.getDisplayableManagers(displayManagers)
         for index in range(displayManagers.GetNumberOfItems()):

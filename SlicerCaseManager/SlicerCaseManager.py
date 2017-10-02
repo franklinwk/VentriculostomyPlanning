@@ -52,7 +52,7 @@ class SlicerCaseManagerWidget(ScriptedLoadableModuleWidget, ModuleWidgetMixin):
       exists = False
     self._caseRootDir = path
     self.setSetting('CasesRootLocation', path if exists else None)
-    self.casesRootDirectoryButton.text = self.truncatePath(path) if exists else "Choose output directory"
+    #self.casesRootDirectoryButton.text = self.truncatePath(path) if exists else "Choose output directory"
     self.casesRootDirectoryButton.toolTip = path
     self.rootDirectoryLabel.setText(str(self._caseRootDir))
     self.openCaseButton.enabled = exists
@@ -145,10 +145,16 @@ class SlicerCaseManagerWidget(ScriptedLoadableModuleWidget, ModuleWidgetMixin):
     self.openCaseButton = self.createButton("Open case")
     self.mainGUIGroupBoxLayout.addWidget(self.createNewCaseButton, 1, 0)
     self.mainGUIGroupBoxLayout.addWidget(self.openCaseButton, 1, 1)
-    
+    self.casesRootDirectoryButton = self.createDirectoryButton(text="Choose cases root location",
+                                                               caption="Choose cases root location",
+                                                               directory=self.getSetting('CasesRootLocation'))
+    self.rootDirectoryLabel = qt.QLabel('')
+    if self.getSetting('CasesRootLocation'):
+      self.rootDirectoryLabel = qt.QLabel(self.getSetting('CasesRootLocation'))
     self.createPatientWatchBox()
     #self.createIntraopWatchBox()
-    self.createCaseInformationArea()
+    self.createCaseWatchBox()
+    #self.createCaseInformationArea()
     self.setupConnections()
     self.layout.addWidget(self._mainGUIGroupBox)
     slicer.mrmlScene.AddObserver(slicer.vtkMRMLScene.StartImportEvent, self.StartCaseImportCallback)
@@ -183,23 +189,6 @@ class SlicerCaseManagerWidget(ScriptedLoadableModuleWidget, ModuleWidgetMixin):
                                        WatchBoxAttribute('StudyDate', 'Planning Study Date: ', DICOMTAGS.STUDY_DATE)]
     self.patientWatchBox = DICOMBasedInformationWatchBox(self.patientWatchBoxInformation)
     self.layout.addWidget(self.patientWatchBox)
-  
-  def createCaseInformationArea(self):
-    self.casesRootDirectoryButton = self.createDirectoryButton(text="Choose cases root location",
-                                                               caption="Choose cases root location",
-                                                               directory=self.getSetting('CasesRootLocation'))
-    self.createCaseWatchBox()
-    self._collapsibleDirectoryConfigurationArea.collapsed = True
-    self._collapsibleDirectoryConfigurationArea.text = "Case Directory Settings"
-    self.directoryConfigurationLayout = qt.QGridLayout(self._collapsibleDirectoryConfigurationArea)
-    self.directoryConfigurationLayout.addWidget(qt.QLabel("Cases Root Directory:"), 1, 0, 1, 1)
-    self.rootDirectoryLabel = qt.QLabel('')
-    if self.getSetting('CasesRootLocation'):
-      self.rootDirectoryLabel = qt.QLabel(self.getSetting('CasesRootLocation'))
-    self.directoryConfigurationLayout.addWidget(self.rootDirectoryLabel, 1, 1, 1, 1)
-    self.directoryConfigurationLayout.addWidget(self.casesRootDirectoryButton, 1, 2, 1, 1)
-    self.directoryConfigurationLayout.addWidget(self.caseWatchBox, 2, 0, 1, 3)
-    self.layout.addWidget(self._collapsibleDirectoryConfigurationArea)
 
   def createCaseWatchBox(self):
     watchBoxInformation = [WatchBoxAttribute('CurrentCaseDirectory', 'Directory')]
@@ -214,7 +203,7 @@ class SlicerCaseManagerWidget(ScriptedLoadableModuleWidget, ModuleWidgetMixin):
 
   def updateCaseWatchBox(self):
     value = self.currentCaseDirectory
-    self.caseWatchBox.setInformation("CurrentCaseDirectory", os.path.relpath(value, self.caseRootDir), toolTip=value)
+    self.caseWatchBox.setInformation("CurrentCaseDirectory", value, toolTip=value)
 
   def onCreateNewCaseButtonClicked(self):
     if not self.checkAndWarnUserIfCaseInProgress():
