@@ -186,7 +186,8 @@ class SlicerCaseManagerWidget(ScriptedLoadableModuleWidget, ModuleWidgetMixin):
     self.patientWatchBoxInformation = [WatchBoxAttribute('PatientID', 'Patient ID: ', DICOMTAGS.PATIENT_ID),
                                        WatchBoxAttribute('PatientName', 'Patient Name: ', DICOMTAGS.PATIENT_NAME),
                                        WatchBoxAttribute('DOB', 'Date of Birth: ', DICOMTAGS.PATIENT_BIRTH_DATE),
-                                       WatchBoxAttribute('StudyDate', 'Planning Study Date: ', DICOMTAGS.STUDY_DATE)]
+                                       WatchBoxAttribute('StudyDate', 'Planning Study Date: ', DICOMTAGS.STUDY_DATE),
+                                       WatchBoxAttribute('CurrentCaseDirectory', 'Case Directory')]
     self.patientWatchBox = DICOMBasedInformationWatchBox(self.patientWatchBoxInformation)
     self.layout.addWidget(self.patientWatchBox)
 
@@ -203,7 +204,7 @@ class SlicerCaseManagerWidget(ScriptedLoadableModuleWidget, ModuleWidgetMixin):
 
   def updateCaseWatchBox(self):
     value = self.currentCaseDirectory
-    self.caseWatchBox.setInformation("CurrentCaseDirectory", value, toolTip=value)
+    self.patientWatchBox.setInformation("CurrentCaseDirectory", os.path.relpath(value, self.caseRootDir), toolTip=value)
 
   def onCreateNewCaseButtonClicked(self):
     if not self.checkAndWarnUserIfCaseInProgress():
