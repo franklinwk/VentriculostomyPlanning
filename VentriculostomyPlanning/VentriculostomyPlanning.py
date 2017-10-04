@@ -237,21 +237,26 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     inputVolumeLayout = qt.QGridLayout()
     self.inputVolumeBox.setLayout(inputVolumeLayout)
     self.layout.addWidget(self.inputVolumeBox)
-    venousVolumeLabel = self.createLabel(title = 'Venous: ')
-    self.venousVolumeNameLabel = self.createLineEdit(title="", text = '--', readOnly = True, maxLength = 50, styleSheet = "QLineEdit { background:transparent; }")
+    venousVolumeLabel = self.createLabel(title = 'Venous')
+    venousVolumeLabel.setAlignment(qt.Qt.AlignLeft | qt.Qt.AlignVCenter)
+
+    self.venousVolumeNameLabel = self.createButton(title="--", enabled = True, maximumWidth = 300, styleSheet = "QPushButton { background:white; border: none;}", toolTip = "Show the table of volumes for assignment.")
     inputVolumeLayout.addWidget(venousVolumeLabel,0,0)
     inputVolumeLayout.addWidget(self.venousVolumeNameLabel,0,1)
-    ventricleVolumeLabel = self.createLabel(title='Ventricle: ')
-    self.ventricleVolumeNameLabel = self.createLineEdit(title="", text='--', readOnly=True,
-                                                     styleSheet="QLineEdit { background:transparent; }")
-    self.venousVolumeNameLabel.setMaxLength(50)
-    self.ventricleVolumeNameLabel.setMaxLength(50)
-    inputVolumeLayout.addWidget(ventricleVolumeLabel,0,2)
-    inputVolumeLayout.addWidget(self.ventricleVolumeNameLabel,0,3)
-    self.showVolumeTable = self.createButton(title = "Show Table", enabled=True, styleSheet="QPushButton { background:white; }", maximumHeight = 35, maximumWidth = 80, toolTip = "Show the table of volumes for assignment.")
-    self.showVolumeTable.connect('clicked(bool)', self.onShowVolumeTable)
-    inputVolumeLayout.addWidget(self.showVolumeTable,0,4)
-
+    ventricleVolumeLabel = self.createLabel(title='Ventricle')
+    ventricleVolumeLabel.setAlignment(qt.Qt.AlignRight | qt.Qt.AlignVCenter)
+    self.ventricleVolumeNameLabel = self.createButton(title="--", enabled = True, maximumWidth = 300,
+                                                     styleSheet="QPushButton { background:white; border: none; }", toolTip = "Show the table of volumes for assignment.")
+    self.venousVolumeNameLabel.connect('clicked(bool)', self.onShowVolumeTable)
+    self.ventricleVolumeNameLabel.connect('clicked(bool)', self.onShowVolumeTable)
+    inputVolumeLayout.addWidget(ventricleVolumeLabel,0,3)
+    inputVolumeLayout.addWidget(self.ventricleVolumeNameLabel,0,2)
+    self.imageSlider = qt.QSlider(qt.Qt.Horizontal)
+    self.imageSlider.setMinimum(0)
+    self.imageSlider.setMaximum(100)
+    self.imageSlider.connect('valueChanged(int)', self.onChangeSliceViewImage)
+    inputVolumeLayout.addWidget(self.imageSlider,1,1,1,2)
+    
     self.nodeAddedEventObserverID = slicer.mrmlScene.AddObserver(slicer.mrmlScene.NodeAddedEvent, self.onVolumeAddedNode)
     self.reverseViewClickedEventObserverID =  slicer.mrmlScene.AddObserver(VentriculostomyUserEvents.ReverseViewClicked, self.responseToReverseView)
 
@@ -320,16 +325,12 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     self.mainGUIGroupBoxLayout.addWidget(self.saveDataButton, 2, 6)
 
     self.viewGroupBox = qt.QGroupBox()
-    self.viewGroupBoxLayout = qt.QHBoxLayout()
+    self.viewGroupBoxLayout = qt.QGridLayout()
     self.viewGroupBox.setLayout(self.viewGroupBoxLayout)
     self.layout.addWidget(self.viewGroupBox)
 
     #viewGroupBoxLabel = qt.QLabel('Viewer Configuration')
     #self.viewGroupBoxLayout.addWidget(viewGroupBoxLabel)
-
-    self.viewSubGroupBox = qt.QGroupBox()
-    self.viewSubGroupBoxLayout = qt.QHBoxLayout()
-    self.viewSubGroupBox.setLayout(self.viewSubGroupBoxLayout)
 
     self.tabWidget = qt.QTabWidget()
     self.layout.addWidget(self.tabWidget)
@@ -379,19 +380,12 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     self.tabWidget.addTab(self.tabMarkupPlacementGroupBox, self.tabMarkupsName)
     index = next((i for i, name in enumerate(self.tabWidgetChildrenName) if name == self.tabMainGroupBoxName), None)
     self.tabWidget.setCurrentIndex(index)
-
-    venousVolumeLabel = qt.QLabel('Venous Image')
-    self.viewSubGroupBoxLayout.addWidget(venousVolumeLabel)
-    self.imageSlider = qt.QSlider(qt.Qt.Horizontal)
-    self.imageSlider.setMinimum(0)
-    self.imageSlider.setMaximum(100)
-    self.viewSubGroupBoxLayout.addWidget(self.imageSlider)
-    ventricleVolumeLabel = qt.QLabel('Ventricle Image')
+    
     self.setWindowLevelButton = WindowLevelEffectsButton()
     self.greenLayoutButton = GreenSliceLayoutButton()
     self.conventionalLayoutButton = ConventionalSliceLayoutButton()
     self.fourUpLayoutButton = FourUpLayoutButton()
-    self.viewSubGroupBoxLayout.addWidget(ventricleVolumeLabel)
+    
     self.screenShotButton = ScreenShotButton()
     self.setReverseViewButton = ReverseViewOnCannulaButton()
     self.viewGroupBoxLayout.addWidget(self.greenLayoutButton, 0, 0)
@@ -400,11 +394,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     self.viewGroupBoxLayout.addWidget(self.setReverseViewButton, 0, 3)
     self.viewGroupBoxLayout.addWidget(self.screenShotButton, 0, 4)
     self.viewGroupBoxLayout.addWidget(self.setWindowLevelButton, 0, 5)
-    self.viewGroupBoxLayout.addWidget(venousVolumeLabel)
-    self.viewGroupBoxLayout.addWidget(self.imageSlider)
-    self.viewGroupBoxLayout.addWidget(ventricleVolumeLabel)
-
-    self.imageSlider.connect('valueChanged(int)', self.onChangeSliceViewImage)
 
     #-- Curve length
     self.infoGroupBox = qt.QGroupBox()
@@ -637,8 +626,9 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     if EventID == VentriculostomyUserEvents.ResetButtonEvent:
       self.onResetButtons()
     if EventID == VentriculostomyUserEvents.SetSliceViewerEvent:
+      volumeID=self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_quarterVolume")
       self.setBackgroundAndForegroundIDs(foregroundVolumeID=self.logic.ventricleVolume.GetID(),
-                                         backgroundVolumeID=self.logic.baseVolumeNode.GetID())
+                                         backgroundVolumeID= volumeID)
     if EventID == VentriculostomyUserEvents.SaveModifiedFiducialEvent:
       self.onSaveData()
     if EventID == VentriculostomyUserEvents.VentricleCylinderModified:
@@ -1091,6 +1081,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
           distalNode = slicer.mrmlScene.GetNodeByID(distalNodeID)
           targetNode.SetLocked(True)
           distalNode.SetLocked(True)
+          self.logic.cylinderInteractor.SetLocked(True)
           croppedVolumeNode = slicer.mrmlScene.GetNodeByID(croppedVolumeNodeID)
           clippedVolumeNode = slicer.mrmlScene.GetNodeByID(clippedVolumeNodeID)
           clipModelNode = slicer.mrmlScene.GetNodeByID(clipModelNodeID)
@@ -1228,6 +1219,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
               "No any cannula candidate exists here, considering redefine the ventricle area?")
             distalNode.SetLocked(False)
             targetNode.SetLocked(False)
+            self.logic.cylinderInteractor.SetLocked(False)
             #self.logic.interactionMode = oriInteractionMode
             return False
           else:
@@ -1699,11 +1691,10 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
           self.fourUpLayoutButton.click()
           self.logic.pathCandidatesModel.SetDisplayVisibility(0)
           # only reformat the slice view at the beginning. or after both target and distal are placed
-          if targetNode.GetNumberOfFiducials()==0:
+          if not (targetNode.GetNumberOfFiducials()==1 and distalNode.GetNumberOfFiducials()==0):
             self.setSliceForCylinder()
-            self.logic.startEditPlanningTarget()
-          elif (targetNode.GetNumberOfFiducials()==1 and distalNode.GetNumberOfFiducials()==1):
-            self.setSliceForCylinder()
+          if not (targetNode.GetNumberOfFiducials()==1 and distalNode.GetNumberOfFiducials()==1):
+            self.logic.startEditPlanningTarget()  
       else:
         self.logic.placeWidget.setPlaceModeEnabled(False)
         targetNode.SetLocked(True)
@@ -2435,6 +2426,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
           self.cliNode = slicer.cli.run(grayMaker, None, parameters, wait_for_completion=True)
           self.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_vesselnessWithMarginModel", marginNode.GetID())
           marginNode.SetAttribute("vtkMRMLModelNode.modelCreated", "True")
+        self.update_observers(VentriculostomyUserEvents.SetSliceViewerEvent)  
     return marginNode
   
   def calculateGrayScaleWithMargin(self):
