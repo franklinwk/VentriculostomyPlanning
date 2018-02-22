@@ -541,8 +541,8 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
       self.simpleMarkupsWidget
       self.initialFieldsValue()
       self.volumeSelected = False
-      self.venousVolumeNameLabel.text = ""
-      self.ventricleVolumeNameLabel.text = ""
+      self.venousVolumeNameLabel.text = "--"
+      self.ventricleVolumeNameLabel.text = "--"
       self.isLoadingCase = False
       self.screenShotButton.caseResultDir = ""
       self.setReverseViewButton.checked = False
@@ -2766,6 +2766,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
       self.venousMedianValue = self.statsFilter.GetMedian(1)
       padFilter = sitk.ConstantPadImageFilter()
       padFilter.SetPadLowerBound([10, 10, 10])
+      padFilter.SetPadUpperBound([10, 10, 10])
       paddedImage = padFilter.Execute(thresholdImage)
       dilateFilter = sitk.BinaryDilateImageFilter()
       dilateFilter.SetKernelRadius([10,10,6])
@@ -2779,10 +2780,8 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
       erodedImage = erodeFilter.Execute(dilatedImage)
       fillHoleFilter = sitk.BinaryFillholeImageFilter()
       holefilledImage= fillHoleFilter.Execute(erodedImage)
-      sitkUtils.PushToSlicer(holefilledImage, "holefilledImage", 0, True)
-      imageCollection = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLScalarVolumeNode","holefilledImage")
-      if imageCollection:
-        holefilledImageNode = imageCollection.GetItemAsObject(0)
+      holefilledImageNode = sitkUtils.PushToSlicer(holefilledImage, "holefilledImage", 0, False)
+      if holefilledImageNode:
         holefilledImageData = holefilledImageNode.GetImageData()
         
         cast = vtk.vtkImageCast()
@@ -2894,14 +2893,8 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
         outputModelNode.SetAndObservePolyData(outputModel)
         outputModelNode.SetAttribute("vtkMRMLModelNode.modelCreated","True")
         outputModelNode.GetDisplayNode().SetVisibility(1)
-      imageCollection = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLScalarVolumeNode","holefilledImage")
-      if imageCollection:
-        holefilledImageNode = imageCollection.GetItemAsObject(0)
         slicer.mrmlScene.RemoveNode(holefilledImageNode)
-      imageCollection = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLScalarVolumeNode","Threshold")
-      if imageCollection:
-        thresholdImageNode = imageCollection.GetItemAsObject(0)
-        slicer.mrmlScene.RemoveNode(thresholdImageNode)
+        slicer.mrmlScene.RemoveNode(labelVolumeNode)
 
   def createClippedVolume(self, inputVolumeNode, clippingModel, outputVolume):
     self.functions.clipVolumeWithModel(inputVolumeNode, clippingModel, True, 0, outputVolume)
@@ -3430,7 +3423,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
       inputPointVector.SetPoint(minDistanceIndex,currentPos)
       
   def constructCurveReference(self, CurveManager,points, distance):
-    step = int(0.5*distance/self.samplingFactor)
+    step = int(0.1*points.GetNumberOfPoints())
     CurveManager.step = step
     ApproximityPos = distance * 0.85
     DestiationPos = distance

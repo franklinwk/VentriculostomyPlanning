@@ -52,7 +52,6 @@ class SlicerCaseManagerWidget(ScriptedLoadableModuleWidget, ModuleWidgetMixin):
       exists = False
     self._caseRootDir = path
     self.setSetting('CasesRootLocation', path if exists else None)
-    #self.casesRootDirectoryButton.text = self.truncatePath(path) if exists else "Choose output directory"
     self.casesRootDirectoryButton.toolTip = path
     self.rootDirectoryLabel.setText(str(self._caseRootDir))
     self.openCaseButton.enabled = exists
