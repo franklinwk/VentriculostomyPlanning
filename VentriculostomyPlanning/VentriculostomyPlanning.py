@@ -2756,6 +2756,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
       self.samplingFactor = 2
       resampleFilter.SetSize(numpy.array(ventricleImage.GetSize())/self.samplingFactor)
       resampleFilter.SetOutputSpacing(numpy.array(ventricleImage.GetSpacing())*self.samplingFactor)
+      resampleFilter.SetOutputDirection(ventricleImage.GetDirection())
       resampleFilter.SetOutputOrigin(numpy.array(ventricleImage.GetOrigin()))
       resampledImage = resampleFilter.Execute(ventricleImage)
       resampledVenousImage = resampleFilter.Execute(venousImage)
