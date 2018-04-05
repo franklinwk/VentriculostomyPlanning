@@ -16,13 +16,13 @@ import PercutaneousApproachAnalysis
 from PercutaneousApproachAnalysis import *
 from numpy import linalg
 from code import interact
-from SlicerCaseManager import SlicerCaseManagerWidget, onReturnProcessEvents, beforeRunProcessEvents
+from VentriculostomyPlanningUtils.SlicerCaseManager import SlicerCaseManagerWidget, onReturnProcessEvents, beforeRunProcessEvents
 from VentriculostomyPlanningUtils.PopUpMessageBox import SerialAssignMessageBox, SagittalCorrectionMessageBox
 from VentriculostomyPlanningUtils.UserEvents import VentriculostomyUserEvents
 from VentriculostomyPlanningUtils.UsefulFunctions import UsefulFunctions
 from VentriculostomyPlanningUtils.WatchDog import WatchDog
-from VentriculostomyPlanningUtils.Constants import EndPlacementModes, SagittalCorrectionStatus
-from VentriculostomyPlanningUtils.VentriclostomyButtons import GreenSliceLayoutButton, ConventionalSliceLayoutButton, ReverseViewOnCannulaButton, ScreenShotButton
+from VentriculostomyPlanningUtils.Constants import EndPlacementModes, SagittalCorrectionStatus, CandidatePathStatus
+from VentriculostomyPlanningUtils.VentriclostomyButtons import *
 from SlicerDevelopmentToolboxUtils.buttons import WindowLevelEffectsButton, FourUpLayoutButton
 from SlicerDevelopmentToolboxUtils.mixins import ModuleWidgetMixin, ModuleLogicMixin
 from shutil import copyfile
@@ -102,14 +102,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     # Lines Area
     #
 
-
-    settingCollapsibleButton = ctk.ctkCollapsibleButton()
-    settingCollapsibleButton.collapsed = True
-    settingCollapsibleButton.text = "Configuration"
-    self.layout.addWidget(settingCollapsibleButton)
-    settingCollapsibleButton.setVisible(True)
     # Layout within the dummy collapsible button
-    appSettingLayout = qt.QFormLayout(settingCollapsibleButton)
 
     self.caseManagerBox = qt.QGroupBox()
     CaseManagerInfoLayout = qt.QVBoxLayout()
@@ -124,7 +117,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     CaseManagerInfoLayout.addWidget(self.slicerCaseWidget.mainGUIGroupBox)
 
     self.caseRootConfigLayout = qt.QHBoxLayout()
-    appSettingLayout.addRow(self.caseRootConfigLayout)
     self.caseRootConfigLayout.addWidget(self.slicerCaseWidget.rootDirectoryLabel)
     self.caseRootConfigLayout.addWidget(self.slicerCaseWidget.casesRootDirectoryButton)
     #
@@ -133,13 +125,12 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     """"""
 
     referenceConfigLayout = qt.QHBoxLayout()
-    appSettingLayout.addRow(referenceConfigLayout)
-
     lengthSagittalReferenceLineLabel = self.createLabel('Sagittal Length:  ')
     #-- Curve length
     referenceConfigLayout.addWidget(lengthSagittalReferenceLineLabel)
     self.lengthSagittalReferenceLineEdit = self.createLineEdit(title= "", text = '100.0', readOnly = False, frame = True,
                                                                styleSheet = "QLineEdit { background:transparent; }", cursor = qt.QCursor(qt.Qt.IBeamCursor))
+    self.lengthSagittalReferenceLineEdit.setSizePolicy(qt.QSizePolicy.Minimum, qt.QSizePolicy.Expanding)
     self.lengthSagittalReferenceLineEdit.connect('textEdited(QString)', self.onModifyMeasureLength)
     referenceConfigLayout.addWidget(self.lengthSagittalReferenceLineEdit)
     lengthSagittalReferenceLineUnitLabel = self.createLabel('mm  ')
@@ -149,6 +140,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     referenceConfigLayout.addWidget(lengthCoronalReferenceLineLabel)
     self.lengthCoronalReferenceLineEdit = self.createLineEdit(title= "", text = '30.0', readOnly = False, frame = True,
                                                               styleSheet="QLineEdit { background:transparent; }", cursor = qt.QCursor(qt.Qt.IBeamCursor))
+    self.lengthCoronalReferenceLineEdit.setSizePolicy(qt.QSizePolicy.Minimum, qt.QSizePolicy.Expanding)
     self.lengthCoronalReferenceLineEdit.connect('textEdited(QString)', self.onModifyMeasureLength)
     referenceConfigLayout.addWidget(self.lengthCoronalReferenceLineEdit)
     lengthCoronalReferenceLineUnitLabel = self.createLabel('mm  ')
@@ -163,6 +155,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
                                                   iconSize=qt.QSize(self.buttonHeight, self.buttonWidth))
     self.selectSagittalButton.connect('clicked(bool)', self.onSelectSagittalPoint)
     referenceConfigLayout.addWidget(self.selectSagittalButton)
+    referenceConfigLayout.addStretch(1)
 
 
     self.layout.addWidget(self.caseManagerBox)
@@ -174,7 +167,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     # -- Algorithm setting
     # Surface Model calculation
     surfaceModelConfigLayout = qt.QHBoxLayout()
-    appSettingLayout.addRow(surfaceModelConfigLayout)
     surfaceModelThresholdLabel = self.createLabel('Surface Model Intensity Threshold Setting:  ')
     surfaceModelConfigLayout.addWidget(surfaceModelThresholdLabel)
     self.surfaceModelThresholdEdit = self.createLineEdit(title= "", text = '-500', readOnly = False, frame = True, toolTip = "set this value to the intensity of the skull, higher value means less segmented skull",
@@ -188,7 +180,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
 
     # Venous model calculation and margin setting
     venousMarginConfigLayout = qt.QHBoxLayout()
-    appSettingLayout.addRow(venousMarginConfigLayout)
     venousMarginLabel = self.createLabel('Venous Safety Margin: ')
     venousMarginConfigLayout.addWidget(venousMarginLabel)
     self.venousMarginEdit = self.createLineEdit(title="", text='10.0', readOnly=False, frame=True, maxLength = 6,
@@ -197,11 +188,16 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     self.venousMarginEdit.connect('textEdited(QString)', self.onModifyVenousMargin)
     venousMarginConfigLayout.addWidget(self.venousMarginEdit)
     venousMarginUnitLabel = qt.QLabel('mm  ')
-    venousMarginConfigLayout.addWidget(venousMarginUnitLabel)
+    venousMarginConfigLayout.addWidget(venousMarginUnitLabel)\
+
+    self.grayScaleMakerButton = self.createButton(title="Segment GrayScale", enabled=True,
+                                                  toolTip="Use the GrayScaleMaker module for vessel calculation ")
+    self.grayScaleMakerButton.connect('clicked(bool)', self.onVenousGrayScaleCalc)
+    venousMarginConfigLayout.addWidget(self.grayScaleMakerButton)
+    venousMarginConfigLayout.addStretch(1)
 
     # Posterior margin distance setting
     posteriorMarginConfigLayout = qt.QHBoxLayout()
-    appSettingLayout.addRow(posteriorMarginConfigLayout)
     posteriorMarginLabel = self.createLabel('Posterior Safety Margin: ')
     posteriorMarginConfigLayout.addWidget(posteriorMarginLabel)
     self.posteriorMarginEdit = self.createLineEdit(title="", text='60.0', readOnly=False, frame=True, maxLength=6,
@@ -211,9 +207,9 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     posteriorMarginConfigLayout.addWidget(self.posteriorMarginEdit)
     posteriorMarginUnitLabel = qt.QLabel('mm  ')
     posteriorMarginConfigLayout.addWidget(posteriorMarginUnitLabel)
+    posteriorMarginConfigLayout.addStretch(1)
 
     kocherMarginConfigLayout = qt.QHBoxLayout()
-    appSettingLayout.addRow(kocherMarginConfigLayout)
     kocherMarginLabel = self.createLabel('Kocher Distance Limit: ')
     kocherMarginConfigLayout.addWidget(kocherMarginLabel)
     self.kocherMarginEdit = self.createLineEdit(title="", text='20.0', readOnly=False, frame=True, maxLength=6,
@@ -223,9 +219,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     kocherMarginConfigLayout.addWidget(self.kocherMarginEdit)
     kocherMarginUnitLabel = qt.QLabel('mm  ')
     kocherMarginConfigLayout.addWidget(kocherMarginUnitLabel)
-    self.grayScaleMakerButton = self.createButton(title="Segment GrayScale", enabled = True, toolTip = "Use the GrayScaleMaker module for vessel calculation ")
-    self.grayScaleMakerButton.connect('clicked(bool)', self.onVenousGrayScaleCalc)
-    venousMarginConfigLayout.addWidget(self.grayScaleMakerButton)
+    kocherMarginConfigLayout.addStretch(1)
 
 
     self.mainGUIGroupBox = qt.QGroupBox()
@@ -277,14 +271,14 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
 
 
     #-- Add Point
-    self.addCannulaTargetButton = self.createButton(title="",
+    self.defineVentricleButton = self.createButton(title="",
                                                   toolTip="Define the ventricle cylinder",
                                                   enabled=False, checkable = True,
                                                   maximumHeight=self.buttonHeight, maximumWidth=self.buttonWidth,
                                                   icon=self.createIcon("cannula.png", self.scriptDirectory),
                                                   iconSize=qt.QSize(self.buttonHeight, self.buttonWidth))
-    self.addCannulaTargetButton.connect('clicked(bool)', self.onEditPlanningTarget)
-    self.mainGUIGroupBoxLayout.addWidget(self.addCannulaTargetButton,2,2)
+    self.defineVentricleButton.connect('clicked(bool)', self.onDefineVentricle)
+    self.mainGUIGroupBoxLayout.addWidget(self.defineVentricleButton,2,2)
 
     self.addVesselSeedButton = self.createButton(title="",
                                                     toolTip="Place the seeds for venous segmentation",
@@ -329,9 +323,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     self.viewGroupBox.setLayout(self.viewGroupBoxLayout)
     self.layout.addWidget(self.viewGroupBox)
 
-    #viewGroupBoxLabel = qt.QLabel('Viewer Configuration')
-    #self.viewGroupBoxLayout.addWidget(viewGroupBoxLabel)
-
     self.tabWidget = qt.QTabWidget()
     self.layout.addWidget(self.tabWidget)
     self.tabWidget.tabBar().hide()
@@ -361,7 +352,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     self.rangeThresholdWidget.connect('valuesChanged(double, double)', self.onChangeThresholdValues)
     vesselThresholdLayout.addWidget(vesselThresholdLabel)
     vesselThresholdLayout.addWidget(self.rangeThresholdWidget)
-    appSettingLayout.addRow(self.vesselThresholdGroupBox)
+
 
     self.segmentVesselWithSeedsButton = self.createButton(title="",
                                                 toolTip="Segment the vessel based on threshold and seeds.",
@@ -385,7 +376,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     self.greenLayoutButton = GreenSliceLayoutButton()
     self.conventionalLayoutButton = ConventionalSliceLayoutButton()
     self.fourUpLayoutButton = FourUpLayoutButton()
-    
     self.screenShotButton = ScreenShotButton()
     self.setReverseViewButton = ReverseViewOnCannulaButton()
     self.viewGroupBoxLayout.addWidget(self.greenLayoutButton, 0, 0)
@@ -394,7 +384,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     self.viewGroupBoxLayout.addWidget(self.setReverseViewButton, 0, 3)
     self.viewGroupBoxLayout.addWidget(self.screenShotButton, 0, 4)
     self.viewGroupBoxLayout.addWidget(self.setWindowLevelButton, 0, 5)
-
     #-- Curve length
     self.infoGroupBox = qt.QGroupBox()
     self.infoGroupBoxLayout = qt.QVBoxLayout()
@@ -523,9 +512,21 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     self.infoGroupBoxLayout.addLayout(planningCannulaToCoronalAngleLayout)
     self.tabMainGroupBoxLayout.addWidget(self.infoGroupBox)
     self.tabMainGroupBoxLayout.addStretch(1)
-
     # Add vertical spacer
     self.layout.addStretch(1)
+
+    appSettingLayout = qt.QFormLayout()
+    appSettingLayout.addRow(self.caseRootConfigLayout)
+    appSettingLayout.addRow(referenceConfigLayout)
+    appSettingLayout.addRow(surfaceModelConfigLayout)
+    appSettingLayout.addRow(venousMarginConfigLayout)
+    appSettingLayout.addRow(posteriorMarginConfigLayout)
+    appSettingLayout.addRow(kocherMarginConfigLayout)
+    appSettingLayout.addRow(self.vesselThresholdGroupBox)
+
+    self.setAlgorithmButton = AlgorithmSettingsButton(appSettingLayout)
+    self.viewGroupBoxLayout.addWidget(self.setAlgorithmButton, 0, 6)
+
     self.setBackgroundAndForegroundIDs(foregroundVolumeID=None,
                                        backgroundVolumeID=None)
     self.initialNodesIDList = []
@@ -582,7 +583,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
       self.screenShotButton.caseResultDir = self.slicerCaseWidget.currentCaseDirectory
       self.SerialAssignBox.Clear()
       self.selectNasionButton.setEnabled(False)
-      self.addCannulaTargetButton.setEnabled(False)
+      self.defineVentricleButton.setEnabled(False)
       self.addVesselSeedButton.setEnabled(False)
       self.relocatePathToKocherButton.setEnabled(False)
       self.createPlanningLineButton.setEnabled(False)
@@ -655,6 +656,10 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
       self.checkCurrentProgress()
     if EventID == VentriculostomyUserEvents.SegmentVesselWithSeedsEvent:
       self.onSegmentVesselWithSeeds()
+    if EventID == VentriculostomyUserEvents.SagittalCorrectionFinishedEvent:
+      self.onResetButtons()
+      self.fourUpLayoutButton.click()
+      self.setSliceForCylinder()
 
   def initialFieldsValue(self):
     self.lengthSagittalPlanningLineEdit.text = '--'
@@ -921,7 +926,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     pass
 
   def onResetButtons(self, caller=None, event=None):
-    self.addCannulaTargetButton.setChecked(False)
+    self.defineVentricleButton.setChecked(False)
     self.selectNasionButton.setChecked(False)
     self.selectSagittalButton.setChecked(False)
     pass
@@ -930,7 +935,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     self.LoadCaseButton.setEnabled(False)
     self.saveDataButton.setEnabled(False)
     self.selectNasionButton.setEnabled(False)
-    self.addCannulaTargetButton.setEnabled(False)
+    self.defineVentricleButton.setEnabled(False)
     self.addVesselSeedButton.setEnabled(False)
     self.relocatePathToKocherButton.setEnabled(False)
     self.createPlanningLineButton.setEnabled(False)
@@ -949,7 +954,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
       if nasionNodeID:
         nasionNode = slicer.mrmlScene.GetNodeByID(nasionNodeID)
         if nasionNode.GetNumberOfFiducials()>0:
-          self.addCannulaTargetButton.setEnabled(True)
+          self.defineVentricleButton.setEnabled(True)
       targetNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_target")
       distalNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_distal")
       if targetNodeID and distalNodeID:
@@ -957,12 +962,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         distalNode = slicer.mrmlScene.GetNodeByID(distalNodeID)
         if targetNode.GetNumberOfFiducials() and distalNode.GetNumberOfFiducials():
           self.addVesselSeedButton.setEnabled(True)
-      vesselMarginNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_vesselnessWithMarginModel")
-      if vesselMarginNodeID:
-        vesselMarginNode = slicer.mrmlScene.GetNodeByID(vesselMarginNodeID)
-        if vesselMarginNode.GetPolyData():
-          if vesselMarginNode.GetPolyData().GetNumberOfPoints()>0:
-            self.relocatePathToKocherButton.setEnabled(True)
+          self.relocatePathToKocherButton.setEnabled(True)
       cannulaFiducialsID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_cannula")
       if cannulaFiducialsID:
         cannulaFiducials = slicer.mrmlScene.GetNodeByID(cannulaFiducialsID)
@@ -1014,6 +1014,8 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         self.selectSagittalButton.click()
     elif self.logic.needSagittalCorrection == SagittalCorrectionStatus.NoNeedForCorrection:
       self.logic.placeWidget.setPlaceModeEnabled(False)
+      self.fourUpLayoutButton.click()
+      self.setSliceForCylinder()
     elif self.logic.needSagittalCorrection == SagittalCorrectionStatus.NeedCorrection:
       self.selectSagittalButton.click()
 
@@ -1209,27 +1211,43 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
             self.logic.pathCandidatesModel.SetAndObservePolyData(polyData)
           self.logic.pathReceived, self.logic.nPathReceived, self.logic.apReceived, self.logic.minimumPoint, self.logic.minimumDistance, self.logic.maximumPoint, self.logic.maximumDistance = self.logic.PercutaneousApproachAnalysisLogic.makePaths(
             self.logic.cylinderMiddlePointNode, None, 0, vesselModelWithMarginNode, tempModel)
-          self.logic.makePathMeetAllConditions(self.logic.pathReceived, self.logic.nPathReceived, self.logic.pathCandidatesModel.GetPolyData(),posKocher,
-                                         posNasion, surfacePolyData)
-          #self.logic.createCandidatesWithinKocherPoint(points, posCenter, self.logic.pathCandidatesModel.GetPolyData(), posKocher, posNasion, surfacePolyData)
-          self.logic.pathCandidatesModel.GetDisplayNode().SetVisibility(1)
-          self.logic.pathCandidatesModel.GetDisplayNode().SetSliceIntersectionOpacity(0.2)
-          if self.logic.nPathReceived<=0:
+          if self.logic.nPathReceived <= 0:
             slicer.util.warningDisplay(
-              "No any cannula candidate exists here, considering redefine the ventricle area?")
-            distalNode.SetLocked(False)
-            targetNode.SetLocked(False)
-            self.logic.cylinderInteractor.SetLocked(False)
-            #self.logic.interactionMode = oriInteractionMode
+              "No any cannula candidate is venous-collision free, considering redefine the ventricle area.")
+            self.disableVentricleModification(False)
             return False
           else:
-            #self.logic.interactionMode = oriInteractionMode
+            status = self.logic.makePathMeetAllConditions(self.logic.pathReceived, self.logic.nPathReceived,
+                                                 self.logic.pathCandidatesModel.GetPolyData(), posKocher,
+                                                 posNasion, surfacePolyData)
+            self.logic.pathCandidatesModel.GetDisplayNode().SetVisibility(1)
+            self.logic.pathCandidatesModel.GetDisplayNode().SetSliceIntersectionOpacity(0.2)
+            self.disableVentricleModification(False)
+            if status == CandidatePathStatus.NoPosteriorAndNoWithinKocherPoint:
+              slicer.util.warningDisplay(
+                "Cannula candidates are both too close to the forehead and too far from the kocher's point, considering redefine the ventricle area.")
+            elif status == CandidatePathStatus.NoPosteriorPoint:
+              slicer.util.warningDisplay(
+                "Cannula candidates are too close to the forehead, considering redefine the ventricle area.")
+            elif status == CandidatePathStatus.NoWithinKocherPoint:
+              slicer.util.warningDisplay(
+                "Cannula candidates are too far from the kocher's point, considering redefine the ventricle area.")
+            else:
+              self.disableVentricleModification(True)
             return True
     else:
-      #self.logic.interactionMode = oriInteractionMode
       return False
-    #self.logic.interactionMode = oriInteractionMode
     return False
+
+  def disableVentricleModification(self, status):
+    targetNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_target")
+    distalNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_distal")
+    if targetNodeID and distalNodeID:
+      targetNode = slicer.mrmlScene.GetNodeByID(targetNodeID)
+      distalNode = slicer.mrmlScene.GetNodeByID(distalNodeID)
+      distalNode.SetLocked(status)
+      targetNode.SetLocked(status)
+      self.logic.cylinderInteractor.SetLocked(status)
 
   def deactivateOtherButtons(self, currentButton=None):
     if currentButton:
@@ -1450,7 +1468,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
   def onEditSagittalReferenceLine(self, switch):
 
     if switch == True:
-      self.addCannulaTargetButton.checked = False
+      self.defineVentricleButton.checked = False
       self.logic.startEditSagittalReferenceLine()
     else:
       self.logic.endEditSagittalReferenceLine()
@@ -1468,7 +1486,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
   def onEditCoronalReferenceLine(self, switch):
 
     if switch == True:
-      self.addCannulaTargetButton.checked = False
+      self.defineVentricleButton.checked = False
       self.logic.startEditCoronalReferenceLine()
     else:
       self.logic.endEditCoronalReferenceLine()
@@ -1671,14 +1689,14 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     pass
 
   # Event handlers for trajectory
-  def onEditPlanningTarget(self):
+  def onDefineVentricle(self):
     targetNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_target")
     distalNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_distal")
     if targetNodeID and distalNodeID:
       targetNode = slicer.mrmlScene.GetNodeByID(targetNodeID)
       distalNode = slicer.mrmlScene.GetNodeByID(distalNodeID)
-      if self.addCannulaTargetButton.isChecked():
-        self.deactivateOtherButtons(currentButton=self.addCannulaTargetButton)
+      if self.defineVentricleButton.isChecked():
+        self.deactivateOtherButtons(currentButton=self.defineVentricleButton)
         if not self.logic.baseVolumeNode:
           slicer.util.warningDisplay("No case is selected, please select the case in the combox", windowTitle="")
           self.deactivateOtherButtons()
@@ -1690,11 +1708,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
           self.logic.cylinderInteractor.SetLocked(False)
           self.fourUpLayoutButton.click()
           self.logic.pathCandidatesModel.SetDisplayVisibility(0)
-          # only reformat the slice view at the beginning. or after both target and distal are placed
-          if not (targetNode.GetNumberOfFiducials()==1 and distalNode.GetNumberOfFiducials()==0):
-            self.setSliceForCylinder()
-          if not (targetNode.GetNumberOfFiducials()==1 and distalNode.GetNumberOfFiducials()==1):
-            self.logic.startEditPlanningTarget()  
+          self.logic.startEditPlanningTarget()
       else:
         self.logic.placeWidget.setPlaceModeEnabled(False)
         targetNode.SetLocked(True)
@@ -1723,7 +1737,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
   def onEditSagittalPlanningLine(self, switch):
 
     if switch == True:
-      self.addCannulaTargetButton.checked = False
+      self.defineVentricleButton.checked = False
       self.logic.startEditSagittalPlanningLine()
     else:
       self.logic.endEditSagittalPlanningLine()
@@ -1741,7 +1755,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
   def onEditCoronalPlanningLine(self, switch):
 
     if switch == True:
-      self.addCannulaTargetButton.checked = False
+      self.defineVentricleButton.checked = False
       self.logic.startEditCoronalPlanningLine()
     else:
       self.logic.endEditCoronalPlanningLine()
@@ -1758,10 +1772,10 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
 
   def onLock(self):
     if self.lockTrajectoryCheckBox.checked == 1:
-      self.addCannulaTargetButton.enabled = False
+      self.defineVentricleButton.enabled = False
       self.logic.lockTrajectoryLine()
     else:
-      self.addCannulaTargetButton.enabled = True
+      self.defineVentricleButton.enabled = True
       self.logic.unlockTrajectoryLine()
 
   def onReload(self,moduleName="VentriculostomyPlanning"):
@@ -2570,11 +2584,15 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
     pcoords = [0.0, 0.0, 0.0]
     subId = vtk.mutable(0)
     numOfRef = self.coronalReferenceCurveManager.curveFiducials.GetNumberOfFiducials()
+    hasPosteriorPoints = False
+    hasWithinKocherPoints = False
     if approachablePoints != 0 and numOfRef >=1:
       for pointIndex in range(1, len(path), 2):
           hasIntersection = locator.IntersectWithLine(path[pointIndex], path[pointIndex - 1], 1e-2, t, x,
                                                     pcoords, subId)
-          if (hasIntersection > 0) and abs(x[2]-posNasion[2]) > self.posteriorMargin and numpy.linalg.norm(numpy.array(x)-numpy.array(posKocher)) < self.kocherMargin:
+          isPosteriorEnough = (abs(x[2] - posNasion[2]) > self.posteriorMargin)
+          isWithinKocherMargin = (numpy.linalg.norm(numpy.array(x) - numpy.array(posKocher)) < self.kocherMargin)
+          if (hasIntersection > 0) and isPosteriorEnough and isWithinKocherMargin:
             pointPre = path[pointIndex - 1]
             index = points.InsertNextPoint(*pointPre)
             linesIDArray.InsertNextTuple1(index)
@@ -2587,9 +2605,16 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
             lines.SetNumberOfCells(1)
             trimmedPath.append(path[pointIndex - 1])
             trimmedPath.append(path[pointIndex])
+          hasPosteriorPoints = isPosteriorEnough if hasPosteriorPoints == False else hasPosteriorPoints
+          hasWithinKocherPoints = isWithinKocherMargin if hasWithinKocherPoints == False else hasWithinKocherPoints
     self.pathReceived = trimmedPath
     self.nPathReceived = int(len(trimmedPath)/2)
-    pass
+    if  hasPosteriorPoints == False and hasWithinKocherPoints == False:
+      return CandidatePathStatus.NoPosteriorAndNoWithinKocherPoint
+    elif  hasPosteriorPoints == False:
+      return CandidatePathStatus.NoPosteriorPoint
+    elif  hasWithinKocherPoints == False:
+      return CandidatePathStatus.NoWithinKocherPoint
 
   def relocateCannula(self, optimizationMethod=1):
     if self.pathReceived:
@@ -2825,7 +2850,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
         smoother = vtk.vtkWindowedSincPolyDataFilter()
         smoother.SetInputConnection(cubes.GetOutputPort())
         smoother.SetNumberOfIterations(10)
-        smoother.BoundarySmoothingOff()
+        smoother.BoundarySmoothingOn()
         smoother.FeatureEdgeSmoothingOff()
         smoother.SetFeatureAngle(120.0)
         smoother.SetPassBand(0.001)
@@ -2951,7 +2976,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
                                1 - self.thresholdProgressiveFactor) + self.thresholdProgressiveFactor
             print voxelValue, voxelValuefactor
             self.connectedComponentFilter.SetLower(voxelValue * voxelValuefactor)
-            self.connectedComponentFilter.SetUpper(800)
+            self.connectedComponentFilter.SetUpper(voxelValue / voxelValuefactor)
             connectedImage = sitk.Cast(self.connectedComponentFilter.Execute(oriImage), sitk.sitkInt16)
             connectedImageTotal = self.addImageFilter.Execute(connectedImage, connectedImageTotal)
           else:
@@ -3261,7 +3286,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
       self.createTrueSagittalPlane()
       self.createEntryPoint()
       self.placeWidget.setPlaceModeEnabled(False)
-      self.update_observers(VentriculostomyUserEvents.ResetButtonEvent)
+      self.update_observers(VentriculostomyUserEvents.SagittalCorrectionFinishedEvent)
     elif self.interactionMode == EndPlacementModes.VentricleTarget:
       if self.trajectoryProjectedMarker and self.trajectoryProjectedMarker.GetMarkupsDisplayNode():
         self.trajectoryProjectedMarker.GetMarkupsDisplayNode().SetVisibility(0)

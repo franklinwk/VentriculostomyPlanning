@@ -2,6 +2,8 @@ import slicer, vtk
 from ctk import ctkAxesWidget
 from VentriculostomyPlanningUtils.UserEvents import VentriculostomyUserEvents
 from SlicerDevelopmentToolboxUtils.buttons import LayoutButton, CheckableIconButton, BasicIconButton
+from SlicerDevelopmentToolboxUtils.icons import Icons
+from SlicerDevelopmentToolboxUtils.mixins import ModuleWidgetMixin
 import os
 import qt
 import numpy
@@ -180,3 +182,40 @@ class ReverseViewOnCannulaButton(CheckableIconButton):
         threeDView.zoomIn()  # to refresh the 3D viewer, when the view position is inside the skull model, the model is not rendered,
         threeDView.zoomOut()  # Zoom in and out will refresh the viewer
         slicer.mrmlScene.InvokeEvent(VentriculostomyUserEvents.ReverseViewClicked)
+
+class AlgorithmSettingsButton(BasicIconButton):
+
+  def __init__(self, connectedLayout, text="", parent=None, **kwargs):
+    self.connectedLayout = connectedLayout
+    self._ICON = Icons.settings
+    super(AlgorithmSettingsButton, self).__init__(text, parent, **kwargs)
+
+  def _connectSignals(self):
+    super(AlgorithmSettingsButton, self)._connectSignals()
+    self.clicked.connect(self.__onClicked)
+
+  def __onClicked(self):
+    settings = AlgorithmSettingsMessageBox(self.connectedLayout, slicer.util.mainWindow())
+    settings.show()
+
+
+class AlgorithmSettingsMessageBox(qt.QMessageBox, ModuleWidgetMixin):
+
+  def __init__(self, connectedLayout, parent = None, **kwargs):
+    qt.QMessageBox.__init__(self, parent, **kwargs)
+    self.setStandardButtons(0)
+    self.setLayout(qt.QGridLayout())
+    self.algorithmFrame = qt.QFrame()
+    self.algorithmFrame.setLayout(connectedLayout)
+    self.layout().addWidget(self.algorithmFrame, 0, 0, 1, 1)
+    self.okButton = self.createButton("OK")
+    self.addButton(self.okButton, qt.QMessageBox.AcceptRole)
+    self.layout().addWidget(self.createHLayout([self.okButton]), 1, 0, 1, 1)
+
+  def show(self):
+    qt.QMessageBox.show(self)
+
+  def setAlgorithmLayout(self, layout):
+    self.algorithmLayout = layout
+    self.algorithmFrame.setLayout(layout)
+

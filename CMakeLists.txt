@@ -19,7 +19,6 @@ include(${Slicer_USE_FILE})
 
 #-----------------------------------------------------------------------------
 # Extension modules
-add_subdirectory(SlicerCaseManager)
 add_subdirectory(VentriculostomyPlanning)
 ## NEXT_MODULE
 
