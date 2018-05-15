@@ -195,8 +195,8 @@ class AlgorithmSettingsButton(BasicIconButton):
     self.clicked.connect(self.__onClicked)
 
   def __onClicked(self):
-    settings = AlgorithmSettingsMessageBox(self.connectedLayout, slicer.util.mainWindow())
-    settings.show()
+    self.settings = AlgorithmSettingsMessageBox(self.connectedLayout, slicer.util.mainWindow())
+    self.settings.show()
 
 
 class AlgorithmSettingsMessageBox(qt.QMessageBox, ModuleWidgetMixin):
