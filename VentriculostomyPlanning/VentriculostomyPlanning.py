@@ -23,7 +23,7 @@ from VentriculostomyPlanningUtils.UsefulFunctions import UsefulFunctions
 from VentriculostomyPlanningUtils.WatchDog import WatchDog
 from VentriculostomyPlanningUtils.Constants import EndPlacementModes, SagittalCorrectionStatus, CandidatePathStatus
 from VentriculostomyPlanningUtils.VentriclostomyButtons import *
-from SlicerDevelopmentToolboxUtils.buttons import WindowLevelEffectsButton, FourUpLayoutButton
+from SlicerDevelopmentToolboxUtils.buttons import FourUpLayoutButton
 from SlicerDevelopmentToolboxUtils.mixins import ModuleWidgetMixin, ModuleLogicMixin
 from shutil import copyfile
 from os.path import basename
@@ -381,7 +381,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     index = next((i for i, name in enumerate(self.tabWidgetChildrenName) if name == self.tabMainGroupBoxName), None)
     self.tabWidget.setCurrentIndex(index)
     
-    self.setWindowLevelButton = WindowLevelEffectsButton()
+    #self.setWindowLevelButton = WindowLevelEffectsButton()
     self.greenLayoutButton = GreenSliceLayoutButton()
     self.conventionalLayoutButton = ConventionalSliceLayoutButton()
     self.fourUpLayoutButton = FourUpLayoutButton()
@@ -392,7 +392,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     self.viewGroupBoxLayout.addWidget(self.fourUpLayoutButton, 0, 2)
     self.viewGroupBoxLayout.addWidget(self.setReverseViewButton, 0, 3)
     self.viewGroupBoxLayout.addWidget(self.screenShotButton, 0, 4)
-    self.viewGroupBoxLayout.addWidget(self.setWindowLevelButton, 0, 5)
+    #self.viewGroupBoxLayout.addWidget(self.setWindowLevelButton, 0, 5)
     #-- Curve length
     self.infoGroupBox = qt.QGroupBox()
     self.infoGroupBoxLayout = qt.QVBoxLayout()
@@ -555,7 +555,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
       self.isLoadingCase = False
       self.screenShotButton.caseResultDir = ""
       self.setReverseViewButton.checked = False
-      self.setWindowLevelButton.checked = False
+      #self.setWindowLevelButton.checked = False
     elif EventID == self.slicerCaseWidget.LoadCaseCompletedEvent:
       self.screenShotButton.caseResultDir = self.slicerCaseWidget.currentCaseDirectory
       allNodes = slicer.mrmlScene.GetNodes()
@@ -597,7 +597,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
       self.createPlanningLineButton.setEnabled(False)
       self.saveDataButton.setEnabled(False)
       self.setReverseViewButton.checked = False
-      self.setWindowLevelButton.checked = False
+      #self.setWindowLevelButton.checked = False
       self.checkCurrentProgress()
     pass
 
@@ -1092,25 +1092,17 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
             posDistal = numpy.array([0.0, 0.0, 0.0])
             distalNode.GetNthFiducialPosition(0, posDistal)
             if self.volumePrepared == False:
-              coneForVolumeClip = vtk.vtkConeSource()
               coneHeight = 100.0  # in millimeter
-              coneForVolumeClip.SetHeight(coneHeight)
-              coneForVolumeClip.SetResolution(60)
+              coneForVolumeClip = self.logic.functions.generateConeModel(posTarget, posDistal, self.logic.cylinderRadius,coneHeight)
+              clipModelNode.SetAndObservePolyData(coneForVolumeClip)
+              # -----------
               ventricleDirect = (posDistal - posTarget) / numpy.linalg.norm(
                 posTarget - posDistal)
               coneTipPoint = posTarget - numpy.linalg.norm(posDistal - posTarget) / 2.0 * ventricleDirect
-              coneCenter = coneHeight / 2.0 * ventricleDirect + coneTipPoint
-              coneForVolumeClip.SetCenter(coneCenter)
-              coneForVolumeClip.SetDirection(-1.0 * ventricleDirect)  # we want the open end of the cone towards outside
-              angle = 180.0 / math.pi * math.atan(2 * self.logic.cylinderRadius / numpy.linalg.norm(
-                posTarget - posDistal))
-              coneForVolumeClip.SetAngle(angle)
-              coneForVolumeClip.Update()
-              clipModelNode.SetAndObservePolyData(coneForVolumeClip.GetOutput())
-              # -----------
               ROICenterPoint = coneTipPoint + ventricleDirect * numpy.array([0, 1, 1])* coneHeight
               self.logic.ROINode.SetXYZ(ROICenterPoint)
-              # ROICenterPoint = coneTipPoint + numpy.array([0, 1, 1]) * 75
+              angle = 180.0 / math.pi * math.atan(2 * self.logic.cylinderRadius / numpy.linalg.norm(
+                posTarget - posDistal))
               ROIRadiusXYZ = [150, coneHeight * ventricleDirect[1],
                               max(coneHeight * math.tan(angle * math.pi / 180.0), coneHeight * ventricleDirect[2])]
               self.logic.ROINode.SetRadiusXYZ(ROIRadiusXYZ)
@@ -1256,10 +1248,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         if childWidget.checked:
           childWidget.click()
           slicer.app.processEvents()
-    if not currentButton == self.createPlanningLineButton:  
-      self.setPrintModelVisibility(False)
-    else:
-      self.setPrintModelVisibility(True)      
+    self.setPrintModelVisibility(True if currentButton == self.createPlanningLineButton else False)
     pass
 
   def onCreatePlanningLine(self):
@@ -1293,12 +1282,17 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         self.logic.generateLabelMapFor3DModel()
         slicer.app.processEvents()
         # Export the label image to vtkMRMLModelNode
-        if self.logic.printModel:
-          slicer.mrmlScene.RemoveNode(self.logic.printModel)
+        modelName = self.logic.guideVolumeNode.GetName()
+        guidanceModelCollect = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLModelNode", modelName)
+        for modelIndex in range(guidanceModelCollect.GetNumberOfItems()):
+          modelNode = guidanceModelCollect.GetItemAsObject(modelIndex)
+          slicer.mrmlScene.RemoveNode(modelNode.GetDisplayNode())
+          slicer.mrmlScene.RemoveNode(modelNode)
         self.activeSegmentSelector.setCurrentNode(self.logic.segmentationNode)
         self.logic.segmentationNode.GetSegmentation().RemoveAllSegments()
         self.importRadioButton.click()
         self.labelMapRadioButton.click()
+        slicer.app.processEvents()
         self.labelMapSelector.setCurrentNode(self.logic.guideVolumeNode)
         self.portPushButton.click()
         slicer.app.processEvents()
@@ -1308,7 +1302,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         self.portPushButton.click()
         slicer.app.processEvents()
         if self.logic.segmentationNode.GetSegmentation().GetNthSegment(0) is not None:
-          modelName = self.logic.segmentationNode.GetSegmentation().GetNthSegment(0).GetName()
           self.logic.printModel = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLModelNode", modelName).GetItemAsObject(0)
           self.logic.printModel.SetDisplayVisibility(False)
           #---------------------
@@ -1382,7 +1375,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         outputModelNode = slicer.mrmlScene.GetNodeByID(outputModelNodeID)
         slicer.mrmlScene.RemoveObserver(self.nodeAddedEventObserverID)
         try:
-          self.logic.holeFilledImageNode, self.logic.subtractedImageNode = self.logic.functions.createHoleFilledVolumeNode(self.logic.ventricleVolume, self.logic.surfaceModelThreshold)
+          self.logic.holeFilledImageNode, self.logic.subtractedImageNode = self.logic.getOrCreateHoleSkullVolumeNode()
           self.logic.functions.createModelBaseOnVolume(self.logic.holeFilledImageNode, outputModelNode)
           self.logic.calculateVenousStat(self.logic.baseVolumeNode, self.logic.surfaceModelThreshold)
         except ValueError:
@@ -1408,8 +1401,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         if outputModelNodeID:
           outputModelNode = slicer.mrmlScene.GetNodeByID(outputModelNodeID)
           if (not outputModelNode) or outputModelNode.GetAttribute("vtkMRMLModelNode.modelCreated") == "False":
-              self.logic.holeFilledImageNode, self.logic.subtractedImageNode = self.logic.functions.createHoleFilledVolumeNode(self.logic.ventricleVolume,
-                                                                                          self.logic.surfaceModelThreshold)
+              self.logic.holeFilledImageNode, self.logic.subtractedImageNode = self.logic.createHoleFilledAndSubtractVolumeNode()
               self.logic.functions.createModelBaseOnVolume(self.logic.holeFilledImageNode, outputModelNode)
               self.logic.calculateVenousStat(self.logic.baseVolumeNode, self.logic.surfaceModelThreshold)
               self.onSet3DViewer()
@@ -1428,6 +1420,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
       self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_leftPrintPart"))
     rightPrintPartNode = slicer.mrmlScene.GetNodeByID(
       self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_rightPrintPart"))
+    leftPrintPartNode.SetDisplayVisibility(value)
     rightPrintPartNode.SetDisplayVisibility(value)
     
   def onSelectSagittalPoint(self):
@@ -1442,8 +1435,8 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         if outputModelNodeID:
           outputModelNode = slicer.mrmlScene.GetNodeByID(outputModelNodeID)
           if (not outputModelNode) or outputModelNode.GetAttribute("vtkMRMLModelNode.modelCreated") == "False":
-            self.logic.holeFilledImageNode, self.logic.subtractedImageNode = self.logic.functions.createHoleFilledVolumeNode(self.logic.ventricleVolume,
-                                                                                        self.logic.surfaceModelThreshold)
+            self.logic.holeFilledImageNode, self.logic.subtractedImageNode = self.logic.createHoleFilledAndSubtractVolumeNode(self.logic.ventricleVolume,
+                                                                                        self.logic.surfaceModelThreshold, self.logic.samplingFactor, self.logic.morphologyParameters)
             self.logic.functions.createModelBaseOnVolume(self.logic.holeFilledImageNode, outputModelNode)
             self.logic.calculateVenousStat(self.logic.baseVolumeNode, self.logic.surfaceModelThreshold)
             self.onSet3DViewer()
@@ -2113,9 +2106,11 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
     self.functions = UsefulFunctions()
     self.useLeftHemisphere = False
     self.cliNode = None
-    self.samplingFactor = 1
+    self.samplingFactor = 2
     self.topPoint = []
     self.surfaceModelThreshold = -500.0
+    # kernel size in pixel: first vector is the hole filling kernel size, second vector is related with the mask thickness
+    self.morphologyParameters = [[10,10,6], [3,3,1]]
     self.distanceMapThreshold = 100
     self.venousMargin = 10.0 #in mm
     self.minimalVentricleLen = 10.0 # in mm
@@ -2164,7 +2159,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
     slicer.mrmlScene.AddNode(self.trajectoryProjectedMarker)
     self.trajectoryProjectedMarker.SetAndObserveDisplayNodeID(markupDisplay.GetID())
     self.guideVolumeNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLLabelMapVolumeNode")
-    self.guideVolumeNode.SetName("Guide")
+    self.guideVolumeNode.SetName("GuideForVentriclostomy")
     slicer.mrmlScene.AddNode(self.guideVolumeNode)
     self.printModel = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
     self.printModel.SetName("fullPrintModel")
@@ -2172,6 +2167,8 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
     self.segmentationNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLSegmentationNode")
     self.segmentationNode.SetName("segmentation")
     slicer.mrmlScene.AddNode(self.segmentationNode)
+    self.segmentationNode.CreateDefaultDisplayNodes()
+    self.segmentationNode.SetDisplayVisibility(False)
 
   def clear(self):
     if self.trajectoryProjectedMarker and self.trajectoryProjectedMarker.GetID():
@@ -2292,8 +2289,11 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
     self.sagittalReferenceCurveManager.unlockLine()
     self.coronalReferenceCurveManager.unlockLine()
 
-  
-    
+  def getOrCreateHoleSkullVolumeNode(self):
+    if (self.holeFilledImageNode is None) or (self.subtractedImageNode is None):
+      self.holeFilledImageNode, self.subtractedImageNode = self.functions.createHoleFilledVolumeNode(self.ventricleVolume, self.surfaceModelThreshold, self.samplingFactor, self.morphologyParameters)
+    return self.holeFilledImageNode, self.subtractedImageNode
+
   def startEditPlanningTarget(self):
     if self.baseVolumeNode:
       if self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_target"):
@@ -3425,20 +3425,22 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
         sagittalPoints = vtk.vtkPoints()
         self.getIntersectPoints(polyData, self.trueSagittalPlane, posNasion, sagittalReferenceLength, 0, sagittalPoints)
 
+        if sagittalPoints.GetNumberOfPoints() <= 0:
+          return
         ## Sorting   
         self.functions.sortVTKPoints(sagittalPoints, posNasion)
-        self.constructCurveReference(self.sagittalReferenceCurveManager, sagittalPoints, sagittalReferenceLength)  
-            
-        ##To do, calculate the curvature value points by point might be necessary to exclude the outliers   
-        if self.topPoint:
+        self.constructCurveReference(self.sagittalReferenceCurveManager, sagittalPoints, sagittalReferenceLength)
+        ##To do, calculate the curvature value points by point might be necessary to exclude the outliers
+        if not (self.topPoint == []):
           posNasionBack100 = self.topPoint
           coronalPoints = vtk.vtkPoints()
           coronalPlane = vtk.vtkPlane()
           coronalPlane.SetOrigin(posNasionBack100[0],posNasionBack100[1],posNasionBack100[2])
           coronalPlane.SetNormal(math.sin(self.sagittalYawAngle),-math.cos(self.sagittalYawAngle),0)
           self.getIntersectPoints(polyData, coronalPlane, posNasionBack100, coronalReferenceLength, 1, coronalPoints)
-                    
-          ## Sorting      
+          if coronalPoints.GetNumberOfPoints() <= 0:
+            return
+          ## Sorting
           self.functions.sortVTKPoints(coronalPoints, posNasionBack100)
           self.constructCurveReference(self.coronalReferenceCurveManager, coronalPoints, coronalReferenceLength)
           posEntry = [0.0, 0.0, 0.0]
@@ -3492,9 +3494,10 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
           coronalPoints = vtk.vtkPoints()
           self.getIntersectPointsPlanning(polyData, coronalPlane, posEntry, 1 , coronalPoints)
 
+          if coronalPoints.GetNumberOfPoints() <= 0:
+            return False
           ## Sorting   
           self.functions.sortVTKPoints(coronalPoints, posEntry)
-          
           self.constructCurvePlanning(self.coronalPlanningCurveManager, self.coronalReferenceCurveManager, coronalPoints, 1)
               
           ##To do, calculate the curvature value points by point might be necessary to exclude the outliers   
@@ -3505,7 +3508,8 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
             sagittalPlane.SetOrigin(posTractoryBack[0],posTractoryBack[1],posTractoryBack[2])
             sagittalPlane.SetNormal(math.cos(self.sagittalYawAngle), math.sin(self.sagittalYawAngle), 0)
             self.getIntersectPointsPlanning(polyData, sagittalPlane, posTractoryBack, 0, sagittalPoints)
-                      
+            if sagittalPoints.GetNumberOfPoints() <= 0:
+              return False
             ## Sorting      
             self.functions.sortVTKPoints(sagittalPoints, posTractoryBack)
             self.constructCurvePlanning(self.sagittalPlanningCurveManager, self.sagittalReferenceCurveManager, sagittalPoints, 0)
@@ -3515,9 +3519,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
     return False
 
   def generateLabelMapFor3DModel(self):
-    if (self.holeFilledImageNode is None) or (self.subtractedImageNode is None):
-      self.holeFilledImageNode, self.subtractedImageNode = self.functions.createHoleFilledVolumeNode(
-        self.ventricleVolume, self.surfaceModelThreshold)
+    self.holeFilledImageNode, self.subtractedImageNode = self.getOrCreateHoleSkullVolumeNode()
     baseDimension = [130, 50, 50]
     posNasion = [0.0, 0.0, 0.0]
     self.sagittalReferenceCurveManager.getFirstPoint(posNasion)
@@ -3526,7 +3528,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
     clippedImageDataBase = self.functions.inverseVTKImage(clippedImage)
     matrix = vtk.vtkMatrix4x4()
     self.holeFilledImageNode.GetIJKToRASMatrix(matrix)
-    centerPos, guidanceDimension = self.getGuidanceBoundary()
+    centerPos, guidanceDimension = self.getGuidanceCubeBoundary()
     guidancePolyData = self.functions.generateCubeModelWithYawAngle(centerPos, self.sagittalYawAngle, guidanceDimension)
     clippedImage = self.functions.clipVolumeWithPolyData(self.holeFilledImageNode, guidancePolyData, True, 1)
     clippedImageDataGuide = self.functions.inverseVTKImage(clippedImage)
@@ -3551,7 +3553,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
     nasionPos = [0.0] * 3
     self.sagittalPlanningCurveManager.curveFiducials.GetNthFiducialPosition(0, nasionPos)
     trueSagittalPlane = vtk.vtkPlane()
-    shift = -1.0 if self.useLeftHemisphere else 1.0 # add some shift to the cutting plane to avoid edge problem
+    shift = -1.0 if self.useLeftHemisphere else 1.0 # add some shift to the cutting plane to avoid cutting the edge of the model
     trueSagittalPlane.SetOrigin(nasionPos[0] - shift, nasionPos[1],
                                 nasionPos[2])
     trueSagittalPlane.SetNormal(math.cos(self.sagittalYawAngle), math.sin(self.sagittalYawAngle), 0)
@@ -3560,6 +3562,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
     coronalPlane = vtk.vtkPlane()
     coronalPlane.SetOrigin(entryPos[0], entryPos[1], entryPos[2])
     coronalPlane.SetNormal(-math.sin(self.sagittalYawAngle), math.cos(self.sagittalYawAngle), 0)
+    #coronalPlane.SetNormal(-math.sin(self.sagittalYawAngle), math.cos(self.sagittalYawAngle)* math.cos(pitchAngle), -math.cos(self.sagittalYawAngle)* math.sin(pitchAngle))
     planes.AddItem(coronalPlane)
     cuttedPolyData = self.functions.getClosedCuttedModel(planes, self.printModel.GetPolyData())
     rightPrintPartNode.SetAndObservePolyData(cuttedPolyData)
@@ -3572,7 +3575,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
     cuttedPolyData = self.functions.getClosedCuttedModel(planes, self.printModel.GetPolyData())
     leftPrintPartNode.SetAndObservePolyData(cuttedPolyData)
 
-  def getGuidanceBoundary(self):
+  def getGuidanceCubeBoundary(self):
     posNasion = [0.0]*3
     self.sagittalPlanningCurveManager.getFirstPoint(posNasion)
     posEntry = [0.0, 0.0, 0.0]
@@ -3580,17 +3583,31 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
     posTop = [0.0, 0.0, 0.0]
     self.coronalPlanningCurveManager.getFirstPoint(posTop)
     posCoronal = [0.0]*3
-    maxDist = 0.0
+    posSagittal = [0.0] * 3
+    maxDistY = 0.0
+    maxDistX = 0.0
     for i in range(self.sagittalPlanningCurveManager.curveFiducials.GetNumberOfFiducials()):
       pos = [0.0]*3
       self.sagittalPlanningCurveManager.curveFiducials.GetNthFiducialPosition(i, pos)
-      yDistance = abs(pos[1]-posTop[1])
-      if yDistance > maxDist:
-        maxDist = yDistance
+      # To calculate the dimension of the cube, coordinate system needs to be rotated also to calculate the correct maximum dimension.
+      yDistance = abs((pos[0]* numpy.sin(-self.sagittalYawAngle) + numpy.cos(self.sagittalYawAngle) * pos[1]) - \
+                 (posEntry[0] * numpy.sin(-self.sagittalYawAngle) + numpy.cos(self.sagittalYawAngle) * posEntry[1]))
+      if yDistance > maxDistY:
+        maxDistY = yDistance
         posCoronal = list(pos)
-    posCoronal[1] = posCoronal[1] + 3.0 # shift in the y axis to cover the dilated skull
-    centerPos = [0.5*(posEntry[0]+posNasion[0]), 0.5*(posTop[1]+posCoronal[1]), 0.5*(posTop[2]+posNasion[2])]
-    guidanceDimension = [abs(posEntry[0]-posNasion[0]), abs(posTop[1]-posCoronal[1]), abs(posTop[2]-posNasion[2])]
+      xDistance = abs((pos[0]* numpy.cos(self.sagittalYawAngle) + numpy.sin(self.sagittalYawAngle)*pos[1]) - \
+                 (posEntry[0] * numpy.cos(self.sagittalYawAngle) + numpy.sin(self.sagittalYawAngle) * posEntry[1]))
+      if xDistance > maxDistX:
+        maxDistX = xDistance
+        posSagittal = list(pos)
+
+    xThickness = (self.samplingFactor * self.morphologyParameters[1][0]) * self.baseVolumeNode.GetSpacing()[0]
+    yThickness = (self.samplingFactor * self.morphologyParameters[1][1]) * self.baseVolumeNode.GetSpacing()[1]
+    posCoronal[0] = posCoronal[0] + math.sin(self.sagittalYawAngle)*xThickness  # shift in the x axis to cover the dilated skull
+    posCoronal[1] = posCoronal[1] + math.cos(self.sagittalYawAngle)*yThickness # shift in the y axis to cover the dilated skull
+    centerPos = [0.5*(posEntry[0]+posSagittal[0]), 0.5*(posEntry[1]+posCoronal[1]), 0.5*(posTop[2]+posNasion[2])]
+    guidanceDimension = [maxDistX, maxDistY + yThickness, abs(posTop[2]-posNasion[2])]
+    print guidanceDimension
     return centerPos, guidanceDimension
 
   def calcPitchYawAngles(self):

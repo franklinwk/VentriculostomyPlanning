@@ -66,35 +66,36 @@ class UsefulFunctions(object):
     outputImageData.DeepCopy(stencilToImage.GetOutput())
     return outputImageData
 
-  def createHoleFilledVolumeNode(self, ventricleVolume, thresholdValue):
+  def createHoleFilledVolumeNode(self, ventricleVolume, thresholdValue, samplingFactor, morphologyParameters):
+    holeFillKernelSize = morphologyParameters[0]
+    maskKernelSize = morphologyParameters[1]
     resampleFilter = sitk.ResampleImageFilter()
     ventricleImage = sitk.Cast(sitkUtils.PullFromSlicer(ventricleVolume.GetID()), sitk.sitkInt16)
-    self.samplingFactor = 2
-    resampleFilter.SetSize(numpy.array(ventricleImage.GetSize()) / self.samplingFactor)
-    resampleFilter.SetOutputSpacing(numpy.array(ventricleImage.GetSpacing()) * self.samplingFactor)
+    resampleFilter.SetSize(numpy.array(ventricleImage.GetSize()) / samplingFactor)
+    resampleFilter.SetOutputSpacing(numpy.array(ventricleImage.GetSpacing()) * samplingFactor)
     resampleFilter.SetOutputDirection(ventricleImage.GetDirection())
     resampleFilter.SetOutputOrigin(numpy.array(ventricleImage.GetOrigin()))
     resampledImage = resampleFilter.Execute(ventricleImage)
     thresholdFilter = sitk.BinaryThresholdImageFilter()
     thresholdImage = thresholdFilter.Execute(resampledImage, thresholdValue, 10000, 1, 0)
     padFilter = sitk.ConstantPadImageFilter()
-    padFilter.SetPadLowerBound([10, 10, 10])
-    padFilter.SetPadUpperBound([10, 10, 10])
+    padFilter.SetPadLowerBound(holeFillKernelSize)
+    padFilter.SetPadUpperBound(holeFillKernelSize)
     paddedImage = padFilter.Execute(thresholdImage)
     dilateFilter = sitk.BinaryDilateImageFilter()
-    dilateFilter.SetKernelRadius([10, 10, 6])
+    dilateFilter.SetKernelRadius(holeFillKernelSize)
     dilateFilter.SetBackgroundValue(0)
     dilateFilter.SetForegroundValue(1)
     dilatedImage = dilateFilter.Execute(paddedImage)
     erodeFilter = sitk.BinaryErodeImageFilter()
-    erodeFilter.SetKernelRadius([10, 10, 6])
+    erodeFilter.SetKernelRadius(holeFillKernelSize)
     erodeFilter.SetBackgroundValue(0)
     erodeFilter.SetForegroundValue(1)
     erodedImage = erodeFilter.Execute(dilatedImage)
     fillHoleFilter = sitk.BinaryFillholeImageFilter()
     holefilledImage = fillHoleFilter.Execute(erodedImage)
     dilateFilter = sitk.BinaryDilateImageFilter()
-    dilateFilter.SetKernelRadius([5, 5, 3])
+    dilateFilter.SetKernelRadius(maskKernelSize)
     dilateFilter.SetBackgroundValue(0)
     dilateFilter.SetForegroundValue(1)
     dilatedImage = dilateFilter.Execute(holefilledImage)
@@ -284,6 +285,22 @@ class UsefulFunctions(object):
     sagittalTransformFilter.SetInputData(cube.GetOutput())
     sagittalTransformFilter.Update()
     return sagittalTransformFilter.GetOutput()
+
+  def generateConeModel(self, tipPos, basePos, radius, height):
+    cone = vtk.vtkConeSource()
+    ventricleDirect = (basePos - tipPos) / numpy.linalg.norm(
+      tipPos - basePos)
+    coneTipPoint = tipPos - numpy.linalg.norm(basePos - tipPos) / 2.0 * ventricleDirect
+    angle = 180.0 / math.pi * math.atan(2 * radius / numpy.linalg.norm(
+      tipPos - basePos))
+    coneCenter = height / 2.0 * ventricleDirect + coneTipPoint
+    cone.SetHeight(height)
+    cone.SetResolution(60)
+    cone.SetCenter(coneCenter)
+    cone.SetDirection(-1.0 * ventricleDirect)  # we want the open end of the cone towards outside
+    cone.SetAngle(angle)
+    cone.Update()
+    return cone.GetOutput()
 
   def calculateMatrixBasedPos(self, pos, yaw, pitch, roll):
     tempMatrix = vtk.vtkMatrix4x4()
