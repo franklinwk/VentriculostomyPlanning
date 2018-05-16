@@ -189,6 +189,7 @@ class AlgorithmSettingsButton(BasicIconButton):
     self.connectedLayout = connectedLayout
     self._ICON = Icons.settings
     super(AlgorithmSettingsButton, self).__init__(text, parent, **kwargs)
+    self.settings = AlgorithmSettingsMessageBox(self.connectedLayout, slicer.util.mainWindow())
 
   def _connectSignals(self):
     super(AlgorithmSettingsButton, self)._connectSignals()

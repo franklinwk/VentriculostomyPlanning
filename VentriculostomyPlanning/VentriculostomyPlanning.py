@@ -1256,6 +1256,10 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         if childWidget.checked:
           childWidget.click()
           slicer.app.processEvents()
+    if not currentButton == self.createPlanningLineButton:  
+      self.setPrintModelVisibility(False)
+    else:
+      self.setPrintModelVisibility(True)      
     pass
 
   def onCreatePlanningLine(self):
@@ -1291,14 +1295,11 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         # Export the label image to vtkMRMLModelNode
         if self.logic.printModel:
           slicer.mrmlScene.RemoveNode(self.logic.printModel)
-        self.activeSegmentSelector.removeCurrentNode()
-        self.activeSegmentSelector.addNode()
-        slicer.app.processEvents()
-        segNode = self.activeSegmentSelector.currentNode()
-        segNode.CreateDefaultDisplayNodes()
-        self.labelMapSelector.setCurrentNode(self.logic.guideVolumeNode)
+        self.activeSegmentSelector.setCurrentNode(self.logic.segmentationNode)
+        self.logic.segmentationNode.GetSegmentation().RemoveAllSegments()
         self.importRadioButton.click()
         self.labelMapRadioButton.click()
+        self.labelMapSelector.setCurrentNode(self.logic.guideVolumeNode)
         self.portPushButton.click()
         slicer.app.processEvents()
         self.exportRadioButton.click()
@@ -1306,9 +1307,10 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         slicer.app.processEvents()
         self.portPushButton.click()
         slicer.app.processEvents()
-        if segNode.GetSegmentation().GetNthSegment(0) is not None:
-          modelName = segNode.GetSegmentation().GetNthSegment(0).GetName()
+        if self.logic.segmentationNode.GetSegmentation().GetNthSegment(0) is not None:
+          modelName = self.logic.segmentationNode.GetSegmentation().GetNthSegment(0).GetName()
           self.logic.printModel = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLModelNode", modelName).GetItemAsObject(0)
+          self.logic.printModel.SetDisplayVisibility(False)
           #---------------------
           leftPrintPartNode = slicer.mrmlScene.GetNodeByID(
             self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_leftPrintPart"))
@@ -1420,7 +1422,14 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
       dnode = nasionNode.GetMarkupsDisplayNode()
       if dnode:
         dnode.SetVisibility(1)
-
+        
+  def setPrintModelVisibility(self, value):
+    leftPrintPartNode = slicer.mrmlScene.GetNodeByID(
+      self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_leftPrintPart"))
+    rightPrintPartNode = slicer.mrmlScene.GetNodeByID(
+      self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_rightPrintPart"))
+    rightPrintPartNode.SetDisplayVisibility(value)
+    
   def onSelectSagittalPoint(self):
     if self.selectSagittalButton.isChecked():
       self.deactivateOtherButtons(currentButton=self.selectSagittalButton)
@@ -2084,6 +2093,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
     self.cylinderInteractor = None
     self.trajectoryProjectedMarker = None
     self.guideVolumeNode = None
+    self.segmentationNode = None
     self.enableAuxilaryNodes()
 
     self.distanceMapFilter = sitk.SignedMaurerDistanceMapImageFilter()
@@ -2159,6 +2169,9 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
     self.printModel = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
     self.printModel.SetName("fullPrintModel")
     slicer.mrmlScene.AddNode(self.printModel)
+    self.segmentationNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLSegmentationNode")
+    self.segmentationNode.SetName("segmentation")
+    slicer.mrmlScene.AddNode(self.segmentationNode)
 
   def clear(self):
     if self.trajectoryProjectedMarker and self.trajectoryProjectedMarker.GetID():
@@ -2207,6 +2220,10 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
       slicer.mrmlScene.RemoveNode(self.printModel.GetDisplayNode())
       slicer.mrmlScene.RemoveNode(self.printModel)
       self.printModel = None
+    if self.segmentationNode:
+      slicer.mrmlScene.RemoveNode(self.segmentationNode.GetDisplayNode())
+      slicer.mrmlScene.RemoveNode(self.segmentationNode)
+      self.segmentationNode = None  
     if self.ROINode:
       self.ROINode = None
     self.baseVolumeNode = None
