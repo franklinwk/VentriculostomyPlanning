@@ -302,6 +302,20 @@ class UsefulFunctions(object):
     cone.Update()
     return cone.GetOutput()
 
+  def generateCylinderModelWithTransform(self, radius, height, transform):
+    cylinderTop = vtk.vtkCylinderSource()
+    cylinderTop.SetCenter(numpy.array([0.0, 0.0, 0.0]))
+    cylinderTop.SetRadius(radius)
+    cylinderTop.SetHeight(height)
+    cylinderTop.SetResolution(200)
+    cylinderTop.Update()
+    transformFilter = vtk.vtkTransformPolyDataFilter()
+    transformFilter.SetInputConnection(cylinderTop.GetOutputPort())
+    transformFilter.SetTransform(transform)
+    transformFilter.ReleaseDataFlagOn()
+    transformFilter.Update()
+    return transformFilter.GetOutput()
+
   def calculateMatrixBasedPos(self, pos, yaw, pitch, roll):
     tempMatrix = vtk.vtkMatrix4x4()
     tempMatrix.Identity()

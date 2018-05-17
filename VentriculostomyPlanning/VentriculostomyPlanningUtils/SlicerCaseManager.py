@@ -160,12 +160,12 @@ class SlicerCaseManagerWidget(ScriptedLoadableModuleWidget, ModuleWidgetMixin):
     slicer.mrmlScene.AddObserver(slicer.vtkMRMLScene.EndImportEvent, self.LoadCaseCompletedCallback)
 
   @vtk.calldata_type(vtk.VTK_OBJECT)
-  def StartCaseImportCallback(self, caller, eventId, callData):
+  def StartCaseImportCallback(self, caller, eventId, callData = None):
     print("loading case")
     self.logic.update_observers(self.StartCaseImportEvent)
 
   @vtk.calldata_type(vtk.VTK_OBJECT)
-  def LoadCaseCompletedCallback(self, caller, eventId, callData):
+  def LoadCaseCompletedCallback(self, caller, eventId, callData = None):
     print("case loaded")
     self.logic.update_observers(self.LoadCaseCompletedEvent)
 
@@ -182,6 +182,7 @@ class SlicerCaseManagerWidget(ScriptedLoadableModuleWidget, ModuleWidgetMixin):
       self.generatedOutputDirectory = ""
 
   def createPatientWatchBox(self):
+    WatchBoxAttribute.TRUNCATE_LENGTH = 30
     self.patientWatchBoxInformation = [WatchBoxAttribute('PatientID', 'Patient ID: ', DICOMTAGS.PATIENT_ID),
                                        WatchBoxAttribute('PatientName', 'Patient Name: ', DICOMTAGS.PATIENT_NAME),
                                        WatchBoxAttribute('DOB', 'Date of Birth: ', DICOMTAGS.PATIENT_BIRTH_DATE),
