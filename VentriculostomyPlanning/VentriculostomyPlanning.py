@@ -16,7 +16,7 @@ import PercutaneousApproachAnalysis
 from PercutaneousApproachAnalysis import *
 from numpy import linalg
 from code import interact
-from VentriculostomyPlanningUtils.SlicerCaseManager import SlicerCaseManagerWidget, onReturnProcessEvents, beforeRunProcessEvents
+from VentriculostomyPlanningUtils.SlicerCaseManager import SlicerCaseManagerWidget, beforeRunProcessEvents
 from VentriculostomyPlanningUtils.PopUpMessageBox import SerialAssignMessageBox, SagittalCorrectionMessageBox
 from VentriculostomyPlanningUtils.UserEvents import VentriculostomyUserEvents
 from VentriculostomyPlanningUtils.UsefulFunctions import UsefulFunctions
@@ -595,7 +595,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
       self.createPlanningLineButton.setEnabled(False)
       self.saveDataButton.setEnabled(False)
       self.setReverseViewButton.checked = False
-      #self.setWindowLevelButton.checked = False
       self.checkCurrentProgress()
     pass
 
@@ -775,6 +774,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
       self.logic.register(self)
       if self.slicerCaseWidget.planningDICOMDataDirectory and listdir(self.slicerCaseWidget.planningDICOMDataDirectory):
         self.slicerCaseWidget.patientWatchBox.sourceFile = os.path.join(self.slicerCaseWidget.planningDICOMDataDirectory,listdir(self.slicerCaseWidget.planningDICOMDataDirectory)[0])
+      self.slicerCaseWidget.currentCaseDirectory
       self.logic.baseVolumeNode = selectedNode
       if self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_ventricleVolume"):
         self.logic.ventricleVolume = slicer.mrmlScene.GetNodeByID(self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_ventricleVolume"))
@@ -998,6 +998,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
       distalNode.AddObserver(slicer.vtkMRMLMarkupsNode().PointEndInteractionEvent, self.logic.endModifiyCylinder)
     if vesselSeedsNode:
       vesselSeedsNode.AddObserver(slicer.vtkMRMLMarkupsNode.MarkupAddedEvent, self.logic.endPlacement)
+    # The TriggerDistalSelectionEvent and CheckSagittalCorrectionEvent are custum events
     slicer.mrmlScene.AddObserver(VentriculostomyUserEvents.TriggerDistalSelectionEvent,
                                  self.logic.startEditPlanningDistal)
     slicer.mrmlScene.AddObserver(VentriculostomyUserEvents.CheckSagittalCorrectionEvent,

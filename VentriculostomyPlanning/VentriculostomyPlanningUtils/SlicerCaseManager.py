@@ -26,6 +26,33 @@ def beforeRunProcessEvents(func):
   return wrapper
 
 
+class DICOMFileMixedInformationWatchBox(DICOMBasedInformationWatchBox):
+
+  CURRENTDIRTAG = "currentdirtag"
+  def __init__(self, attributes, title="", sourceFile=None, parent=None, columns=1):
+    super(DICOMFileMixedInformationWatchBox, self).__init__(attributes, title, sourceFile, parent, columns)
+
+  def reset(self):
+    super(DICOMFileMixedInformationWatchBox, self).reset()
+
+  def updateInformationFromWatchBoxAttribute(self, attribute):
+    if attribute.tags and self.sourceFile:
+      values = []
+      for tag in attribute.tags:
+        currentValue = ModuleLogicMixin.getDICOMValue(self.sourceFile, tag, "")
+        if tag in self.DATE_TAGS_TO_FORMAT:
+          currentValue = self._formatDate(currentValue)
+        elif tag == DICOMTAGS.PATIENT_NAME:
+          currentValue = self._formatPatientName(currentValue)
+        elif tag == self.CURRENTDIRTAG:
+          path = os.path.normpath(self.sourceFile)
+          folderList = path.split(os.sep)
+          if len(folderList)>=4:
+            currentValue = folderList[-4]
+        values.append(currentValue)
+      return self._getTagValueFromTagValues(values)
+    return ""
+
 class SlicerCaseManager(ScriptedLoadableModule):
   def __init__(self, parent):
     ScriptedLoadableModule.__init__(self, parent)
@@ -93,11 +120,7 @@ class SlicerCaseManagerWidget(ScriptedLoadableModuleWidget, ModuleWidgetMixin):
   @currentCaseDirectory.setter
   def currentCaseDirectory(self, path):
     self._currentCaseDirectory = path
-    valid = path is not None
-    if valid:
-      self.updateCaseWatchBox()
-    else:
-      self.caseWatchBox.reset()
+    self.patientWatchBox.setInformation("CurrentCaseDirectory", os.path.relpath(path, self.caseRootDir), toolTip=path)
 
   @property
   def generatedOutputDirectory(self):
@@ -151,9 +174,6 @@ class SlicerCaseManagerWidget(ScriptedLoadableModuleWidget, ModuleWidgetMixin):
     if self.getSetting('CasesRootLocation'):
       self.rootDirectoryLabel = qt.QLabel(self.getSetting('CasesRootLocation'))
     self.createPatientWatchBox()
-    #self.createIntraopWatchBox()
-    self.createCaseWatchBox()
-    #self.createCaseInformationArea()
     self.setupConnections()
     self.layout.addWidget(self._mainGUIGroupBox)
     slicer.mrmlScene.AddObserver(slicer.vtkMRMLScene.StartImportEvent, self.StartCaseImportCallback)
@@ -187,13 +207,9 @@ class SlicerCaseManagerWidget(ScriptedLoadableModuleWidget, ModuleWidgetMixin):
                                        WatchBoxAttribute('PatientName', 'Patient Name: ', DICOMTAGS.PATIENT_NAME),
                                        WatchBoxAttribute('DOB', 'Date of Birth: ', DICOMTAGS.PATIENT_BIRTH_DATE),
                                        WatchBoxAttribute('StudyDate', 'Planning Study Date: ', DICOMTAGS.STUDY_DATE),
-                                       WatchBoxAttribute('CurrentCaseDirectory', 'Case Directory')]
-    self.patientWatchBox = DICOMBasedInformationWatchBox(self.patientWatchBoxInformation)
+                                       WatchBoxAttribute('CurrentCaseDirectory', 'Case Directory: ', DICOMFileMixedInformationWatchBox.CURRENTDIRTAG)]
+    self.patientWatchBox = DICOMFileMixedInformationWatchBox(self.patientWatchBoxInformation)
     self.layout.addWidget(self.patientWatchBox)
-
-  def createCaseWatchBox(self):
-    watchBoxInformation = [WatchBoxAttribute('CurrentCaseDirectory', 'Directory')]
-    self.caseWatchBox = BasicInformationWatchBox(watchBoxInformation, title="Current Case")
 
 
   def setupConnections(self):
@@ -201,10 +217,6 @@ class SlicerCaseManagerWidget(ScriptedLoadableModuleWidget, ModuleWidgetMixin):
     self.openCaseButton.clicked.connect(self.onOpenCaseButtonClicked)
     self.casesRootDirectoryButton.directorySelected.connect(lambda: setattr(self, "caseRootDir",
                                                                            self.casesRootDirectoryButton.directory))
-
-  def updateCaseWatchBox(self):
-    value = self.currentCaseDirectory
-    self.patientWatchBox.setInformation("CurrentCaseDirectory", os.path.relpath(value, self.caseRootDir), toolTip=value)
 
   def onCreateNewCaseButtonClicked(self):
     if not self.checkAndWarnUserIfCaseInProgress():
@@ -264,12 +276,10 @@ class SlicerCaseManagerWidget(ScriptedLoadableModuleWidget, ModuleWidgetMixin):
   def clearData(self):
     # To do: clear the flags
     if self.currentCaseDirectory:
-      #self.logic.closeCase(self.currentCaseDirectory) #this function remove the whole case directory.
       self.currentCaseDirectory = None
     slicer.mrmlScene.Clear(0)
     self.logic.update_observers(self.CloseCaseEvent)
     self.patientWatchBox.sourceFile = None
-    self.caseWatchBox.sourceFile = None
     pass
 
 
