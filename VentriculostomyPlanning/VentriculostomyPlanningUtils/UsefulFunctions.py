@@ -67,10 +67,12 @@ class UsefulFunctions(object):
     return outputImageData
 
   def createHoleFilledVolumeNode(self, ventricleVolume, thresholdValue, samplingFactor, morphologyParameters):
+    
     holeFillKernelSize = morphologyParameters[0]
     maskKernelSize = morphologyParameters[1]
     resampleFilter = sitk.ResampleImageFilter()
     ventricleImage = sitk.Cast(sitkUtils.PullFromSlicer(ventricleVolume.GetID()), sitk.sitkInt16)
+    
     resampleFilter.SetSize(numpy.array(ventricleImage.GetSize()) / samplingFactor)
     resampleFilter.SetOutputSpacing(numpy.array(ventricleImage.GetSpacing()) * samplingFactor)
     resampleFilter.SetOutputDirection(ventricleImage.GetDirection())
@@ -78,20 +80,24 @@ class UsefulFunctions(object):
     resampledImage = resampleFilter.Execute(ventricleImage)
     thresholdFilter = sitk.BinaryThresholdImageFilter()
     thresholdImage = thresholdFilter.Execute(resampledImage, thresholdValue, 10000, 1, 0)
+
     padFilter = sitk.ConstantPadImageFilter()
     padFilter.SetPadLowerBound(holeFillKernelSize)
     padFilter.SetPadUpperBound(holeFillKernelSize)
     paddedImage = padFilter.Execute(thresholdImage)
+    
     dilateFilter = sitk.BinaryDilateImageFilter()
     dilateFilter.SetKernelRadius(holeFillKernelSize)
     dilateFilter.SetBackgroundValue(0)
     dilateFilter.SetForegroundValue(1)
     dilatedImage = dilateFilter.Execute(paddedImage)
+    
     erodeFilter = sitk.BinaryErodeImageFilter()
     erodeFilter.SetKernelRadius(holeFillKernelSize)
     erodeFilter.SetBackgroundValue(0)
     erodeFilter.SetForegroundValue(1)
     erodedImage = erodeFilter.Execute(dilatedImage)
+    
     fillHoleFilter = sitk.BinaryFillholeImageFilter()
     holefilledImage = fillHoleFilter.Execute(erodedImage)
     dilateFilter = sitk.BinaryDilateImageFilter()
@@ -105,6 +111,79 @@ class UsefulFunctions(object):
     subtractedImageNode = sitkUtils.PushToSlicer(subtractedImage, "subtractedImage", 0, False)
     return holefilledImageNode, subtractedImageNode
 
+
+  def createHoleFilledVolumeNode2(self, ventricleVolume, thresholdValue, samplingFactor, morphologyParameters):
+
+    maskKernelSize = morphologyParameters[1]
+
+    ## Convert to binary image by threshold
+    resampleFilter = sitk.ResampleImageFilter()
+    ventricleImage = sitk.Cast(sitkUtils.PullFromSlicer(ventricleVolume.GetID()), sitk.sitkInt16)
+    resampleFilter.SetSize(numpy.array(ventricleImage.GetSize()) / samplingFactor)
+    resampleFilter.SetOutputSpacing(numpy.array(ventricleImage.GetSpacing()) * samplingFactor)
+    resampleFilter.SetOutputDirection(ventricleImage.GetDirection())
+    resampleFilter.SetOutputOrigin(numpy.array(ventricleImage.GetOrigin()))
+    resampledImage = resampleFilter.Execute(ventricleImage)
+    thresholdFilter = sitk.BinaryThresholdImageFilter()
+    thresholdImage = thresholdFilter.Execute(resampledImage, thresholdValue, 10000, 1, 0)
+    
+    ## Close the holes at top and bottom slices
+    inputSize = list(thresholdImage.GetSize())
+    extractFilter = sitk.ExtractImageFilter()
+    extractFilter.SetDirectionCollapseToStrategy(sitk.ExtractImageFilter.DIRECTIONCOLLAPSETOSUBMATRIX)
+    extractFilter.SetSize([inputSize[0], inputSize[1], 0])
+
+    pasteFilter = sitk.PasteImageFilter()
+    pasteFilter.SetSourceIndex([0, 0, 0])
+    pasteFilter.SetSourceSize([inputSize[0], inputSize[1], 1])
+    sliceFillHoleFilter = sitk.BinaryFillholeImageFilter()
+    
+    # Close top slice
+    extractFilter.SetIndex([0,0, 0])
+    topSlice = extractFilter.Execute(thresholdImage)
+    topSliceFillHole = sliceFillHoleFilter.Execute(topSlice)
+    topVolumeFillHole = sitk.JoinSeries(topSliceFillHole)
+    pasteFilter.SetDestinationIndex([0, 0, 0])
+    topClosedThresholdImage = pasteFilter.Execute(thresholdImage, topVolumeFillHole)
+
+    # Close bottom slice
+    extractFilter.SetIndex([0,0,inputSize[2]-1])
+    bottomSlice = extractFilter.Execute(thresholdImage)
+    bottomSliceFillHole = sliceFillHoleFilter.Execute(bottomSlice)
+    bottomVolumeFillHole = sitk.JoinSeries(bottomSliceFillHole)
+    pasteFilter.SetDestinationIndex([0, 0, inputSize[2]-1])
+    topBottomClosedThresholdImage = pasteFilter.Execute(topClosedThresholdImage, bottomVolumeFillHole)
+
+    ## Padding
+    padFilter = sitk.ConstantPadImageFilter()
+    padFilter.SetPadLowerBound([1,1,1])
+    padFilter.SetPadUpperBound([1,1,1])
+    paddedImage = padFilter.Execute(topBottomClosedThresholdImage)
+    
+    ## Close
+    closingFilter = sitk.BinaryMorphologicalClosingImageFilter()
+    closingFilter.SetForegroundValue(1)
+    closingFilter.SafeBorderOn()
+    closedImage = closingFilter.Execute(paddedImage)
+
+    ## Fill the holes in 3D
+    fillHoleFilter = sitk.BinaryFillholeImageFilter()
+    holefilledImage = fillHoleFilter.Execute(closedImage)
+    
+    dilateFilter = sitk.BinaryDilateImageFilter()
+    dilateFilter.SetKernelRadius(maskKernelSize)
+    dilateFilter.SetBackgroundValue(0)
+    dilateFilter.SetForegroundValue(1)
+    dilatedImage = dilateFilter.Execute(holefilledImage)
+    
+    subtractFilter = sitk.SubtractImageFilter()
+    subtractedImage = subtractFilter.Execute(dilatedImage, holefilledImage)
+    holefilledImageNode = sitkUtils.PushToSlicer(holefilledImage, "holefilledImage", 0, False)
+    subtractedImageNode = sitkUtils.PushToSlicer(subtractedImage, "subtractedImage", 0, False)
+    return holefilledImageNode, subtractedImageNode
+
+
+  
   def createModelBaseOnVolume(self, holefilledImageNode, outputModelNode):
     if holefilledImageNode:
       holefilledImageData = holefilledImageNode.GetImageData()

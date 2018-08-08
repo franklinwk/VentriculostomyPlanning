@@ -2114,7 +2114,8 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
     self.topPoint = []
     self.surfaceModelThreshold = -500.0
     # kernel size in pixel: first vector is the hole filling kernel size, second vector is related with the mask thickness
-    self.morphologyParameters = [[10,10,6], [3,3,1]]
+    #self.morphologyParameters = [[10,10,6], [3,3,1]]
+    self.morphologyParameters = [[1,1,1], [1,1,1]]
     self.distanceMapThreshold = 100
     self.venousMargin = 10.0 #in mm
     self.minimalVentricleLen = 10.0 # in mm
@@ -2288,7 +2289,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
 
   def getOrCreateHoleSkullVolumeNode(self):
     if (self.holeFilledImageNode is None) or (self.subtractedImageNode is None):
-      self.holeFilledImageNode, self.subtractedImageNode = self.functions.createHoleFilledVolumeNode(self.ventricleVolume, self.surfaceModelThreshold, self.samplingFactor, self.morphologyParameters)
+      self.holeFilledImageNode, self.subtractedImageNode = self.functions.createHoleFilledVolumeNode2(self.ventricleVolume, self.surfaceModelThreshold, self.samplingFactor, self.morphologyParameters)
     return self.holeFilledImageNode, self.subtractedImageNode
 
   def startEditPlanningTarget(self):
