@@ -1305,7 +1305,8 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         if self.logic.segmentationNode.GetSegmentation().GetNthSegment(0) is not None:
           printModel = slicer.mrmlScene.GetNodeByID(self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_printModel"))
           if printModel:
-            slicer.mrmlScene.RemoveNode(printModel)
+            pass
+            #slicer.mrmlScene.RemoveNode(printModel)
           printModel = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLModelNode", modelName).GetItemAsObject(0)
           printModel.SetDisplayVisibility(False)
           self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_printModel", printModel.GetID())
@@ -2159,13 +2160,23 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
     markupDisplay.SetScene(slicer.mrmlScene)
     markupDisplay.SetVisibility(0)
     slicer.mrmlScene.AddNode(markupDisplay)
+    
+    self.modelNodeGuide = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
+    self.modelNodeGuide.SetName("Attachment")
+    guideDisplayNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelDisplayNode")
+    guideDisplayNode.SetColor(red[0], red[1], red[2])
+    guideDisplayNode.SetScene(slicer.mrmlScene)
+    slicer.mrmlScene.AddNode(guideDisplayNode)
+    self.modelNodeGuide.SetAndObserveDisplayNodeID(guideDisplayNode.GetID())
+    slicer.mrmlScene.AddNode(self.modelNodeGuide)    
+    
     self.trajectoryProjectedMarker = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
     self.trajectoryProjectedMarker.SetName("trajectoryProject")
     slicer.mrmlScene.AddNode(self.trajectoryProjectedMarker)
     self.trajectoryProjectedMarker.SetAndObserveDisplayNodeID(markupDisplay.GetID())
     self.guideVolumeNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLLabelMapVolumeNode")
     self.guideVolumeNode.SetName("GuideForVentriclostomy")
-    slicer.mrmlScene.AddNode(self.guideVolumeNode)
+    slicer.mrmlScene.AddNode(self.guideVolumeNode)    
     self.segmentationNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLSegmentationNode")
     self.segmentationNode.SetName("segmentation")
     slicer.mrmlScene.AddNode(self.segmentationNode)
@@ -3564,16 +3575,22 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
     imageFilterSubtract.Update()
     #------------------------------------
 
-    imageFilterMax = vtk.vtkImageMathematics()
-    imageFilterMax.SetInput1Data(clippedImageDataGuide)
-    imageFilterMax.SetInput2Data(clippedImageDataBase)
-    imageFilterMax.SetOperationToMax()  # performed union operation on the two volume
-    imageFilterMax.Update()
+    #imageFilterMax = vtk.vtkImageMathematics()
+    #imageFilterMax.SetInput1Data(clippedImageDataGuide)
+    #imageFilterMax.SetInput2Data(clippedImageDataBase)
+    #imageFilterMax.SetOperationToMax()  # performed union operation on the two volume
+    #imageFilterMax.Update()
     imageFilterMax2 = vtk.vtkImageMathematics()
-    imageFilterMax2.SetInput1Data(imageFilterMax.GetOutput())
+    imageFilterMax2.SetInput1Data(clippedImageDataBase)
     imageFilterMax2.SetInput2Data(imageFilterSubtract.GetOutput())
     imageFilterMax2.SetOperationToMax()  # performed union operation on the two volume
     imageFilterMax2.Update()
+    
+     #----------------GuideModel-------------
+    self.modelNodeGuide.SetAndObservePolyData(guidancePolyData)
+     
+     #---------------------------------------
+    
 
     self.guideVolumeNode.SetIJKToRASMatrix(matrix)
     self.guideVolumeNode.SetAndObserveImageData(imageFilterMax2.GetOutput())
@@ -3633,8 +3650,9 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
     yThickness = (self.samplingFactor * self.morphologyParameters[1][1]) * self.baseVolumeNode.GetSpacing()[1]
     posCoronal[0] = posCoronal[0] + math.sin(self.sagittalYawAngle)*xThickness  # shift in the x axis to cover the dilated skull
     posCoronal[1] = posCoronal[1] + math.cos(self.sagittalYawAngle)*yThickness # shift in the y axis to cover the dilated skull
-    centerPos = [0.5*(posEntry[0]+posSagittal[0]), 0.5*(posEntry[1]+posCoronal[1]), 0.5*(posTop[2]+posNasion[2])]
-    guidanceDimension = [maxDistX, maxDistY + yThickness, abs(posTop[2]-posNasion[2])]
+    #centerPos = [0.5*(posEntry[0]+posSagittal[0]), 0.5*(posEntry[1]+posCoronal[1]), 0.5*(posTop[2]+posNasion[2])]
+    centerPos = [posEntry[0], 0.5*(posEntry[1]+posCoronal[1]), 0.5*(posTop[2]+posNasion[2])]
+    guidanceDimension = [maxDistX, maxDistY + yThickness + 20, abs(posTop[2]-posNasion[2])+5]
     return centerPos, guidanceDimension
 
   def calcPitchYawAngles(self):
