@@ -315,6 +315,15 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
                                                  iconSize=qt.QSize(self.buttonHeight, self.buttonWidth))
     self.createPlanningLineButton.connect('clicked(bool)', self.onCreatePlanningLine)
     self.mainGUIGroupBoxLayout.addWidget(self.createPlanningLineButton, 2, 5)
+    
+    # self.createGuideModelButton = self.createButton(title="",
+                                                 # toolTip="Create guide model.",
+                                                 # enabled=False,
+                                                 # maximumHeight=self.buttonHeight, maximumWidth=self.buttonWidth,
+                                                 # icon=self.createIcon("confirm.png", self.scriptDirectory),
+                                                 # iconSize=qt.QSize(self.buttonHeight, self.buttonWidth))
+    # self.createGuideModelButton.connect('clicked(bool)', self.onCreateGuideModel)
+    # self.mainGUIGroupBoxLayout.addWidget(self.createGuideModelButton, 2, 6)
 
     self.saveDataButton = self.createButton(title="",
                                                 toolTip="Save the scene and data.",
@@ -941,6 +950,8 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     self.addVesselSeedButton.setEnabled(False)
     self.relocatePathToKocherButton.setEnabled(False)
     self.createPlanningLineButton.setEnabled(False)
+    
+    
     self.tabMainGroupBox.visible = False
     if self.slicerCaseWidget.currentCaseDirectory:
       self.LoadCaseButton.setEnabled(True)
@@ -1282,13 +1293,19 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         cannulaNode.AddObserver(cannulaNode.PointStartInteractionEvent, self.onResetPlanningOutput)
         self.logic.generateLabelMapFor3DModel()
         slicer.app.processEvents()
+        
+        #TODO: ^ Generate that label map for 3D Model earlier on at the start for the face mask
+        self.onCreateGuideModel()
+        
         # Export the label image to vtkMRMLModelNode
+        #TODO: Move this earlier
         modelName = self.logic.guideVolumeNode.GetName()
         guidanceModelCollect = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLModelNode", modelName)
         for modelIndex in range(guidanceModelCollect.GetNumberOfItems()):
           modelNode = guidanceModelCollect.GetItemAsObject(modelIndex)
           slicer.mrmlScene.RemoveNode(modelNode.GetDisplayNode())
           slicer.mrmlScene.RemoveNode(modelNode)
+        #Create Face Mask
         self.activeSegmentSelector.setCurrentNode(self.logic.segmentationNode)
         self.logic.segmentationNode.GetSegmentation().RemoveAllSegments()
         self.importRadioButton.click()
@@ -1305,8 +1322,9 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         if self.logic.segmentationNode.GetSegmentation().GetNthSegment(0) is not None:
           printModel = slicer.mrmlScene.GetNodeByID(self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_printModel"))
           if printModel:
-            pass
-            #slicer.mrmlScene.RemoveNode(printModel)
+            #pass
+            #TODO: Fix this (try with a fresh scene?)
+            slicer.mrmlScene.RemoveNode(printModel)
           printModel = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLModelNode", modelName).GetItemAsObject(0)
           printModel.SetDisplayVisibility(False)
           self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_printModel", printModel.GetID())
@@ -1316,9 +1334,72 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
           rightPrintPartNode = slicer.mrmlScene.GetNodeByID(
             self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_rightPrintPart"))
           self.logic.cutModel(printModel, leftPrintPartNode, rightPrintPartNode)
+          
+          
+        #Create attachment model without hole
+        attachmentName = self.logic.guideAttachmentNode.GetName()
+        attachmentModelCollect = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLModelNode", attachmentName)
+        for modelIndex in range(attachmentModelCollect.GetNumberOfItems()):
+          modelNode = attachmentModelCollect.GetItemAsObject(modelIndex)
+          slicer.mrmlScene.RemoveNode(modelNode.GetDisplayNode())
+          slicer.mrmlScene.RemoveNode(modelNode)
+        self.activeSegmentSelector.setCurrentNode(self.logic.segmentationNode)
+        self.logic.segmentationNode.GetSegmentation().RemoveAllSegments()
+        self.importRadioButton.click()
+        self.labelMapRadioButton.click()
+        slicer.app.processEvents()
+        self.labelMapSelector.setCurrentNode(self.logic.guideAttachmentNode)
+        self.portPushButton.click()
+        slicer.app.processEvents()
+        self.exportRadioButton.click()
+        self.modelsRadioButton.click()
+        slicer.app.processEvents()
+        self.portPushButton.click()
+        slicer.app.processEvents()
+        if self.logic.segmentationNode.GetSegmentation().GetNthSegment(0) is not None:
+          #printModel = slicer.mrmlScene.GetNodeByID(self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_printModel"))
+          #if printModel:
+          #  slicer.mrmlScene.RemoveNode(printModel)
+          attachmentModel = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLModelNode", attachmentName).GetItemAsObject(0)
+          #attachmentModel.SetDisplayVisibility(False)
+          #self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_printModel", attachmentModel.GetID())
+        
+        #Generate guide hole
+        targetPos = numpy.array([0.0, 0.0, 0.0])
+        self.logic.cannulaManager.getFirstPoint(targetPos)
+        entryPos = numpy.array([0.0, 0.0, 0.0])
+        self.logic.cannulaManager.getLastPoint(entryPos)
+        transform = self.logic.calculateCannulaTransform()
+        transformWithTranslate = vtk.vtkTransform()
+        transformWithTranslate.SetMatrix(transform.GetMatrix())
+        transformWithTranslate.RotateX(-90.0)
+        transformWithTranslate.PostMultiply()
+        transformWithTranslate.Translate(entryPos)
+        cylinder = self.logic.functions.generateCylinderModelWithTransform(2.5, 200.0, transformWithTranslate)
+        
+        #Create hole in attachment model
+        booleanFilter = vtk.vtkBooleanOperationPolyDataFilter()
+        #booleanFilter.SetOperationToDifference()
+        booleanFilter.SetOperationToUnion()
+        booleanFilter.SetInputData(0, attachmentModel.GetPolyData())
+        booleanFilter.SetInputData(1, cylinder)
+        booleanFilter.Update()
+        #attachmentModel.SetAndObservePolyData(booleanFilter.GetOutput())
+        
+        cylinderNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
+        cylinderNode.SetName("TEMPCYLINDER")
+        cylinderDisplayNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelDisplayNode")
+        cylinderDisplayNode.SetColor(1.0, 0.0, 0.0)
+        cylinderDisplayNode.SetScene(slicer.mrmlScene)
+        slicer.mrmlScene.AddNode(cylinderDisplayNode)
+        cylinderNode.SetAndObserveDisplayNodeID(cylinderDisplayNode.GetID())        
+        slicer.mrmlScene.AddNode(cylinderNode)    
+        #cylinderNode.SetAndObservePolyData(booleanFilter.GetOutput())
+        cylinderNode.SetAndObservePolyData(cylinder)
+        
         self.onSaveData()
     pass
-
+    
 
   def onPlaceVesselSeed(self):
     slicer.mrmlScene.RemoveObserver(self.nodeAddedEventObserverID)
@@ -1767,6 +1848,10 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     self.logic = VentriculostomyPlanningLogic()
     self.logic.register(self)
     
+  def onCreateGuideModel(self):
+    self.logic.createGuideModel()
+
+    
 class CurveManager():
 
   def __init__(self):
@@ -2116,7 +2201,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
     self.surfaceModelThreshold = -500.0
     # kernel size in pixel: first vector is the hole filling kernel size, second vector is related with the mask thickness
     #self.morphologyParameters = [[10,10,6], [3,3,1]]
-    self.morphologyParameters = [[1,1,1], [1,1,1]]
+    self.morphologyParameters = [[1,1,1], [10,10,5]]
     self.distanceMapThreshold = 100
     self.venousMargin = 10.0 #in mm
     self.minimalVentricleLen = 10.0 # in mm
@@ -2138,6 +2223,8 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
     self.transform = vtk.vtkTransform()
     self.placeWidget = slicer.qSlicerMarkupsPlaceWidget()
     self.interactionMode = EndPlacementModes.NotSpecifiedMode
+    
+    self.guideHoleDiameter = 5.0
 
   def enableAuxilaryNodes(self):
     # Create display node
@@ -2161,14 +2248,9 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
     markupDisplay.SetVisibility(0)
     slicer.mrmlScene.AddNode(markupDisplay)
     
-    self.modelNodeGuide = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
-    self.modelNodeGuide.SetName("Attachment")
-    guideDisplayNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelDisplayNode")
-    guideDisplayNode.SetColor(red[0], red[1], red[2])
-    guideDisplayNode.SetScene(slicer.mrmlScene)
-    slicer.mrmlScene.AddNode(guideDisplayNode)
-    self.modelNodeGuide.SetAndObserveDisplayNodeID(guideDisplayNode.GetID())
-    slicer.mrmlScene.AddNode(self.modelNodeGuide)    
+    self.guideAttachmentNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLLabelMapVolumeNode")
+    self.guideAttachmentNode.SetName("Attachment")
+    slicer.mrmlScene.AddNode(self.guideAttachmentNode)    
     
     self.trajectoryProjectedMarker = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
     self.trajectoryProjectedMarker.SetName("trajectoryProject")
@@ -2226,6 +2308,10 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
       slicer.mrmlScene.RemoveNode(self.guideVolumeNode.GetDisplayNode())
       slicer.mrmlScene.RemoveNode(self.guideVolumeNode)
       self.guideVolumeNode = None
+    if self.guideAttachmentNode:
+      slicer.mrmlScene.RemoveNode(self.guideAttachmentNode.GetDisplayNode())
+      slicer.mrmlScene.RemoveNode(self.guideAttachmentNode)
+      self.guideAttachmentNode = None      
     if self.segmentationNode:
       slicer.mrmlScene.RemoveNode(self.segmentationNode.GetDisplayNode())
       slicer.mrmlScene.RemoveNode(self.segmentationNode)
@@ -3544,56 +3630,10 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
     clippedImage  = self.functions.clipVolumeWithPolyData(self.holeFilledImageNode, basePolyData, True, 1)
     clippedImageDataBase = self.functions.inverseVTKImage(clippedImage)
     matrix = vtk.vtkMatrix4x4()
-    self.holeFilledImageNode.GetIJKToRASMatrix(matrix)
-    centerPos, guidanceDimension = self.getGuidanceCubeBoundary()
-    guidancePolyData = self.functions.generateCubeModelWithYawAngle(centerPos, self.sagittalYawAngle, guidanceDimension)
-    clippedImageDataGuide = self.functions.clipVolumeWithPolyData(self.subtractedImageNode, guidancePolyData, True, 0)
-    # Generate Donut like structure at the entry
-    targetPos = numpy.array([0.0, 0.0, 0.0])
-    self.cannulaManager.getFirstPoint(targetPos)
-    entryPos = numpy.array([0.0, 0.0, 0.0])
-    self.cannulaManager.getLastPoint(entryPos)
-    xThickness = (self.samplingFactor * self.morphologyParameters[1][0]) * self.baseVolumeNode.GetSpacing()[0]
-    yThickness = (self.samplingFactor * self.morphologyParameters[1][1]) * self.baseVolumeNode.GetSpacing()[1]
-    totalThickness = numpy.linalg.norm([xThickness, yThickness, 0])
-    transform = self.calculateCannulaTransform()
-    transformWithTranslate = vtk.vtkTransform()
-    transformWithTranslate.SetMatrix(transform.GetMatrix())
-    transformWithTranslate.RotateX(-90.0)
-    transformWithTranslate.PostMultiply()
-    transformWithTranslate.Translate(entryPos)
-    cylinderOutside = self.functions.generateCylinderModelWithTransform(4.0, totalThickness * 2, transformWithTranslate)
-    clippedImage = self.functions.clipVolumeWithPolyData(self.holeFilledImageNode, cylinderOutside, True, 1)
-    clippedImageOutside = self.functions.inverseVTKImage(clippedImage)
-    cylinderInside = self.functions.generateCylinderModelWithTransform(2.0, totalThickness * 2, transformWithTranslate)
-    clippedImage = self.functions.clipVolumeWithPolyData(self.holeFilledImageNode, cylinderInside, True, 1)
-    clippedImageInside = self.functions.inverseVTKImage(clippedImage)
-    imageFilterSubtract = vtk.vtkImageMathematics()
-    imageFilterSubtract.SetInput1Data(clippedImageOutside)
-    imageFilterSubtract.SetInput2Data(clippedImageInside)
-    imageFilterSubtract.SetOperationToSubtract()  # performed subtraction operation on the two volume
-    imageFilterSubtract.Update()
-    #------------------------------------
-
-    #imageFilterMax = vtk.vtkImageMathematics()
-    #imageFilterMax.SetInput1Data(clippedImageDataGuide)
-    #imageFilterMax.SetInput2Data(clippedImageDataBase)
-    #imageFilterMax.SetOperationToMax()  # performed union operation on the two volume
-    #imageFilterMax.Update()
-    imageFilterMax2 = vtk.vtkImageMathematics()
-    imageFilterMax2.SetInput1Data(clippedImageDataBase)
-    imageFilterMax2.SetInput2Data(imageFilterSubtract.GetOutput())
-    imageFilterMax2.SetOperationToMax()  # performed union operation on the two volume
-    imageFilterMax2.Update()
-    
-     #----------------GuideModel-------------
-    self.modelNodeGuide.SetAndObservePolyData(guidancePolyData)
-     
-     #---------------------------------------
-    
+    self.holeFilledImageNode.GetIJKToRASMatrix(matrix) 
 
     self.guideVolumeNode.SetIJKToRASMatrix(matrix)
-    self.guideVolumeNode.SetAndObserveImageData(imageFilterMax2.GetOutput())
+    self.guideVolumeNode.SetAndObserveImageData(clippedImageDataBase)
     pass
 
   def cutModel(self, printModel, leftPrintPartNode, rightPrintPartNode):
@@ -3621,6 +3661,8 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
     leftPrintPartNode.SetAndObservePolyData(cuttedPolyData)
 
   def getGuidanceCubeBoundary(self):
+    #Create Guidance Cube boundaries for both vertical and horizontal directions
+    holeDiameter = self.guideHoleDiameter
     posNasion = [0.0]*3
     self.sagittalPlanningCurveManager.getFirstPoint(posNasion)
     posEntry = [0.0, 0.0, 0.0]
@@ -3650,10 +3692,17 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
     yThickness = (self.samplingFactor * self.morphologyParameters[1][1]) * self.baseVolumeNode.GetSpacing()[1]
     posCoronal[0] = posCoronal[0] + math.sin(self.sagittalYawAngle)*xThickness  # shift in the x axis to cover the dilated skull
     posCoronal[1] = posCoronal[1] + math.cos(self.sagittalYawAngle)*yThickness # shift in the y axis to cover the dilated skull
+    
     #centerPos = [0.5*(posEntry[0]+posSagittal[0]), 0.5*(posEntry[1]+posCoronal[1]), 0.5*(posTop[2]+posNasion[2])]
-    centerPos = [posEntry[0], 0.5*(posEntry[1]+posCoronal[1]), 0.5*(posTop[2]+posNasion[2])]
-    guidanceDimension = [maxDistX, maxDistY + yThickness + 20, abs(posTop[2]-posNasion[2])+5]
-    return centerPos, guidanceDimension
+    #centerPos = [posEntry[0], 0.5*(posEntry[1]+posCoronal[1]), 0.5*(posTop[2]+posNasion[2])]
+    centerPosV = [posCoronal[0], 0.5*(posEntry[1]+posCoronal[1]), 0.5*(posTop[2]+posNasion[2])]
+    guidanceDimensionV = [maxDistX, maxDistY + yThickness + 20, abs(posTop[2]-posNasion[2])+20]
+    
+    centerPosH = [0.5*(posEntry[0]+posCoronal[0]), posEntry[1], 0.5*(posTop[2]+posNasion[2])]
+    dimensionH_X = abs(posEntry[0]-posCoronal[0]) + holeDiameter + 10.0
+    guidanceDimensionH = [dimensionH_X, holeDiameter + 10.0, abs(posTop[2]-posNasion[2])+20]
+    
+    return centerPosV, guidanceDimensionV, centerPosH, guidanceDimensionH
 
   def calcPitchYawAngles(self):
     firstPos = numpy.array([0.0,0.0,0.0])
@@ -3758,6 +3807,32 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
 
     return averageNormal
 
+  def createGuideModel(self):
+    #Generate guide arm
+    centerPosV, guidanceDimensionV, centerPosH, guidanceDimensionH = self.getGuidanceCubeBoundary()
+    
+    #Vertical guide arm
+    guidancePolyDataV = self.functions.generateCubeModelWithYawAngle(centerPosV, self.sagittalYawAngle, guidanceDimensionV)
+    clippedImageDataGuideV = self.functions.clipVolumeWithPolyData(self.subtractedImageNode, guidancePolyDataV, True, 0)
+    
+    #Horizontal guide arm
+    guidancePolyDataH = self.functions.generateCubeModelWithYawAngle(centerPosH, self.sagittalYawAngle, guidanceDimensionH)
+    clippedImageDataGuideH = self.functions.clipVolumeWithPolyData(self.subtractedImageNode, guidancePolyDataH, True, 0)
+  
+    #Combine guide arms
+    imageFilterMax = vtk.vtkImageMathematics()
+    imageFilterMax.SetInput1Data(clippedImageDataGuideV)
+    imageFilterMax.SetInput2Data(clippedImageDataGuideH)
+    imageFilterMax.SetOperationToMax()  # performed union operation on the two volume
+    imageFilterMax.Update()
+    
+    matrix = vtk.vtkMatrix4x4()
+    self.holeFilledImageNode.GetIJKToRASMatrix(matrix)    
+    self.guideAttachmentNode.SetIJKToRASMatrix(matrix)
+    self.guideAttachmentNode.SetAndObserveImageData(imageFilterMax.GetOutput())
+    
+    
+    
   def updateSliceViewBasedOnPoints(self, firstPos, lastPos):
     ## due to the RAS and vtk space difference, the X axis is flipped, So the standard rotation matrix is multiplied by -1 in the X axis
     self.pitchAngle = numpy.arctan2(lastPos[2]-firstPos[2], abs(lastPos[1]-firstPos[1]))*180.0/numpy.pi
