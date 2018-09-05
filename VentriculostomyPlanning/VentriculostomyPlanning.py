@@ -1403,25 +1403,25 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
           printModel.SetAndObservePolyData(printModelWithSlot)
           
           
-          cylinderNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
-          cylinderNode.SetName("TEMPCYLINDER")
-          cylinderDisplayNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelDisplayNode")
-          cylinderDisplayNode.SetColor(1.0, 0.0, 0.0)
-          cylinderDisplayNode.SetScene(slicer.mrmlScene)
-          slicer.mrmlScene.AddNode(cylinderDisplayNode)
-          cylinderNode.SetAndObserveDisplayNodeID(cylinderDisplayNode.GetID())        
-          slicer.mrmlScene.AddNode(cylinderNode)    
-          cylinderNode.SetAndObservePolyData(slotBox1)
+          slotNode1 = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
+          slotNode1.SetName("SlotBox1")
+          slot1DisplayNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelDisplayNode")
+          slot1DisplayNode.SetColor(1.0, 0.0, 0.0)
+          slot1DisplayNode.SetScene(slicer.mrmlScene)
+          slicer.mrmlScene.AddNode(slot1DisplayNode)
+          slotNode1.SetAndObserveDisplayNodeID(slot1DisplayNode.GetID())        
+          slicer.mrmlScene.AddNode(slotNode1)    
+          slotNode1.SetAndObservePolyData(slotBox1)
 
-          cylinderNode2 = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
-          cylinderNode2.SetName("TEMPCYLINDER2")
-          cylinderDisplayNode2 = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelDisplayNode")
-          cylinderDisplayNode2.SetColor(1.0, 0.0, 0.0)
-          cylinderDisplayNode2.SetScene(slicer.mrmlScene)
-          slicer.mrmlScene.AddNode(cylinderDisplayNode2)
-          cylinderNode2.SetAndObserveDisplayNodeID(cylinderDisplayNode2.GetID())        
-          slicer.mrmlScene.AddNode(cylinderNode2)    
-          cylinderNode2.SetAndObservePolyData(slotBox2)            
+          slotNode2 = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
+          slotNode2.SetName("SlotBox2")
+          slot2DisplayNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelDisplayNode")
+          slot2DisplayNode.SetColor(1.0, 0.0, 0.0)
+          slot2DisplayNode.SetScene(slicer.mrmlScene)
+          slicer.mrmlScene.AddNode(slot2DisplayNode)
+          slotNode2.SetAndObserveDisplayNodeID(slot2DisplayNode.GetID())        
+          slicer.mrmlScene.AddNode(slotNode2)    
+          slotNode2.SetAndObservePolyData(slotBox2)          
           
           
           
@@ -1504,11 +1504,10 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         
         attachmentCutOff = self.logic.functions.polydataBoolean(attachmentWithHole, triangleFilter.GetOutput(), "difference")
         
-        #Add attachment arm
-        #attachmentWithArm = self.logic.functions.polydataBoolean(attachmentCutOff, slotBoxAttachment, "union")
+        #Cut attachment arm slot
+        attachmentWithArm = self.logic.functions.polydataBoolean(attachmentCutOff, slotBox2, "difference")
         
-        
-        attachmentModel.SetAndObservePolyData(attachmentCutOff)
+        attachmentModel.SetAndObservePolyData(attachmentWithArm)
         
         self.onSaveData()
     pass
