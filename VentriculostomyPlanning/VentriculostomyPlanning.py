@@ -275,7 +275,13 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
                                             iconSize=qt.QSize(self.buttonHeight, self.buttonWidth))
     self.selectNasionButton.connect('clicked(bool)', self.onSelectNasionPoint)
     self.mainGUIGroupBoxLayout.addWidget(self.selectNasionButton, 2, 1)
-
+    
+    self.createMaskButton = self.createButton(title="", toolTip="Create face mask for guide", enabled=False,
+                                            maximumHeight=self.buttonHeight, maximumWidth=self.buttonWidth, checkable = True,
+                                            icon=self.createIcon("faceMask.png", self.scriptDirectory),
+                                            iconSize=qt.QSize(self.buttonHeight, self.buttonWidth))
+    self.createMaskButton.connect('clicked(bool)', self.onCreateMask)
+    self.mainGUIGroupBoxLayout.addWidget(self.createMaskButton, 2, 2)    
 
     #-- Add Point
     self.defineVentricleButton = self.createButton(title="",
@@ -285,7 +291,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
                                                   icon=self.createIcon("cannula.png", self.scriptDirectory),
                                                   iconSize=qt.QSize(self.buttonHeight, self.buttonWidth))
     self.defineVentricleButton.connect('clicked(bool)', self.onDefineVentricle)
-    self.mainGUIGroupBoxLayout.addWidget(self.defineVentricleButton,2,2)
+    self.mainGUIGroupBoxLayout.addWidget(self.defineVentricleButton, 2, 3)
 
     self.addVesselSeedButton = self.createButton(title="",
                                                     toolTip="Place the seeds for venous segmentation",
@@ -294,8 +300,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
                                                     icon=self.createIcon("vessel.png", self.scriptDirectory),
                                                     iconSize=qt.QSize(self.buttonHeight, self.buttonWidth))
     self.addVesselSeedButton.connect('clicked(bool)', self.onPlaceVesselSeed)
-    self.mainGUIGroupBoxLayout.addWidget(self.addVesselSeedButton, 2, 3)
-
+    self.mainGUIGroupBoxLayout.addWidget(self.addVesselSeedButton, 2, 4)
 
     self.relocatePathToKocherButton = self.createButton(title="",
                                                  toolTip="Relocate the cannula to be close to Kocher's point",
@@ -304,8 +309,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
                                                  icon=self.createIcon("pathPlanning.png", self.scriptDirectory),
                                                  iconSize=qt.QSize(self.buttonHeight, self.buttonWidth))
     self.relocatePathToKocherButton.connect('clicked(bool)', self.onRelocatePathToKocher)
-    self.mainGUIGroupBoxLayout.addWidget(self.relocatePathToKocherButton, 2, 4)
-
+    self.mainGUIGroupBoxLayout.addWidget(self.relocatePathToKocherButton, 2, 5)
 
     self.createPlanningLineButton = self.createButton(title="",
                                                  toolTip="Confirm the target and generate the planning line.",
@@ -314,17 +318,8 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
                                                  icon=self.createIcon("confirm.png", self.scriptDirectory),
                                                  iconSize=qt.QSize(self.buttonHeight, self.buttonWidth))
     self.createPlanningLineButton.connect('clicked(bool)', self.onCreatePlanningLine)
-    self.mainGUIGroupBoxLayout.addWidget(self.createPlanningLineButton, 2, 5)
+    self.mainGUIGroupBoxLayout.addWidget(self.createPlanningLineButton, 2, 6)
     
-    # self.createGuideModelButton = self.createButton(title="",
-                                                 # toolTip="Create guide model.",
-                                                 # enabled=False,
-                                                 # maximumHeight=self.buttonHeight, maximumWidth=self.buttonWidth,
-                                                 # icon=self.createIcon("confirm.png", self.scriptDirectory),
-                                                 # iconSize=qt.QSize(self.buttonHeight, self.buttonWidth))
-    # self.createGuideModelButton.connect('clicked(bool)', self.onCreateGuideModel)
-    # self.mainGUIGroupBoxLayout.addWidget(self.createGuideModelButton, 2, 6)
-
     self.saveDataButton = self.createButton(title="",
                                                 toolTip="Save the scene and data.",
                                                 enabled=False,
@@ -332,7 +327,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
                                                 icon=self.createIcon("save.png", self.scriptDirectory),
                                                 iconSize=qt.QSize(self.buttonHeight, self.buttonWidth))
     self.saveDataButton.connect('clicked(bool)', self.onSaveData)
-    self.mainGUIGroupBoxLayout.addWidget(self.saveDataButton, 2, 6)
+    self.mainGUIGroupBoxLayout.addWidget(self.saveDataButton, 2, 7)
 
     self.viewGroupBox = qt.QGroupBox()
     self.viewGroupBoxLayout = qt.QGridLayout()
@@ -598,6 +593,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
       self.screenShotButton.caseResultDir = self.slicerCaseWidget.currentCaseDirectory
       self.SerialAssignBox.Clear()
       self.selectNasionButton.setEnabled(False)
+      self.createMaskButton.setEnabled(False)
       self.defineVentricleButton.setEnabled(False)
       self.addVesselSeedButton.setEnabled(False)
       self.relocatePathToKocherButton.setEnabled(False)
@@ -946,6 +942,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     self.LoadCaseButton.setEnabled(False)
     self.saveDataButton.setEnabled(False)
     self.selectNasionButton.setEnabled(False)
+    self.createMaskButton.setEnabled(False)
     self.defineVentricleButton.setEnabled(False)
     self.addVesselSeedButton.setEnabled(False)
     self.relocatePathToKocherButton.setEnabled(False)
@@ -967,6 +964,9 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
       if nasionNodeID:
         nasionNode = slicer.mrmlScene.GetNodeByID(nasionNodeID)
         if nasionNode.GetNumberOfFiducials()>0:
+          #TODO: Add another step to enable after nasion and before ventricle
+          #^ Check for facemask node ID
+          self.createMaskButton.setEnabled(True)
           self.defineVentricleButton.setEnabled(True)
       targetNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_target")
       distalNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_distal")
@@ -1298,13 +1298,14 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         self.onCreateGuideModel()
         
         # Export the label image to vtkMRMLModelNode
-        #TODO: Move this earlier
+        #TODO: Move this to an earlier point in workflow *****************
         modelName = self.logic.guideVolumeNode.GetName()
         guidanceModelCollect = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLModelNode", modelName)
         for modelIndex in range(guidanceModelCollect.GetNumberOfItems()):
           modelNode = guidanceModelCollect.GetItemAsObject(modelIndex)
           slicer.mrmlScene.RemoveNode(modelNode.GetDisplayNode())
           slicer.mrmlScene.RemoveNode(modelNode)
+          
         #Create Face Mask
         self.activeSegmentSelector.setCurrentNode(self.logic.segmentationNode)
         self.logic.segmentationNode.GetSegmentation().RemoveAllSegments()
@@ -1334,7 +1335,98 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
           rightPrintPartNode = slicer.mrmlScene.GetNodeByID(
             self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_rightPrintPart"))
           self.logic.cutModel(printModel, leftPrintPartNode, rightPrintPartNode)
+        
+          #Create attachment arm and slot in mask
+          #baseDimension = [130, 50, 50]
+          matrix = vtk.vtkMatrix4x4()
+          self.logic.holeFilledImageNode.GetIJKToRASMatrix(matrix)
+          nasionNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_nasion")
+          nasionNode = slicer.mrmlScene.GetNodeByID(nasionNodeID)
+          posNasion = numpy.array([0.0, 0.0, 0.0])
+          nasionNode.GetNthFiducialPosition(0, posNasion)
+          matrix.SetElement(0,3,posNasion[0])
+          matrix.SetElement(1,3,posNasion[1]+0)
+          matrix.SetElement(2,3,posNasion[2]+0)
+          cubeTransform = vtk.vtkTransform()
+          cubeTransform.Identity()
+          cubeTransform.SetMatrix(matrix)
+          cubeSource = vtk.vtkCubeSource()
+          cubeSource.SetXLength(30)
+          cubeSource.SetYLength(8)
+          cubeSource.SetZLength(5)
+          cubeSource.SetCenter(0,-28,3)
+          cubeSource.Update()
+          transformFilter = vtk.vtkTransformPolyDataFilter()
+          transformFilter.SetInputConnection(cubeSource.GetOutputPort())
+          transformFilter.SetTransform(cubeTransform)
+          transformFilter.Update()
+          triangleFilter = vtk.vtkTriangleFilter()
+          triangleFilter.SetInputData(transformFilter.GetOutput())
+          triangleFilter.Update()          
+          subdivideFilter1 = vtk.vtkLinearSubdivisionFilter()
+          subdivideFilter1.SetInputData(triangleFilter.GetOutput())
+          subdivideFilter1.SetNumberOfSubdivisions(4)
+          subdivideFilter1.Update()
+          slotBox1 = subdivideFilter1.GetOutput()
           
+          matrix2 = vtk.vtkMatrix4x4()
+          self.logic.holeFilledImageNode.GetIJKToRASMatrix(matrix2)
+          matrix2.SetElement(0,3,posNasion[0])
+          matrix2.SetElement(1,3,posNasion[1]+0)
+          matrix2.SetElement(2,3,posNasion[2]+0)
+          cubeTransform2 = vtk.vtkTransform()
+          cubeTransform2.Identity()
+          cubeTransform2.SetMatrix(matrix2)
+          cubeSource2 = vtk.vtkCubeSource()
+          cubeSource2.SetXLength(25)
+          cubeSource2.SetYLength(30)
+          cubeSource2.SetZLength(0.6)
+          cubeSource2.SetCenter(0,-18,5)
+          cubeSource2.Update()
+          transformFilter2 = vtk.vtkTransformPolyDataFilter()
+          transformFilter2.SetInputConnection(cubeSource2.GetOutputPort())
+          transformFilter2.SetTransform(cubeTransform2)
+          transformFilter2.Update()
+          triangleFilter2 = vtk.vtkTriangleFilter()
+          triangleFilter2.SetInputData(transformFilter2.GetOutput())
+          triangleFilter2.Update()          
+          subdivideFilter2 = vtk.vtkLinearSubdivisionFilter()
+          subdivideFilter2.SetInputData(triangleFilter2.GetOutput())
+          subdivideFilter2.SetNumberOfSubdivisions(4)
+          subdivideFilter2.Update()
+          slotBox2 = subdivideFilter2.GetOutput()
+          
+          #slotBoxAttachment = self.logic.functions.polydataBoolean(slotBox1, slotBox2, "union")
+          
+          # Cut slot out of face mask
+          printModelWithSlot = self.logic.functions.polydataBoolean(printModel.GetPolyData(), slotBox1, "difference")
+          printModel.SetAndObservePolyData(printModelWithSlot)
+          
+          
+          cylinderNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
+          cylinderNode.SetName("TEMPCYLINDER")
+          cylinderDisplayNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelDisplayNode")
+          cylinderDisplayNode.SetColor(1.0, 0.0, 0.0)
+          cylinderDisplayNode.SetScene(slicer.mrmlScene)
+          slicer.mrmlScene.AddNode(cylinderDisplayNode)
+          cylinderNode.SetAndObserveDisplayNodeID(cylinderDisplayNode.GetID())        
+          slicer.mrmlScene.AddNode(cylinderNode)    
+          cylinderNode.SetAndObservePolyData(slotBox1)
+
+          cylinderNode2 = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
+          cylinderNode2.SetName("TEMPCYLINDER2")
+          cylinderDisplayNode2 = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelDisplayNode")
+          cylinderDisplayNode2.SetColor(1.0, 0.0, 0.0)
+          cylinderDisplayNode2.SetScene(slicer.mrmlScene)
+          slicer.mrmlScene.AddNode(cylinderDisplayNode2)
+          cylinderNode2.SetAndObserveDisplayNodeID(cylinderDisplayNode2.GetID())        
+          slicer.mrmlScene.AddNode(cylinderNode2)    
+          cylinderNode2.SetAndObservePolyData(slotBox2)            
+          
+          
+          
+        #**********************************************
+        
           
         #Create attachment model without hole
         attachmentName = self.logic.guideAttachmentNode.GetName()
@@ -1357,7 +1449,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         self.portPushButton.click()
         slicer.app.processEvents()
         if self.logic.segmentationNode.GetSegmentation().GetNthSegment(0) is not None:
-          #printModel = slicer.mrmlScene.GetNodeByID(self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_printModel"))
+          printModel = slicer.mrmlScene.GetNodeByID(self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_printModel"))
           #if printModel:
           #  slicer.mrmlScene.RemoveNode(printModel)
           attachmentModel = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLModelNode", attachmentName).GetItemAsObject(0)
@@ -1378,24 +1470,45 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         cylinder = self.logic.functions.generateCylinderModelWithTransform(2.5, 200.0, transformWithTranslate)
         
         #Create hole in attachment model
-        booleanFilter = vtk.vtkBooleanOperationPolyDataFilter()
-        #booleanFilter.SetOperationToDifference()
-        booleanFilter.SetOperationToUnion()
-        booleanFilter.SetInputData(0, attachmentModel.GetPolyData())
-        booleanFilter.SetInputData(1, cylinder)
-        booleanFilter.Update()
-        #attachmentModel.SetAndObservePolyData(booleanFilter.GetOutput())
+        attachmentWithHole = self.logic.functions.polydataBoolean(attachmentModel.GetPolyData(), cylinder, "difference")
         
-        cylinderNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
-        cylinderNode.SetName("TEMPCYLINDER")
-        cylinderDisplayNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelDisplayNode")
-        cylinderDisplayNode.SetColor(1.0, 0.0, 0.0)
-        cylinderDisplayNode.SetScene(slicer.mrmlScene)
-        slicer.mrmlScene.AddNode(cylinderDisplayNode)
-        cylinderNode.SetAndObserveDisplayNodeID(cylinderDisplayNode.GetID())        
-        slicer.mrmlScene.AddNode(cylinderNode)    
-        #cylinderNode.SetAndObservePolyData(booleanFilter.GetOutput())
-        cylinderNode.SetAndObservePolyData(cylinder)
+        #Cut off bottom of attachment model
+        #Place on nasion point
+        matrix = vtk.vtkMatrix4x4()
+        self.logic.holeFilledImageNode.GetIJKToRASMatrix(matrix)
+        nasionNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_nasion")
+        nasionNode = slicer.mrmlScene.GetNodeByID(nasionNodeID)
+        posNasion = numpy.array([0.0, 0.0, 0.0])
+        nasionNode.GetNthFiducialPosition(0, posNasion)
+        matrix.SetElement(0,3,posNasion[0])
+        matrix.SetElement(1,3,posNasion[1])
+        matrix.SetElement(2,3,posNasion[2])
+        cubeTransform = vtk.vtkTransform()
+        cubeTransform.Identity()
+        cubeTransform.SetMatrix(matrix)
+        
+        cubeSource = vtk.vtkCubeSource()
+        cubeSource.SetXLength(600)
+        cubeSource.SetYLength(50)
+        cubeSource.SetZLength(7)
+        cubeSource.Update()
+        
+        transformFilter = vtk.vtkTransformPolyDataFilter()
+        transformFilter.SetInputConnection(cubeSource.GetOutputPort())
+        transformFilter.SetTransform(cubeTransform)
+        transformFilter.Update()
+        
+        triangleFilter = vtk.vtkTriangleFilter()
+        triangleFilter.SetInputData(transformFilter.GetOutput())
+        triangleFilter.Update()
+        
+        attachmentCutOff = self.logic.functions.polydataBoolean(attachmentWithHole, triangleFilter.GetOutput(), "difference")
+        
+        #Add attachment arm
+        #attachmentWithArm = self.logic.functions.polydataBoolean(attachmentCutOff, slotBoxAttachment, "union")
+        
+        
+        attachmentModel.SetAndObservePolyData(attachmentCutOff)
         
         self.onSaveData()
     pass
@@ -1850,6 +1963,10 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     
   def onCreateGuideModel(self):
     self.logic.createGuideModel()
+    
+  def onCreateMask(self):
+    #TODO: Move mask creation to here from planning line creation
+    pass
 
     
 class CurveManager():

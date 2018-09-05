@@ -113,7 +113,6 @@ class UsefulFunctions(object):
 
 
   def createHoleFilledVolumeNode2(self, ventricleVolume, thresholdValue, samplingFactor, morphologyParameters):
-
     maskKernelSize = morphologyParameters[1]
 
     ## Convert to binary image by threshold
@@ -394,7 +393,32 @@ class UsefulFunctions(object):
     transformFilter.ReleaseDataFlagOn()
     transformFilter.Update()
     return transformFilter.GetOutput()
-
+    
+  def polydataBoolean(self, polyData1, polyData2, operation):
+    # Subtract/add polyData2 from polyData1
+  
+    triangleFilter1 = vtk.vtkTriangleFilter()
+    triangleFilter1.SetInputData(polyData1)
+    triangleFilter1.Update()
+    
+    triangleFilter2 = vtk.vtkTriangleFilter()
+    triangleFilter2.SetInputData(polyData2)
+    triangleFilter2.Update()
+    
+    booleanFilter = vtk.vtkBooleanOperationPolyDataFilter()
+    
+    if operation=="difference" or operation=="subtract":
+      booleanFilter.SetOperationToDifference()
+    elif operation=="union" or operation=="addition":
+      booleanFilter.SetOperationToUnion()
+    else:
+      return None
+      
+    booleanFilter.SetInputData(0, triangleFilter1.GetOutput())
+    booleanFilter.SetInputData(1, triangleFilter2.GetOutput())
+    booleanFilter.Update()
+    return booleanFilter.GetOutput()
+    
   def calculateMatrixBasedPos(self, pos, yaw, pitch, roll):
     tempMatrix = vtk.vtkMatrix4x4()
     tempMatrix.Identity()
