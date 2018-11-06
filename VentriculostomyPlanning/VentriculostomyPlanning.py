@@ -1379,7 +1379,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
           cubeTransform2.SetMatrix(matrix2)
           cubeSource2 = vtk.vtkCubeSource()
           cubeSource2.SetXLength(25)
-          cubeSource2.SetYLength(30)
+          cubeSource2.SetYLength(25)
           cubeSource2.SetZLength(0.6)
           cubeSource2.SetCenter(0,-18,5)
           cubeSource2.Update()

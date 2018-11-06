@@ -21,7 +21,7 @@ include(${Slicer_USE_FILE})
 # Extension modules
 add_subdirectory(VentriculostomyPlanning)
 add_subdirectory(LabelMapBinning)
-## NEXT_MODULE
+add_subdirectory(SkullRemoval)
 
 #-----------------------------------------------------------------------------
 include(${Slicer_EXTENSION_CPACK})
