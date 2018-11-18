@@ -46,7 +46,25 @@ class SkullRemovalWidget:
     self.nodeSelector.showHidden = False
     self.nodeSelector.setMRMLScene( slicer.mrmlScene )
     self.nodeSelector.setToolTip( "Pick Volume" )
-    controlLayout.addRow("Volume Node:", self.nodeSelector)    
+    controlLayout.addRow("Volume Node:", self.nodeSelector)
+    
+    self.marginBox = qt.QDoubleSpinBox()
+    self.marginBox.setValue(3.5)
+    controlLayout.addRow("Margin:", self.marginBox)
+    
+    self.labelmapSelector = slicer.qMRMLNodeComboBox()
+    self.labelmapSelector.nodeTypes = ["vtkMRMLScalarVolumeNode"]
+    self.labelmapSelector.selectNodeUponCreation = False
+    self.labelmapSelector.noneEnabled = False
+    self.labelmapSelector.addEnabled = False
+    self.labelmapSelector.showHidden = False
+    self.labelmapSelector.setMRMLScene( slicer.mrmlScene )
+    self.labelmapSelector.setToolTip( "Pick Labelmap" )
+    controlLayout.addRow("Labelmap Node:", self.labelmapSelector)    
+    
+    self.labelmapCheckBox = qt.QCheckBox()
+    self.labelmapCheckBox.setChecked(True)
+    controlLayout.addRow("Also mask labelmap? ", self.labelmapCheckBox)
   
     self.applyButton = qt.QPushButton("Apply")
     controlLayout.addRow(self.applyButton)
@@ -65,7 +83,7 @@ class SkullRemovalWidget:
     parameters = {}
     parameters["inputVolume1"] = volume.GetID()
     parameters["inputVolume2"] = maskedVolume.GetID()
-
+    parameters["order"] = 0
     parameters["outputVolume"] = subtractedVolume.GetID()
     return slicer.cli.runSync(subScalar, None, parameters)
     
@@ -97,7 +115,7 @@ class SkullRemovalWidget:
 
     segmentEditorWidget.setActiveEffectByName("Margin")
     effect = segmentEditorWidget.activeEffect()
-    effect.setParameter("MarginSizeMm","3.5")
+    effect.setParameter("MarginSizeMm",str(self.marginBox.value))
     effect.self().onApply()
 
     labelmapVolumeNode = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLLabelMapVolumeNode')
@@ -111,6 +129,16 @@ class SkullRemovalWidget:
     subtractedVolume = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLScalarVolumeNode')
     subtractedVolume.SetName("Cropped_volume_sub")    
     self.runSubtract(volume, maskedVolume, subtractedVolume)
+    
+    if self.labelmapCheckBox.checkState():
+      labelMaskedVolume = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLScalarVolumeNode')
+      labelMaskedVolume.SetName("LabelMaskedVolume")    
+      self.runMask(self.labelmapSelector.currentNode(), labelmapVolumeNode, labelMaskedVolume)
+      
+      labelSubtractedVolume = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLScalarVolumeNode')
+      labelSubtractedVolume.SetName("Cropped_labelmap")    
+      self.runSubtract(self.labelmapSelector.currentNode(), labelMaskedVolume, labelSubtractedVolume)      
+    
 
 class SkullRemovalLogic:
   def __init__(self):
