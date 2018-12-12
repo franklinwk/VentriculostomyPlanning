@@ -1337,6 +1337,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
           self.logic.cutModel(printModel, leftPrintPartNode, rightPrintPartNode)
         
           #Create attachment arm and slot in mask
+          #TODO: Instead of all this, just load in an STL and use that
           #baseDimension = [130, 50, 50]
           matrix = vtk.vtkMatrix4x4()
           self.logic.holeFilledImageNode.GetIJKToRASMatrix(matrix)
@@ -1354,7 +1355,8 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
           cubeSource.SetXLength(30)
           cubeSource.SetYLength(8)
           cubeSource.SetZLength(5)
-          cubeSource.SetCenter(0,-28,3)
+          #cubeSource.SetCenter(0,-28,3)
+          #cubeSource.SetCenter(-28,0,3)
           cubeSource.Update()
           transformFilter = vtk.vtkTransformPolyDataFilter()
           transformFilter.SetInputConnection(cubeSource.GetOutputPort())
@@ -1381,7 +1383,8 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
           cubeSource2.SetXLength(25)
           cubeSource2.SetYLength(25)
           cubeSource2.SetZLength(0.6)
-          cubeSource2.SetCenter(0,-18,5)
+          #cubeSource2.SetCenter(0,-18,5)
+          #cubeSource2.SetCenter(-18,0,5)
           cubeSource2.Update()
           transformFilter2 = vtk.vtkTransformPolyDataFilter()
           transformFilter2.SetInputConnection(cubeSource2.GetOutputPort())
@@ -1399,8 +1402,8 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
           #slotBoxAttachment = self.logic.functions.polydataBoolean(slotBox1, slotBox2, "union")
           
           # Cut slot out of face mask
-          printModelWithSlot = self.logic.functions.polydataBoolean(printModel.GetPolyData(), slotBox1, "difference")
-          printModel.SetAndObservePolyData(printModelWithSlot)
+          #printModelWithSlot = self.logic.functions.polydataBoolean(printModel.GetPolyData(), slotBox1, "difference")
+          #printModel.SetAndObservePolyData(printModelWithSlot)
           
           
           slotNode1 = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
@@ -1487,27 +1490,40 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         cubeTransform.Identity()
         cubeTransform.SetMatrix(matrix)
         
+        # Need to not use these dimensions because they change depending on image
         cubeSource = vtk.vtkCubeSource()
         cubeSource.SetXLength(600)
-        cubeSource.SetYLength(50)
-        cubeSource.SetZLength(7)
+        cubeSource.SetYLength(100)
+        cubeSource.SetZLength(50)
         cubeSource.Update()
         
         transformFilter = vtk.vtkTransformPolyDataFilter()
         transformFilter.SetInputConnection(cubeSource.GetOutputPort())
         transformFilter.SetTransform(cubeTransform)
         transformFilter.Update()
+
         
         triangleFilter = vtk.vtkTriangleFilter()
         triangleFilter.SetInputData(transformFilter.GetOutput())
         triangleFilter.Update()
         
         attachmentCutOff = self.logic.functions.polydataBoolean(attachmentWithHole, triangleFilter.GetOutput(), "difference")
+
+        slotNode3 = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
+        slotNode3.SetName("SlotBox3")
+        slot3DisplayNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelDisplayNode")
+        slot3DisplayNode.SetColor(1.0, 0.0, 0.0)
+        slot3DisplayNode.SetScene(slicer.mrmlScene)
+        slicer.mrmlScene.AddNode(slot3DisplayNode)
+        slotNode3.SetAndObserveDisplayNodeID(slot3DisplayNode.GetID())        
+        slicer.mrmlScene.AddNode(slotNode3)    
+        slotNode3.SetAndObservePolyData(triangleFilter.GetOutput())        
         
         #Cut attachment arm slot
-        attachmentWithArm = self.logic.functions.polydataBoolean(attachmentCutOff, slotBox2, "difference")
+        #attachmentWithArm = self.logic.functions.polydataBoolean(attachmentCutOff, slotBox2, "difference")
         
-        attachmentModel.SetAndObservePolyData(attachmentWithArm)
+        #attachmentModel.SetAndObservePolyData(attachmentWithArm)
+        attachmentModel.SetAndObservePolyData(attachmentCutOff)
         
         self.onSaveData()
     pass
@@ -2317,7 +2333,8 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
     self.surfaceModelThreshold = -500.0
     # kernel size in pixel: first vector is the hole filling kernel size, second vector is related with the mask thickness
     #self.morphologyParameters = [[10,10,6], [3,3,1]]
-    self.morphologyParameters = [[1,1,1], [10,10,5]]
+    #self.morphologyParameters = [[1,1,1], [10,10,5]]
+    self.morphologyParameters = [[1,1,1], [20,20,5]]
     self.distanceMapThreshold = 100
     self.venousMargin = 10.0 #in mm
     self.minimalVentricleLen = 10.0 # in mm
@@ -3739,7 +3756,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
 
   def generateLabelMapFor3DModel(self):
     self.holeFilledImageNode, self.subtractedImageNode = self.getOrCreateHoleSkullVolumeNode()
-    baseDimension = [130, 50, 50]
+    baseDimension = [160, 120, 50]
     posNasion = [0.0, 0.0, 0.0]
     self.sagittalReferenceCurveManager.getFirstPoint(posNasion)
     basePolyData = self.functions.generateCubeModelWithYawAngle(posNasion, self.sagittalYawAngle, baseDimension)
