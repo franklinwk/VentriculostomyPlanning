@@ -66,6 +66,25 @@ class UsefulFunctions(object):
     outputImageData.DeepCopy(stencilToImage.GetOutput())
     return outputImageData
 
+  # def intersectVolumeWithPolyData(self, , inputVolume, polyData, clipOutsideSurface, fillValue, )
+  #   ijkToRas = vtk.vtkMatrix4x4()
+  #   inputVolume.GetIJKToRASMatrix(ijkToRas)
+  #   modelToIjkTransform = vtk.vtkTransform()
+  #   modelToIjkTransform.SetMatrix(ijkToRas)
+  #   modelToIjkTransform.Inverse()
+  #   transformModelToIjk = vtk.vtkTransformPolyDataFilter()
+  #   transformModelToIjk.SetTransform(modelToIjkTransform)
+  #   transformModelToIjk.SetInputData(polyData)
+  #   transformModelToIjk.Update()
+
+  #   polyToStencil = vtk.vtkPolyDataToImageStencil()
+  #   polyToStencil.SetInputConnection(transformModelToIjk.GetOutputPort())
+  #   polyToStencil.SetOutputSpacing(inputVolume.GetImageData().GetSpacing())
+  #   polyToStencil.SetOutputOrigin(inputVolume.GetImageData().GetOrigin())
+  #   polyToStencil.SetOutputWholeExtent(inputVolume.GetImageData().GetExtent())    
+
+
+
   def createHoleFilledVolumeNode(self, ventricleVolume, thresholdValue, samplingFactor, morphologyParameters):
     
     holeFillKernelSize = morphologyParameters[0]
@@ -385,7 +404,7 @@ class UsefulFunctions(object):
     cylinderTop.SetCenter(numpy.array([0.0, 0.0, 0.0]))
     cylinderTop.SetRadius(radius)
     cylinderTop.SetHeight(height)
-    cylinderTop.SetResolution(200)
+    cylinderTop.SetResolution(50)
     cylinderTop.Update()
     transformFilter = vtk.vtkTransformPolyDataFilter()
     transformFilter.SetInputConnection(cylinderTop.GetOutputPort())
@@ -462,12 +481,3 @@ class UsefulFunctions(object):
     subtractFilter.SetOperationToSubtract()  # performed inverse operation on the
     subtractFilter.Update()
     return subtractFilter.GetOutput()
-
-  def getClosedCuttedModel(self, cutPlanes, polyData):
-    clipper = vtk.vtkClipClosedSurface()
-    clipper.SetClippingPlanes(cutPlanes)
-    clipper.SetActivePlaneId(2)
-    clipper.SetInputData(polyData)
-    clipper.Update()
-    cuttedPolyData = clipper.GetOutput()
-    return cuttedPolyData
