@@ -1318,8 +1318,8 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
           #self.logic.cutModel(printModel, leftPrintPartNode, rightPrintPartNode)
 
         # Load needle guide platform model
-        baseCylinderHeight = 20.0 #TODO: Set height as setting
-        guidePlatform = self.LoadStl("D:/Work/s/VentriculostomyPlanning/VentriculostomyPlanning/NeedleGuideModel.STL")
+        baseCylinderHeight = 30.0 #TODO: Set height as setting
+        guidePlatform = self.LoadStl("C:/w/s/VentriculostomyPlanning/VentriculostomyPlanning/NeedleGuideModel2.STL")
 
         targetPos = numpy.array([0.0, 0.0, 0.0])
         self.logic.cannulaManager.getFirstPoint(targetPos)
@@ -1332,9 +1332,8 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
 
         transformWithTranslate = vtk.vtkTransform()
         transformWithTranslate.SetMatrix(transform.GetMatrix())
-        #transformWithTranslate.RotateX(-90.0)
         transformWithTranslate.PostMultiply()
-        transformWithTranslate.Translate(entryPos - (insertionVector*(baseCylinderHeight/2)))        
+        transformWithTranslate.Translate(entryPos - (insertionVector*(baseCylinderHeight/2+0.75)))        
         transformFilter = vtk.vtkTransformPolyDataFilter()
         transformFilter.SetInputData(guidePlatform)
         transformFilter.SetTransform(transformWithTranslate)
@@ -1342,14 +1341,15 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         transformFilter.Update()
         guidePlatform = transformFilter.GetOutput()
 
-        faceMaskWithBase = self.logic.functions.polydataBoolean(printModel.GetPolyData(), guidePlatform, "union")
+        faceMask = printModel.GetPolyData()
+        # faceMaskWithBase = self.logic.functions.polydataBoolean(printModel.GetPolyData(), guidePlatform, "union")
 
         #Generate hole cylinder
-        targetPos = numpy.array([0.0, 0.0, 0.0])
-        self.logic.cannulaManager.getFirstPoint(targetPos)
-        entryPos = numpy.array([0.0, 0.0, 0.0])
-        self.logic.cannulaManager.getLastPoint(entryPos)
-        transform = self.logic.calculateCannulaTransform()
+        # targetPos = numpy.array([0.0, 0.0, 0.0])
+        # self.logic.cannulaManager.getFirstPoint(targetPos)
+        # entryPos = numpy.array([0.0, 0.0, 0.0])
+        # self.logic.cannulaManager.getLastPoint(entryPos)
+        # transform = self.logic.calculateCannulaTransform()
         holeCylinderHeight = 600.0
 
         transformWithTranslate = vtk.vtkTransform()
@@ -1357,66 +1357,73 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         transformWithTranslate.RotateX(-90.0)
         transformWithTranslate.PostMultiply()
         transformWithTranslate.Translate(entryPos)
-        holeCylinderRadius = 7.0 #TODO: Set radius as setting
+        holeCylinderRadius = 21.0 #TODO: Set radius as setting
         holeCylinder = self.logic.functions.generateCylinderModelWithTransform(holeCylinderRadius, holeCylinderHeight, transformWithTranslate) 
 
-        faceMaskWithHole = self.logic.functions.polydataBoolean(faceMaskWithBase, holeCylinder, "difference")
+        # faceMaskWithHole = self.logic.functions.polydataBoolean(faceMaskWithBase, holeCylinder, "difference")
+        # printModel.SetAndObservePolyData(faceMaskWithHole)
 
 
-        # #Generate platform cylinder
-        # targetPos = numpy.array([0.0, 0.0, 0.0])
-        # self.logic.cannulaManager.getFirstPoint(targetPos)
-        # entryPos = numpy.array([0.0, 0.0, 0.0])
-        # self.logic.cannulaManager.getLastPoint(entryPos)
+        #Generate trajectory cylinder
+        # targetPos2 = numpy.array([0.0, 0.0, 0.0])
+        # self.logic.cannulaManager.getFirstPoint(targetPos2)
+        # entryPos2 = numpy.array([0.0, 0.0, 0.0])
+        # self.logic.cannulaManager.getLastPoint(entryPos2)
         # transform = self.logic.calculateCannulaTransform()
-        # insertionVector = targetPos - entryPos
-        # insertionVectorNorm = numpy.linalg.norm(insertionVector)
-        # insertionVector = numpy.array([insertionVector[0]/insertionVectorNorm, insertionVector[1]/insertionVectorNorm, insertionVector[2]/insertionVectorNorm])
-        # baseCylinderHeight = 20.0 #TODO: Set height as setting
+        trajDistance = numpy.linalg.norm(targetPos-entryPos)
+        trajectoryCylinderHeight = trajDistance + 20
 
-        # transformWithTranslate = vtk.vtkTransform()
-        # transformWithTranslate.SetMatrix(transform.GetMatrix())
-        # transformWithTranslate.RotateX(-90.0)
-        # transformWithTranslate.PostMultiply()
-        # transformWithTranslate.Translate(entryPos - (insertionVector*(baseCylinderHeight/2 + 5.5)))
-        # baseCylinderRadius = 12.5 #TODO: Set radius as setting
-        # baseCylinder = self.logic.functions.generateCylinderModelWithTransform(baseCylinderRadius, baseCylinderHeight, transformWithTranslate) 
-        # faceMaskWithBase = self.logic.functions.polydataBoolean(printModel.GetPolyData(), baseCylinder, "union")
+        trajectoryVector = targetPos - entryPos
+        trajectoryVectorNorm = numpy.linalg.norm(trajectoryVector)
+        trajectoryVector = numpy.array([trajectoryVector[0]/trajectoryVectorNorm, trajectoryVector[1]/trajectoryVectorNorm, trajectoryVector[2]/trajectoryVectorNorm])        
 
-        # #Generate recessed cylinder
-        # transformWithTranslate = vtk.vtkTransform()
-        # transformWithTranslate.SetMatrix(transform.GetMatrix())
-        # transformWithTranslate.RotateX(-90.0)
-        # transformWithTranslate.PostMultiply()
-        # transformWithTranslate.Translate(entryPos - (insertionVector*(baseCylinderHeight + 11.5)))
-        # recessedCylinderRadius = baseCylinderRadius - 2.5 #TODO: Set radius as setting
-        # recessedCylinder = self.logic.functions.generateCylinderModelWithTransform(recessedCylinderRadius, baseCylinderHeight, transformWithTranslate) 
-        # recessedBaseCylinder = self.logic.functions.polydataBoolean(faceMaskWithBase, recessedCylinder, "difference")              
+        transformWithTranslate2 = vtk.vtkTransform()
+        transformWithTranslate2.SetMatrix(transform.GetMatrix())
+        transformWithTranslate2.RotateX(-90.0)
+        transformWithTranslate2.PostMultiply()
+        transformWithTranslate2.Translate(targetPos - (trajectoryVector*(trajectoryCylinderHeight/2)))
+        trajectoryCylinderRadius = 1.0
+        trajectoryCylinder = self.logic.functions.generateCylinderModelWithTransform(trajectoryCylinderRadius, trajectoryCylinderHeight, transformWithTranslate2)            
 
+        testNode2 = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
+        testNode2.SetName("Trajectory")
+        testDisplayNode2 = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelDisplayNode")
+        testDisplayNode2.SetColor(1.0, 0.0, 0.0)
+        testDisplayNode2.SetScene(slicer.mrmlScene)
+        slicer.mrmlScene.AddNode(testDisplayNode2)
+        testNode2.SetAndObserveDisplayNodeID(testDisplayNode2.GetID())        
+        slicer.mrmlScene.AddNode(testNode2)    
+        testNode2.SetAndObservePolyData(trajectoryCylinder)
 
-  
-
-        printModel.SetAndObservePolyData(faceMaskWithHole)
-
-        # testNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
-        # testNode.SetName("Testtesttest")
-        # testDisplayNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelDisplayNode")
-        # testDisplayNode.SetColor(1.0, 0.0, 0.0)
-        # testDisplayNode.SetScene(slicer.mrmlScene)
-        # slicer.mrmlScene.AddNode(testDisplayNode)
-        # testNode.SetAndObserveDisplayNodeID(testDisplayNode.GetID())        
-        # slicer.mrmlScene.AddNode(testNode)    
-        # testNode.SetAndObservePolyData(faceMaskWithBase)
-
-        # testNode2 = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
-        # testNode2.SetName("Testtesttest2")
-        # testDisplayNode2 = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelDisplayNode")
-        # testDisplayNode2.SetColor(1.0, 0.0, 0.0)
-        # testDisplayNode2.SetScene(slicer.mrmlScene)
-        # slicer.mrmlScene.AddNode(testDisplayNode2)
-        # testNode2.SetAndObserveDisplayNodeID(testDisplayNode2.GetID())        
-        # slicer.mrmlScene.AddNode(testNode2)    
-        # testNode2.SetAndObservePolyData(recessedBaseCylinder)        
+        testNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
+        testNode.SetName("FaceMask")
+        testDisplayNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelDisplayNode")
+        testDisplayNode.SetColor(0.0, 0.0, 1.0)
+        testDisplayNode.SetScene(slicer.mrmlScene)
+        slicer.mrmlScene.AddNode(testDisplayNode)
+        testNode.SetAndObserveDisplayNodeID(testDisplayNode.GetID())        
+        slicer.mrmlScene.AddNode(testNode)    
+        testNode.SetAndObservePolyData(faceMask)
+         
+        testNode3 = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
+        testNode3.SetName("GuidePlatform")
+        testDisplayNode3 = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelDisplayNode")
+        testDisplayNode3.SetColor(0.0, 1.0, 0.0)
+        testDisplayNode3.SetScene(slicer.mrmlScene)
+        slicer.mrmlScene.AddNode(testDisplayNode3)
+        testNode3.SetAndObserveDisplayNodeID(testDisplayNode3.GetID())        
+        slicer.mrmlScene.AddNode(testNode3)    
+        testNode3.SetAndObservePolyData(guidePlatform)        
+        
+        testNode4 = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
+        testNode4.SetName("HoleCylinder")
+        testDisplayNode4 = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelDisplayNode")
+        testDisplayNode4.SetColor(1.0, 0.0, 0.0)
+        testDisplayNode4.SetScene(slicer.mrmlScene)
+        slicer.mrmlScene.AddNode(testDisplayNode4)
+        testNode4.SetAndObserveDisplayNodeID(testDisplayNode4.GetID())        
+        slicer.mrmlScene.AddNode(testNode4)    
+        testNode4.SetAndObservePolyData(holeCylinder) 
         
         self.onSaveData()
     pass
@@ -2230,7 +2237,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
     # kernel size in pixel: first vector is the hole filling kernel size, second vector is related with the mask thickness
     #self.morphologyParameters = [[10,10,6], [3,3,1]]
     #self.morphologyParameters = [[1,1,1], [10,10,5]]
-    self.morphologyParameters = [[1,1,1], [20,20,5]]
+    self.morphologyParameters = [[1,1,1], [1,1,1]]
     self.distanceMapThreshold = 100
     self.venousMargin = 10.0 #in mm
     self.minimalVentricleLen = 10.0 # in mm
@@ -3680,7 +3687,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
     
     heightOfPath = abs(heightPos[2] - posNasion[2])
     midpointPos = [(heightPos[0]+posNasion[0])/2, (heightPos[1]+posNasion[1])/2, (heightPos[2]+posNasion[2])/2]
-    maskHeight = heightOfPath + 70 # TODO: Set this as an option in settings later
+    maskHeight = heightOfPath + 300 # TODO: Set this as an option in settings later
 
     baseDimension = [160, 120, maskHeight] # Size of face mask
     basePolyData = self.functions.generateCubeModelWithYawAngle(midpointPos, self.sagittalYawAngle, baseDimension)
@@ -3693,33 +3700,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
     self.guideVolumeNode.SetIJKToRASMatrix(matrix)
     self.guideVolumeNode.SetAndObserveImageData(clippedImage)
 
-    #------------------------------------------------ Create platform ------------------------------------------------
-    
-    # #Generate platform cylinder
-    # targetPos = numpy.array([0.0, 0.0, 0.0])
-    # self.cannulaManager.getFirstPoint(targetPos)
-    # entryPos = numpy.array([0.0, 0.0, 0.0])
-    # self.cannulaManager.getLastPoint(entryPos)
-    # transform = self.calculateCannulaTransform()
-    # insertionVector = targetPos - entryPos
-    # insertionVectorNorm = numpy.linalg.norm(insertionVector)
-    # insertionVector = numpy.array([insertionVector[0]/insertionVectorNorm, insertionVector[1]/insertionVectorNorm, insertionVector[2]/insertionVectorNorm])
-    # baseCylinderHeight = 15.0 #TODO: Set height as setting
 
-    # transformWithTranslate = vtk.vtkTransform()
-    # transformWithTranslate.SetMatrix(transform.GetMatrix())
-    # transformWithTranslate.RotateX(-90.0)
-    # transformWithTranslate.PostMultiply()
-    # transformWithTranslate.Translate(entryPos - (insertionVector*(baseCylinderHeight/2 + 7.5)))
-    # baseCylinderRadius = 12.5 #TODO: Set radius as setting
-    # baseCylinder = self.functions.generateCylinderModelWithTransform(baseCylinderRadius, baseCylinderHeight, transformWithTranslate) 
-
-    # maskWithBaseImage  = self.functions.clipVolumeWithPolyData(self.guideVolumeNode, baseCylinder, False, 1)
-
-    # #faceMaskWithBase = self.logic.functions.polydataBoolean(printModel.GetPolyData(), baseCylinder, "union")
-
-
-    # self.guideVolumeNode.SetAndObserveImageData(maskWithBaseImage)
 
   def cutModel(self, printModel, leftPrintPartNode, rightPrintPartNode):
     entryPos = [0.0] * 3
