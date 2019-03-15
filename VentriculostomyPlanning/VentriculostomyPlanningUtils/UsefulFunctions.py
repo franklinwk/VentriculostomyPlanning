@@ -344,7 +344,7 @@ class UsefulFunctions(object):
       obbTree.BuildLocator()
       pointsVTKintersection = vtk.vtkPoints()
       hasIntersection = obbTree.IntersectWithLine(posFirst, posSecond, pointsVTKintersection, None)
-      if hasIntersection>0:
+      if hasIntersection > 0:
         pointsVTKIntersectionData = pointsVTKintersection.GetData()
         numPointsVTKIntersection = pointsVTKIntersectionData.GetNumberOfTuples()
         if intersectionNode:
@@ -413,30 +413,48 @@ class UsefulFunctions(object):
     transformFilter.Update()
     return transformFilter.GetOutput()
     
-  def polydataBoolean(self, polyData1, polyData2, operation):
-    # Subtract/add polyData2 from polyData1
-  
-    triangleFilter1 = vtk.vtkTriangleFilter()
-    triangleFilter1.SetInputData(polyData1)
-    triangleFilter1.Update()
-    
-    triangleFilter2 = vtk.vtkTriangleFilter()
-    triangleFilter2.SetInputData(polyData2)
-    triangleFilter2.Update()
-    
+  def polydataBoolean(self, polyData1, polyData2, operation, triangleFilter=True, loop=False, clean=True):
+  # Subtract/add polyData2 from polyData1
+    if (not polyData1) or (not polyData2):
+      return polyData1
+      
+      
     booleanFilter = vtk.vtkBooleanOperationPolyDataFilter()
-    
+    if loop:
+      booleanFilter = vtk.vtkLoopBooleanPolyDataFilter()
+      
     if operation=="difference" or operation=="subtract":
       booleanFilter.SetOperationToDifference()
     elif operation=="union" or operation=="addition":
       booleanFilter.SetOperationToUnion()
     else:
-      return None
+      return None      
       
-    booleanFilter.SetInputData(0, triangleFilter1.GetOutput())
-    booleanFilter.SetInputData(1, triangleFilter2.GetOutput())
+    if triangleFilter:
+      triangleFilter1 = vtk.vtkTriangleFilter()
+      triangleFilter1.SetInputData(polyData1)
+      triangleFilter1.Update()
+      
+      triangleFilter2 = vtk.vtkTriangleFilter()
+      triangleFilter2.SetInputData(polyData2)
+      triangleFilter2.Update()
+
+      booleanFilter.SetInputData(0, triangleFilter1.GetOutput())
+      booleanFilter.SetInputData(1, triangleFilter2.GetOutput())
+    else:
+      booleanFilter.SetInputData(0, polyData1)
+      booleanFilter.SetInputData(1, polyData2)
+      
     booleanFilter.Update()
-    return booleanFilter.GetOutput()
+    
+    if clean:
+      cleanFilter = vtk.vtkCleanPolyData()
+      cleanFilter.SetInputData(booleanFilter.GetOutput())
+      cleanFilter.PointMergingOn()
+      cleanFilter.Update()
+      return cleanFilter.GetOutput()
+    else:
+      return booleanFilter.GetOutput()
     
   def calculateMatrixBasedPos(self, pos, yaw, pitch, roll):
     tempMatrix = vtk.vtkMatrix4x4()

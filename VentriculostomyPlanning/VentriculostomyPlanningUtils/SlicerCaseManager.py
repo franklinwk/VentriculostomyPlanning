@@ -364,14 +364,20 @@ class NewCaseSelectionNameWidget(qt.QMessageBox, ModuleWidgetMixin):
 
   def setupUI(self):
     self.setWindowTitle("Case Number Selection")
-    self.setText("Please select a case number for the new case.")
+    #self.setText("Please select a case number for the new case.")
     self.setIcon(qt.QMessageBox.Question)
     self.spinbox = qt.QSpinBox()
     self.spinbox.setRange(self.minimum, int("9"*self.CASE_NUMBER_DIGITS))
     self.preview = qt.QLabel()
     self.notice = qt.QLabel()
-    self.layout().addWidget(self.createVLayout([self.createHLayout([qt.QLabel("Proposed Case Number"), self.spinbox]),
-                                                self.preview, self.notice]), 2, 1)
+
+    caseWidget = qt.QWidget()
+    caseNumberLayout = qt.QHBoxLayout()
+    caseWidget.setLayout(caseNumberLayout)
+    caseNumberLayout.addWidget(qt.QLabel("Proposed Case Number"))
+    caseNumberLayout.addWidget(self.spinbox)
+  
+    self.layout().addWidget(self.createVLayout([caseWidget, self.preview, self.notice]))
     self.okButton = self.addButton(self.Ok)
     self.okButton.enabled = False
     self.cancelButton = self.addButton(self.Cancel)

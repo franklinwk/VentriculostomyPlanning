@@ -559,21 +559,17 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
           self.logic.baseVolumeNode = node
           self.logic.ventricleVolume = slicer.mrmlScene.GetNodeByID(node.GetAttribute("vtkMRMLScalarVolumeNode.rel_ventricleVolume"))
       if self.logic.baseVolumeNode and self.logic.ventricleVolume:
-        self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_ventricleVolume",
-                                               self.logic.ventricleVolume.GetID())
+        self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_ventricleVolume", self.logic.ventricleVolume.GetID())
         self.venousVolumeNameLabel.text = self.logic.baseVolumeNode.GetName()
         self.ventricleVolumeNameLabel.text = self.logic.ventricleVolume.GetName()
         self.SerialAssignBox.Clear()
-        self.SerialAssignBox.volumesCheckedDict = { "Venous" : self.logic.baseVolumeNode,
-                                                    "Ventricle": self.logic.ventricleVolume,
-                                                  }
+        self.SerialAssignBox.volumesCheckedDict = { "Venous" : self.logic.baseVolumeNode, "Ventricle": self.logic.ventricleVolume,}
         self.SerialAssignBox.AppendVolumeNode(self.logic.baseVolumeNode)
         self.SerialAssignBox.AppendVolumeNode(self.logic.ventricleVolume)
         self.onSelect(self.logic.baseVolumeNode)
       else:
         slicer.util.warningDisplay("Case is not valid, no venous volume found")
-      self.nodeAddedEventObserverID = slicer.mrmlScene.AddObserver(slicer.mrmlScene.NodeAddedEvent,
-                                                                   self.onVolumeAddedNode)
+      self.nodeAddedEventObserverID = slicer.mrmlScene.AddObserver(slicer.mrmlScene.NodeAddedEvent, self.onVolumeAddedNode)
       self.isLoadingCase = False
     elif EventID == self.slicerCaseWidget.StartCaseImportEvent:
       self.red_cn.SetDoPropagateVolumeSelection(False) # make sure the compositenode doesn't get updated,
@@ -643,8 +639,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
       distalNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_distal")
       distalNode = slicer.mrmlScene.GetNodeByID(distalNodeID)
       distalNode.GetNthFiducialPosition(0, distalPos)
-      ventriclePointLeft = -numpy.sign(numpy.dot(distalPos - targetPos,
-                                               normalVec))  # here left hemisphere means from the patient's perspective
+      ventriclePointLeft = -numpy.sign(numpy.dot(distalPos - targetPos, normalVec))  # here left hemisphere means from the patient's perspective
       if ventriclePointLeft >= 0 and self.logic.useLeftHemisphere == False:
         self.logic.useLeftHemisphere = True
         self.logic.createEntryPoint()
@@ -716,8 +711,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
           if self.logic.ventricleVolume:
             self.ventricleVolumeNameLabel.text = self.logic.ventricleVolume.GetName()
           if self.logic.baseVolumeNode and self.logic.ventricleVolume:
-            self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_ventricleVolume",
-                                                 self.logic.ventricleVolume.GetID())
+            self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_ventricleVolume", self.logic.ventricleVolume.GetID())
             self.initialNodesIDList.append(self.logic.baseVolumeNode.GetDisplayNodeID()) 
             self.initialNodesIDList.append(self.logic.baseVolumeNode.GetStorageNodeID()) 
             self.initialNodesIDList.append(self.logic.ventricleVolume.GetDisplayNodeID())  
@@ -789,21 +783,14 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         self.logic.enableRelatedModel("vtkMRMLScalarVolumeNode.rel_sagittalReferenceModel", "sagittalReferenceModel",color=[1.0, 1.0, 0.5], intersectionVis=False)
         self.logic.enableRelatedModel("vtkMRMLScalarVolumeNode.rel_coronalReferenceModel", "coronalReferenceModel", color =[0.5, 1.0, 0.5], intersectionVis=False)
         self.logic.enableRelatedModel("vtkMRMLScalarVolumeNode.rel_sagittalPlanningModel", "sagittalPlanningModel", color=[1.0,1.0,0.0])
-        self.logic.enableRelatedModel("vtkMRMLScalarVolumeNode.rel_cylinderModel", "cylinderModel",
-                                      color=[0.0, 1.0, 1.0])
-        self.logic.enableRelatedModel("vtkMRMLScalarVolumeNode.rel_pathCandidateModel", "pathCandidateModel",
-                                      color=[1.0, 1.0, 0.0], visibility= False)
-        self.logic.enableRelatedModel("vtkMRMLScalarVolumeNode.rel_pathNavigationModel", "pathNavigationModel",
-                                      color=[1.0, 1.0, 0.0], visibility= False)
+        self.logic.enableRelatedModel("vtkMRMLScalarVolumeNode.rel_cylinderModel", "cylinderModel", color=[0.0, 1.0, 1.0])
+        self.logic.enableRelatedModel("vtkMRMLScalarVolumeNode.rel_pathCandidateModel", "pathCandidateModel",  color=[1.0, 1.0, 0.0], visibility= False)
+        self.logic.enableRelatedModel("vtkMRMLScalarVolumeNode.rel_pathNavigationModel", "pathNavigationModel",  color=[1.0, 1.0, 0.0], visibility= False)
         self.logic.enableRelatedModel("vtkMRMLScalarVolumeNode.rel_coronalPlanningModel", "coronalPlanningModel", color=[0.0,1.0,0.0])
         self.logic.enableRelatedModel("vtkMRMLScalarVolumeNode.rel_vesselnessModel", "vesselnessModel", color=[1.0, 0.0, 0.0])
         self.logic.enableRelatedModel("vtkMRMLScalarVolumeNode.rel_vesselnessWithMarginModel", "vesselnessWithMarginModel", visibility=False)
-        self.logic.enableRelatedModel("vtkMRMLScalarVolumeNode.rel_grayScaleModel", "grayScaleModel",
-                                      color=[0.8, 0.2, 0.0])
-        self.logic.enableRelatedModel("vtkMRMLScalarVolumeNode.rel_grayScaleWithMarginModel",
-                                      "grayScaleWithMarginModel", visibility=False)
-        self.logic.enableRelatedModel("vtkMRMLScalarVolumeNode.rel_rightPrintPart", "rightPrintPart")
-        self.logic.enableRelatedModel("vtkMRMLScalarVolumeNode.rel_leftPrintPart", "leftPrintPart")
+        self.logic.enableRelatedModel("vtkMRMLScalarVolumeNode.rel_grayScaleModel", "grayScaleModel",  color=[0.8, 0.2, 0.0])
+        self.logic.enableRelatedModel("vtkMRMLScalarVolumeNode.rel_grayScaleWithMarginModel", "grayScaleWithMarginModel", visibility=False)
         self.logic.enableRelatedModel("vtkMRMLScalarVolumeNode.rel_printModel", "printModel")
         self.logic.enableRelatedMarkups("vtkMRMLScalarVolumeNode.rel_nasion", "nasion")
         self.logic.enableRelatedMarkups("vtkMRMLScalarVolumeNode.rel_kocher","kocher")
@@ -828,10 +815,9 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         self.logic.enableRelatedVariables("vtkMRMLScalarVolumeNode.rel_thresholdProgressiveFactor", "thresholdProgressiveFactor")
         self.logic.enableRelatedVariables("vtkMRMLScalarVolumeNode.rel_posteriorMargin", "posteriorMargin")
         self.logic.enableRelatedVariables("vtkMRMLScalarVolumeNode.rel_needSagittalCorrection", "needSagittalCorrection")
-        self.logic.enableRelatedVariables("vtkMRMLScalarVolumeNode.rel_venousMedianValue",
-                                          "venousMedianValue")
-        self.logic.enableRelatedVariables("vtkMRMLScalarVolumeNode.rel_venousMaxValue",
-                                          "venousMaxValue")
+        self.logic.enableRelatedVariables("vtkMRMLScalarVolumeNode.rel_venousMedianValue", "venousMedianValue")
+        self.logic.enableRelatedVariables("vtkMRMLScalarVolumeNode.rel_venousMaxValue", "venousMaxValue")
+        self.logic.enableRelatedROI("vtkMRMLScalarVolumeNode.rel_maskROI", "maskROI")
         if self.rangeThresholdWidget.minimum >= self.logic.thresholdProgressiveFactor:
           self.rangeThresholdWidget.minimum = self.logic.thresholdProgressiveFactor*0.9
         self.rangeThresholdWidget.setValues(self.logic.thresholdProgressiveFactor, 1.0)
@@ -890,9 +876,10 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         self.onCreatePlanningLine()
         self.isReverseView = False
         self.progressBar.show()
-        self.progressBar.labelText = 'Calculating Skull Surface'
+        self.progressBar.labelText = 'Calculating Skin Surface'
         slicer.app.processEvents()
         self.createModel()
+
         self.progressBar.value = 25
         self.progressBar.labelText = 'Calculating Vessel'
         slicer.app.processEvents()
@@ -904,15 +891,13 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         self.prepareCandidatePath()
         self.progressBar.value = 75
         self.logic.calculateCylinderTransform()
-        self.setBackgroundAndForegroundIDs(foregroundVolumeID=self.logic.ventricleVolume.GetID(),
-                                           backgroundVolumeID=self.logic.baseVolumeNode.GetID())
+        self.setBackgroundAndForegroundIDs(foregroundVolumeID=self.logic.ventricleVolume.GetID(), backgroundVolumeID=self.logic.baseVolumeNode.GetID())
         self.onSet3DViewer()
         self.progressBar.labelText = 'Saving Preprocessed Data'
         slicer.app.processEvents()
         self.onSaveData()
         self.progressBar.close()
-        self.logic.appendPlanningTimeStampToJson(self.jsonFile, "EndPreprocessing",
-                                                 datetime.datetime.now().time().isoformat())
+        self.logic.appendPlanningTimeStampToJson(self.jsonFile, "EndPreprocessing", datetime.datetime.now().time().isoformat())
         self.imageSlider.setValue(100.0)
       qt.QApplication.restoreOverrideCursor()
       self.selectNasionButton.setEnabled(True)
@@ -937,8 +922,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     self.addVesselSeedButton.setEnabled(False)
     self.relocatePathToKocherButton.setEnabled(False)
     self.createPlanningLineButton.setEnabled(False)
-    
-    
+
     self.tabMainGroupBox.visible = False
     if self.slicerCaseWidget.currentCaseDirectory:
       self.LoadCaseButton.setEnabled(True)
@@ -1164,6 +1148,9 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         self.logic.functions.calculateLineModelIntersect(surfacePolyData, posDistal+1e6*direction, posTarget-1e6*direction, FiducialPointAlongVentricle)
         posEntry = numpy.array([0.0, 0.0, 0.0])
         FiducialPointAlongVentricle.GetNthFiducialPosition(0,posEntry)
+        # I believe new versions of VTK add 0,0,0 as an intersection point causing a bug
+        if numpy.array_equal(posEntry, [0,0,0]):
+          FiducialPointAlongVentricle.GetNthFiducialPosition(1,posEntry)
         self.logic.cylinderMiddlePointNode.RemoveAllMarkups()
         posCenter = numpy.array([(posTarget[0]+posDistal[0])/2.0, (posTarget[1]+posDistal[1])/2.0, (posTarget[2]+posDistal[2])/2.0])
         self.logic.cylinderMiddlePointNode.AddFiducial(posCenter[0], posCenter[1], posCenter[2])
@@ -1171,8 +1158,10 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         self.logic.calculateCylinderTransform()
         matrix = self.logic.transform.GetMatrix()
         points = vtk.vtkPoints()
-        phiResolution = 1*numpy.pi/180.0
+        phiResolution = 1*numpy.pi/180.0 # Increase number to reduce candidates generated
+        #phiResolution = 100*numpy.pi/180.0
         radiusResolution = 1.0
+        #radiusResolution = 12.0
         points.InsertNextPoint(posEntry)
         distance2 = numpy.linalg.norm(numpy.array(posTarget) - numpy.array(posEntry))
         distance1 = numpy.linalg.norm(numpy.array(posTarget) - numpy.array(posDistal))/2 # Divided by 2 is because, all the cylinder bottom are possible target points
@@ -1201,26 +1190,20 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
           self.logic.pathReceived, self.logic.nPathReceived, self.logic.apReceived, self.logic.minimumPoint, self.logic.minimumDistance, self.logic.maximumPoint, self.logic.maximumDistance = self.logic.PercutaneousApproachAnalysisLogic.makePaths(
             self.logic.cylinderMiddlePointNode, None, 0, vesselModelWithMarginNode, tempModel)
           if self.logic.nPathReceived <= 0:
-            slicer.util.warningDisplay(
-              "No any cannula candidate is venous-collision free, consider redefining the ventricle area.")
+            slicer.util.warningDisplay("No cannula candidate is venous-collision free, consider redefining the ventricle area.")
             self.disableVentricleModification(False)
             return False
           else:
-            status = self.logic.makePathMeetAllConditions(self.logic.pathReceived, self.logic.nPathReceived,
-                                                 self.logic.pathCandidatesModel.GetPolyData(), posKocher,
-                                                 posNasion, surfacePolyData)
+            status = self.logic.makePathMeetAllConditions(self.logic.pathReceived, self.logic.nPathReceived, self.logic.pathCandidatesModel.GetPolyData(), posKocher, posNasion, surfacePolyData)
             self.logic.pathCandidatesModel.GetDisplayNode().SetVisibility(1)
             self.logic.pathCandidatesModel.GetDisplayNode().SetSliceIntersectionOpacity(0.2)
             self.disableVentricleModification(False)
             if status == CandidatePathStatus.NoPosteriorAndNoWithinKocherPoint:
-              slicer.util.warningDisplay(
-                "Cannula candidates are both too close to the forehead and too far from the kocher's point, consider redefining the ventricle area.")
+              slicer.util.warningDisplay("Cannula candidates are both too close to the forehead and too far from the kocher's point, consider redefining the ventricle area.")
             elif status == CandidatePathStatus.NoPosteriorPoint:
-              slicer.util.warningDisplay(
-                "Cannula candidates are too close to the forehead, consider redefining the ventricle area.")
+              slicer.util.warningDisplay("Cannula candidates are too close to the forehead, consider redefining the ventricle area.")
             elif status == CandidatePathStatus.NoWithinKocherPoint:
-              slicer.util.warningDisplay(
-                "Cannula candidates are too far from the kocher's point, consider redefining the ventricle area.")
+              slicer.util.warningDisplay("Cannula candidates are too far from the kocher's point, consider redefining the ventricle area.")
             else:
               self.disableVentricleModification(True)
             return True
@@ -1246,7 +1229,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         if childWidget.checked:
           childWidget.click()
           slicer.app.processEvents()
-    self.setPrintModelVisibility(True if currentButton == self.createPlanningLineButton else False)
     pass
 
   def onCreatePlanningLine(self):
@@ -1278,11 +1260,9 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         cannulaNode = slicer.mrmlScene.GetNodeByID(self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_cannula"))
         cannulaNode.AddObserver(cannulaNode.PointStartInteractionEvent, self.onResetPlanningOutput)
 
+        #self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_ventricleVolume", self.logic.ventricleVolume.GetID())
         self.logic.generateLabelMapForFaceMask() # Generate volume for hole-less face mask
         slicer.app.processEvents()
-        
-        #
-
 
         # Export the label image to vtkMRMLModelNode
         modelName = self.logic.guideVolumeNode.GetName()
@@ -1308,19 +1288,16 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         slicer.app.processEvents()
 
         if self.logic.segmentationNode.GetSegmentation().GetNthSegment(0) is not None:
-          printModel = slicer.mrmlScene.GetNodeByID(self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_printModel"))
-          if printModel:
-            slicer.mrmlScene.RemoveNode(printModel)
-          printModel = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLModelNode", modelName).GetItemAsObject(0)
-          printModel.SetDisplayVisibility(False)
-          self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_printModel", printModel.GetID())
-          #---------------------
-          #self.logic.cutModel(printModel, leftPrintPartNode, rightPrintPartNode)
+          faceMaskNode = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLModelNode", modelName).GetItemAsObject(0)
+          faceMaskNode.SetDisplayVisibility(False)
+          decimatePro = vtk.vtkDecimatePro()
+          decimatePro.SetInputData(faceMaskNode.GetPolyData())
+          decimatePro.SetTargetReduction(0.7)
+          decimatePro.Update()
+          faceMaskNode.SetAndObservePolyData(decimatePro.GetOutput())
+          faceMask = faceMaskNode.GetPolyData()
 
-        # Load needle guide platform model
-        baseCylinderHeight = 30.0 #TODO: Set height as setting
-        guidePlatform = self.LoadStl("C:/w/s/VentriculostomyPlanning/VentriculostomyPlanning/NeedleGuideModel2.STL")
-
+        # Determine vector of trajectory
         targetPos = numpy.array([0.0, 0.0, 0.0])
         self.logic.cannulaManager.getFirstPoint(targetPos)
         entryPos = numpy.array([0.0, 0.0, 0.0])
@@ -1330,10 +1307,13 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         insertionVectorNorm = numpy.linalg.norm(insertionVector)
         insertionVector = numpy.array([insertionVector[0]/insertionVectorNorm, insertionVector[1]/insertionVectorNorm, insertionVector[2]/insertionVectorNorm])
 
+        # Load needle guide platform model and position
+        guidePlatformPath = os.path.dirname(os.path.realpath(__file__)) + "/NeedleGuideModel.STL"
+        guidePlatform = self.LoadStl(guidePlatformPath) #Guide platform model has its centre point 20mm from the top to account for 8mm minimum height from skin (13mm total, with 7mm for margin)
         transformWithTranslate = vtk.vtkTransform()
         transformWithTranslate.SetMatrix(transform.GetMatrix())
         transformWithTranslate.PostMultiply()
-        transformWithTranslate.Translate(entryPos - (insertionVector*(baseCylinderHeight/2+0.75)))        
+        transformWithTranslate.Translate(entryPos)
         transformFilter = vtk.vtkTransformPolyDataFilter()
         transformFilter.SetInputData(guidePlatform)
         transformFilter.SetTransform(transformWithTranslate)
@@ -1341,59 +1321,147 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         transformFilter.Update()
         guidePlatform = transformFilter.GetOutput()
 
-        faceMask = printModel.GetPolyData()
-        # faceMaskWithBase = self.logic.functions.polydataBoolean(printModel.GetPolyData(), guidePlatform, "union")
+        # Cut away area under skin from guide platform and mask
+        skullModelNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_model")
+        skullModel = None
+        if skullModelNodeID:
+          skullModelNode = slicer.mrmlScene.GetNodeByID(skullModelNodeID)
+          skullModel = skullModelNode.GetPolyData()
+        skullTransform = vtk.vtkTransform()
+        skullTransform.Translate(insertionVector*(-2.0))
+        skullTransformFilter = vtk.vtkTransformPolyDataFilter()
+        skullTransformFilter.SetInputData(skullModel)
+        skullTransformFilter.SetTransform(skullTransform)
+        skullTransformFilter.ReleaseDataFlagOn()
+        skullTransformFilter.Update()
+        guidePlatformCut = self.logic.functions.polydataBoolean(guidePlatform, skullTransformFilter.GetOutput(), "difference", loop=True)
+        # platformDecimatePro = vtk.vtkDecimatePro()
+        # platformDecimatePro.SetInputData(guidePlatformCut)
+        # platformDecimatePro.SetTargetReduction(0.5)
+        # platformDecimatePro.Update()
+        # guidePlatformCut = platformDecimatePro.GetOutput()        
 
-        #Generate hole cylinder
-        # targetPos = numpy.array([0.0, 0.0, 0.0])
-        # self.logic.cannulaManager.getFirstPoint(targetPos)
-        # entryPos = numpy.array([0.0, 0.0, 0.0])
-        # self.logic.cannulaManager.getLastPoint(entryPos)
-        # transform = self.logic.calculateCannulaTransform()
+        # Attach guide platform to the mask
+        faceMaskWithPlatform = self.logic.functions.polydataBoolean(faceMask, guidePlatformCut, "union", triangleFilter=False, loop=True, clean=True)
+
+        # Generate hole cylinder to cut through model and mask
         holeCylinderHeight = 600.0
-
         transformWithTranslate = vtk.vtkTransform()
         transformWithTranslate.SetMatrix(transform.GetMatrix())
         transformWithTranslate.RotateX(-90.0)
         transformWithTranslate.PostMultiply()
         transformWithTranslate.Translate(entryPos)
-        holeCylinderRadius = 21.0 #TODO: Set radius as setting
+        holeCylinderRadius = 20.0 #TODO: Set radius as setting
         holeCylinder = self.logic.functions.generateCylinderModelWithTransform(holeCylinderRadius, holeCylinderHeight, transformWithTranslate) 
+        faceMaskWithHole = self.logic.functions.polydataBoolean(faceMaskWithPlatform, holeCylinder, "difference", triangleFilter=True, loop=True)
 
-        # faceMaskWithHole = self.logic.functions.polydataBoolean(faceMaskWithBase, holeCylinder, "difference")
-        # printModel.SetAndObservePolyData(faceMaskWithHole)
+        # # Create screw pilot holes
+        # pilotHolesTemplatePath = os.path.dirname(os.path.realpath(__file__)) + "/PilotHolesTemplate1.STL"
+        # pilotHolesTemplate = self.LoadStl(pilotHolesTemplatePath)
+        # transformWithTranslate = vtk.vtkTransform()
+        # transformWithTranslate.SetMatrix(transform.GetMatrix())
+        # transformWithTranslate.PostMultiply()
+        # transformWithTranslate.Translate(entryPos)
+        # transformFilter = vtk.vtkTransformPolyDataFilter()
+        # transformFilter.SetInputData(pilotHolesTemplate)
+        # transformFilter.SetTransform(transformWithTranslate)
+        # transformFilter.ReleaseDataFlagOn()
+        # transformFilter.Update()
+        # pilotHolesTemplate = transformFilter.GetOutput()
+        # faceMaskWithPilotHoles = self.logic.functions.polydataBoolean(faceMaskWithHole, pilotHolesTemplate, "difference", triangleFilter=True, loop=True, clean=True) 
 
+        # pilotHolesTemplatePath = os.path.dirname(os.path.realpath(__file__)) + "/PilotHolesTemplate2.STL"
+        # pilotHolesTemplate = self.LoadStl(pilotHolesTemplatePath)
+        # transformWithTranslate = vtk.vtkTransform()
+        # transformWithTranslate.SetMatrix(transform.GetMatrix())
+        # transformWithTranslate.PostMultiply()
+        # transformWithTranslate.Translate(entryPos)
+        # transformFilter = vtk.vtkTransformPolyDataFilter()
+        # transformFilter.SetInputData(pilotHolesTemplate)
+        # transformFilter.SetTransform(transformWithTranslate)
+        # transformFilter.ReleaseDataFlagOn()
+        # transformFilter.Update()
+        # pilotHolesTemplate = transformFilter.GetOutput()
+        # faceMaskWithPilotHoles = self.logic.functions.polydataBoolean(faceMaskWithPilotHoles, pilotHolesTemplate, "difference", triangleFilter=True, loop=True, clean=True) 
+
+        # pilotHolesTemplatePath = os.path.dirname(os.path.realpath(__file__)) + "/PilotHolesTemplate3.STL"
+        # pilotHolesTemplate = self.LoadStl(pilotHolesTemplatePath)
+        # transformWithTranslate = vtk.vtkTransform()
+        # transformWithTranslate.SetMatrix(transform.GetMatrix())
+        # transformWithTranslate.PostMultiply()
+        # transformWithTranslate.Translate(entryPos)
+        # transformFilter = vtk.vtkTransformPolyDataFilter()
+        # transformFilter.SetInputData(pilotHolesTemplate)
+        # transformFilter.SetTransform(transformWithTranslate)
+        # transformFilter.ReleaseDataFlagOn()
+        # transformFilter.Update()
+        # pilotHolesTemplate = transformFilter.GetOutput()
+        # faceMaskWithPilotHoles = self.logic.functions.polydataBoolean(faceMaskWithPilotHoles, pilotHolesTemplate, "difference", triangleFilter=True, loop=True, clean=True) 
+
+        # pilotHolesTemplatePath = os.path.dirname(os.path.realpath(__file__)) + "/PilotHolesTemplate4.STL"
+        # pilotHolesTemplate = self.LoadStl(pilotHolesTemplatePath)
+        # transformWithTranslate = vtk.vtkTransform()
+        # transformWithTranslate.SetMatrix(transform.GetMatrix())
+        # transformWithTranslate.PostMultiply()
+        # transformWithTranslate.Translate(entryPos)
+        # transformFilter = vtk.vtkTransformPolyDataFilter()
+        # transformFilter.SetInputData(pilotHolesTemplate)
+        # transformFilter.SetTransform(transformWithTranslate)
+        # transformFilter.ReleaseDataFlagOn()
+        # transformFilter.Update()
+        # pilotHolesTemplate = transformFilter.GetOutput()
+        # faceMaskWithPilotHoles = self.logic.functions.polydataBoolean(faceMaskWithPilotHoles, pilotHolesTemplate, "difference", triangleFilter=True, loop=True, clean=True)                         
+
+        # pilotHoleCylinderHeight = 600.0
+        # transformWithTranslate = vtk.vtkTransform()
+        # transformWithTranslate.SetMatrix(transform.GetMatrix())
+        # transformWithTranslate.RotateX(-90.0)
+        # transformWithTranslate.PostMultiply()
+        # transformWithTranslate.Translate(entryPos)
+        # pilotHoleCylinderRadius = 20.0 #TODO: Set radius as setting
+        # pilotHoleCylinder = self.logic.functions.generateCylinderModelWithTransform(holeCylinderRadius, holeCylinderHeight, transformWithTranslate) 
+        # faceMaskWithHole = self.logic.functions.polydataBoolean(faceMaskWithPlatform, holeCylinder, "difference", triangleFilter=True, loop=True)
+
+        # Assign print model
+        printModel = slicer.mrmlScene.GetNodeByID(self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_printModel"))
+        if printModel:
+          slicer.mrmlScene.RemoveNode(printModel)
+        printModel = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
+        printModel.SetName("PrintModel")
+        printModelDisplay = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelDisplayNode")
+        printModelDisplay.SetColor(0.3, 0.3, 0.3)
+        printModelDisplay.SetScene(slicer.mrmlScene)
+        slicer.mrmlScene.AddNode(printModelDisplay)
+        printModel.SetAndObserveDisplayNodeID(printModelDisplay.GetID())        
+        slicer.mrmlScene.AddNode(printModel)    
+        printModel.SetAndObservePolyData(faceMaskWithHole)        
+        self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_printModel", printModel.GetID())
 
         #Generate trajectory cylinder
-        # targetPos2 = numpy.array([0.0, 0.0, 0.0])
-        # self.logic.cannulaManager.getFirstPoint(targetPos2)
-        # entryPos2 = numpy.array([0.0, 0.0, 0.0])
-        # self.logic.cannulaManager.getLastPoint(entryPos2)
-        # transform = self.logic.calculateCannulaTransform()
-        trajDistance = numpy.linalg.norm(targetPos-entryPos)
-        trajectoryCylinderHeight = trajDistance + 20
+        # trajDistance = numpy.linalg.norm(targetPos-entryPos)
+        # trajectoryCylinderHeight = trajDistance + 20
 
-        trajectoryVector = targetPos - entryPos
-        trajectoryVectorNorm = numpy.linalg.norm(trajectoryVector)
-        trajectoryVector = numpy.array([trajectoryVector[0]/trajectoryVectorNorm, trajectoryVector[1]/trajectoryVectorNorm, trajectoryVector[2]/trajectoryVectorNorm])        
+        # trajectoryVector = targetPos - entryPos
+        # trajectoryVectorNorm = numpy.linalg.norm(trajectoryVector)
+        # trajectoryVector = numpy.array([trajectoryVector[0]/trajectoryVectorNorm, trajectoryVector[1]/trajectoryVectorNorm, trajectoryVector[2]/trajectoryVectorNorm])        
 
-        transformWithTranslate2 = vtk.vtkTransform()
-        transformWithTranslate2.SetMatrix(transform.GetMatrix())
-        transformWithTranslate2.RotateX(-90.0)
-        transformWithTranslate2.PostMultiply()
-        transformWithTranslate2.Translate(targetPos - (trajectoryVector*(trajectoryCylinderHeight/2)))
-        trajectoryCylinderRadius = 1.0
-        trajectoryCylinder = self.logic.functions.generateCylinderModelWithTransform(trajectoryCylinderRadius, trajectoryCylinderHeight, transformWithTranslate2)            
+        # transformWithTranslate2 = vtk.vtkTransform()
+        # transformWithTranslate2.SetMatrix(transform.GetMatrix())
+        # transformWithTranslate2.RotateX(-90.0)
+        # transformWithTranslate2.PostMultiply()
+        # transformWithTranslate2.Translate(targetPos - (trajectoryVector*(trajectoryCylinderHeight/2)))
+        # trajectoryCylinderRadius = 1.0
+        # trajectoryCylinder = self.logic.functions.generateCylinderModelWithTransform(trajectoryCylinderRadius, trajectoryCylinderHeight, transformWithTranslate2)            
 
-        testNode2 = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
-        testNode2.SetName("Trajectory")
-        testDisplayNode2 = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelDisplayNode")
-        testDisplayNode2.SetColor(1.0, 0.0, 0.0)
-        testDisplayNode2.SetScene(slicer.mrmlScene)
-        slicer.mrmlScene.AddNode(testDisplayNode2)
-        testNode2.SetAndObserveDisplayNodeID(testDisplayNode2.GetID())        
-        slicer.mrmlScene.AddNode(testNode2)    
-        testNode2.SetAndObservePolyData(trajectoryCylinder)
+        # testNode2 = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
+        # testNode2.SetName("Trajectory")
+        # testDisplayNode2 = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelDisplayNode")
+        # testDisplayNode2.SetColor(1.0, 0.0, 0.0)
+        # testDisplayNode2.SetScene(slicer.mrmlScene)
+        # slicer.mrmlScene.AddNode(testDisplayNode2)
+        # testNode2.SetAndObserveDisplayNodeID(testDisplayNode2.GetID())        
+        # slicer.mrmlScene.AddNode(testNode2)    
+        # testNode2.SetAndObservePolyData(faceMaskWithHole)
 
         testNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
         testNode.SetName("FaceMask")
@@ -1403,27 +1471,27 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         slicer.mrmlScene.AddNode(testDisplayNode)
         testNode.SetAndObserveDisplayNodeID(testDisplayNode.GetID())        
         slicer.mrmlScene.AddNode(testNode)    
-        testNode.SetAndObservePolyData(faceMask)
+        testNode.SetAndObservePolyData(faceMaskWithPlatform)
          
-        testNode3 = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
-        testNode3.SetName("GuidePlatform")
-        testDisplayNode3 = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelDisplayNode")
-        testDisplayNode3.SetColor(0.0, 1.0, 0.0)
-        testDisplayNode3.SetScene(slicer.mrmlScene)
-        slicer.mrmlScene.AddNode(testDisplayNode3)
-        testNode3.SetAndObserveDisplayNodeID(testDisplayNode3.GetID())        
-        slicer.mrmlScene.AddNode(testNode3)    
-        testNode3.SetAndObservePolyData(guidePlatform)        
+        # testNode3 = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
+        # testNode3.SetName("GuidePlatform")
+        # testDisplayNode3 = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelDisplayNode")
+        # testDisplayNode3.SetColor(0.0, 1.0, 0.0)
+        # testDisplayNode3.SetScene(slicer.mrmlScene)
+        # slicer.mrmlScene.AddNode(testDisplayNode3)
+        # testNode3.SetAndObserveDisplayNodeID(testDisplayNode3.GetID())        
+        # slicer.mrmlScene.AddNode(testNode3)    
+        # testNode3.SetAndObservePolyData(guidePlatformCut)        
         
-        testNode4 = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
-        testNode4.SetName("HoleCylinder")
-        testDisplayNode4 = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelDisplayNode")
-        testDisplayNode4.SetColor(1.0, 0.0, 0.0)
-        testDisplayNode4.SetScene(slicer.mrmlScene)
-        slicer.mrmlScene.AddNode(testDisplayNode4)
-        testNode4.SetAndObserveDisplayNodeID(testDisplayNode4.GetID())        
-        slicer.mrmlScene.AddNode(testNode4)    
-        testNode4.SetAndObservePolyData(holeCylinder) 
+        # testNode4 = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
+        # testNode4.SetName("HoleCylinder")
+        # testDisplayNode4 = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelDisplayNode")
+        # testDisplayNode4.SetColor(1.0, 0.0, 0.0)
+        # testDisplayNode4.SetScene(slicer.mrmlScene)
+        # slicer.mrmlScene.AddNode(testDisplayNode4)
+        # testNode4.SetAndObserveDisplayNodeID(testDisplayNode4.GetID())        
+        # slicer.mrmlScene.AddNode(testNode4)    
+        # testNode4.SetAndObservePolyData(faceMaskWithPilotHoles) 
         
         self.onSaveData()
     pass
@@ -1433,7 +1501,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     reader.SetFileName(fname)
     reader.Update()
     polydata = reader.GetOutput()
-
     return polydata
 
   def onPlaceVesselSeed(self):
@@ -1528,22 +1595,13 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
               self.logic.calculateVenousStat(self.logic.baseVolumeNode, self.logic.surfaceModelThreshold)
               self.onSet3DViewer()
           self.logic.selectNasionPointNode(outputModelNode) # when the model is not available, the model will be created, so nodeAdded signal should be disconnected
-          self.setBackgroundAndForegroundIDs(foregroundVolumeID=self.logic.ventricleVolume.GetID(),
-                                             backgroundVolumeID=self.logic.baseVolumeNode.GetID())
+          self.setBackgroundAndForegroundIDs(foregroundVolumeID=self.logic.ventricleVolume.GetID(),  backgroundVolumeID=self.logic.baseVolumeNode.GetID())
     else:
       self.logic.placeWidget.setPlaceModeEnabled(False)
       nasionNode = slicer.mrmlScene.GetNodeByID(self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_nasion"))
       dnode = nasionNode.GetMarkupsDisplayNode()
       if dnode:
         dnode.SetVisibility(1)
-        
-  def setPrintModelVisibility(self, value):
-    leftPrintPartNode = slicer.mrmlScene.GetNodeByID(
-      self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_leftPrintPart"))
-    rightPrintPartNode = slicer.mrmlScene.GetNodeByID(
-      self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_rightPrintPart"))
-    leftPrintPartNode.SetDisplayVisibility(value)
-    rightPrintPartNode.SetDisplayVisibility(value)
     
   def onSelectSagittalPoint(self):
     if self.selectSagittalButton.isChecked():
@@ -1578,14 +1636,14 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
       nodeAttributes=["rel_ventricleVolume", "rel_model","rel_nasion", "rel_kocher", "rel_sagittalPoint","rel_target","rel_distal", "rel_vesselSeeds", \
                       "rel_cannula","rel_skullNorm","rel_cannulaModel","rel_sagittalReferenceModel","rel_sagittalReferenceMarker","rel_coronalReferenceModel","rel_coronalReferenceMarker",\
                       "rel_sagittalPlanningModel","rel_sagittalPlanningMarker","rel_coronalPlanningModel","rel_coronalPlanningMarker","rel_cylinderMarker","rel_vesselnessModel",\
-                      "rel_vesselnessWithMarginModel","rel_vesselnessVolume"]
+                      "rel_vesselnessWithMarginModel","rel_vesselnessVolume","rel_maskROI"]
       for attribute in nodeAttributes:
         nodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode."+attribute)
         if nodeID and slicer.mrmlScene.GetNodeByID(nodeID):
           node = slicer.mrmlScene.GetNodeByID(nodeID)
           if node and node.GetModifiedSinceRead():
             self.logic.savePlanningDataToDirectory(node, outputDir)
-      printModelAttributes = ["rel_printModel", "rel_rightPrintPart", "rel_leftPrintPart"]
+      printModelAttributes = ["rel_printModel"]
       for attribute in printModelAttributes:
         nodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode."+attribute)
         if nodeID and slicer.mrmlScene.GetNodeByID(nodeID):
@@ -1695,36 +1753,36 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     self.isInAlgorithmSteps = False
     pass
 
-  def onVenousVesselnessCalc(self):
-    self.isInAlgorithmSteps = True
-    vesselSeedsNode = None
-    if self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_vesselSeeds"):
-        vesselSeedsNode = slicer.mrmlScene.GetNodeByID(self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_vesselSeeds"))
-    if self.logic.baseVolumeNode and vesselSeedsNode:
-      quarterVolumeNode = self.logic.baseVolumeNode
-      quarterVolumeNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_quarterVolume")
-      if quarterVolumeNodeID:
-        quarterVolumeNode = slicer.mrmlScene.GetNodeByID(quarterVolumeNodeID)
-      vesselnessVolumeNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_vesselnessVolume")
-      vesselnessModelNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_vesselnessModel")
-      if vesselnessVolumeNodeID and vesselnessModelNodeID:
-        vesselnessVolumeNode = slicer.mrmlScene.GetNodeByID(vesselnessVolumeNodeID)
-        vesselnessModelNode = slicer.mrmlScene.GetNodeByID(vesselnessModelNodeID)
-        slicer.mrmlScene.RemoveObserver(self.nodeAddedEventObserverID)
-        outputTubeFile = os.path.join(self.slicerCaseWidget.outputDir, "OutputTubeTree")
-        try:
-          self.logic.calculateVenousVesselness(quarterVolumeNode, vesselnessVolumeNode, vesselSeedsNode, outputTubeFile, vesselnessModelNode)
-        except ValueError or TypeError:
-          slicer.util.warningDisplay(
-            "Vessel Margin Calculation error, volumes might not be suitable for calculation")
-        finally:
-          slicer.app.processEvents()
-          self.nodeAddedEventObserverID = slicer.mrmlScene.AddObserver(slicer.mrmlScene.NodeAddedEvent,
-                                                                     self.onVolumeAddedNode)
-          self.onCalculateVenousCompletion(self.logic.cliNode)
-          self.onSaveData()
-    self.isInAlgorithmSteps = False    
-    pass
+  # def onVenousVesselnessCalc(self):
+  #   self.isInAlgorithmSteps = True
+  #   vesselSeedsNode = None
+  #   if self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_vesselSeeds"):
+  #       vesselSeedsNode = slicer.mrmlScene.GetNodeByID(self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_vesselSeeds"))
+  #   if self.logic.baseVolumeNode and vesselSeedsNode:
+  #     quarterVolumeNode = self.logic.baseVolumeNode
+  #     quarterVolumeNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_quarterVolume")
+  #     if quarterVolumeNodeID:
+  #       quarterVolumeNode = slicer.mrmlScene.GetNodeByID(quarterVolumeNodeID)
+  #     vesselnessVolumeNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_vesselnessVolume")
+  #     vesselnessModelNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_vesselnessModel")
+  #     if vesselnessVolumeNodeID and vesselnessModelNodeID:
+  #       vesselnessVolumeNode = slicer.mrmlScene.GetNodeByID(vesselnessVolumeNodeID)
+  #       vesselnessModelNode = slicer.mrmlScene.GetNodeByID(vesselnessModelNodeID)
+  #       slicer.mrmlScene.RemoveObserver(self.nodeAddedEventObserverID)
+  #       outputTubeFile = os.path.join(self.slicerCaseWidget.outputDir, "OutputTubeTree")
+  #       try:
+  #         self.logic.calculateVenousVesselness(quarterVolumeNode, vesselnessVolumeNode, vesselSeedsNode, outputTubeFile, vesselnessModelNode)
+  #       except ValueError or TypeError:
+  #         slicer.util.warningDisplay(
+  #           "Vessel Margin Calculation error, volumes might not be suitable for calculation")
+  #       finally:
+  #         slicer.app.processEvents()
+  #         self.nodeAddedEventObserverID = slicer.mrmlScene.AddObserver(slicer.mrmlScene.NodeAddedEvent,
+  #                                                                    self.onVolumeAddedNode)
+  #         self.onCalculateVenousCompletion(self.logic.cliNode)
+  #         self.onSaveData()
+  #   self.isInAlgorithmSteps = False    
+  #   pass
 
   #@beforeRunProcessEvents
   def onCalculateVenousCompletion(self,node=None,event=None):
@@ -1864,13 +1922,13 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
   def onCannulaModified(self, caller, event):
     self.lengthCannulaEdit.text = '%.2f' % self.logic.getCannulaLength()
 
-  def onLock(self):
-    if self.lockTrajectoryCheckBox.checked == 1:
-      self.defineVentricleButton.enabled = False
-      self.logic.lockTrajectoryLine()
-    else:
-      self.defineVentricleButton.enabled = True
-      self.logic.unlockTrajectoryLine()
+  # def onLock(self):
+  #   if self.lockTrajectoryCheckBox.checked == 1:
+  #     self.defineVentricleButton.enabled = False
+  #     self.logic.lockTrajectoryLine()
+  #   else:
+  #     self.defineVentricleButton.enabled = True
+  #     self.logic.unlockTrajectoryLine()
 
   def onReload(self,moduleName="VentriculostomyPlanning"):
     """Generic reload method for any scripted module.
@@ -1883,10 +1941,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     self.logic = VentriculostomyPlanningLogic()
     self.logic.register(self)
     
-  def onCreateGuideModel(self):
-    self.logic.createGuideModel()
 
-    
 class CurveManager():
 
   def __init__(self):
@@ -2237,10 +2292,10 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
     # kernel size in pixel: first vector is the hole filling kernel size, second vector is related with the mask thickness
     #self.morphologyParameters = [[10,10,6], [3,3,1]]
     #self.morphologyParameters = [[1,1,1], [10,10,5]]
-    self.morphologyParameters = [[1,1,1], [1,1,1]]
+    self.morphologyParameters = [[1,1,1], [4,4,4]]
     self.distanceMapThreshold = 100
     self.venousMargin = 10.0 #in mm
-    self.minimalVentricleLen = 10.0 # in mm
+    self.minimalVentricleLen = 5.0 # in mm
     self.yawAngle = 0.0
     self.pitchAngle = 0.0
     self.kocherDistance = 0.0
@@ -2254,6 +2309,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
     self.activeTrajectoryMarkup = 0
     self.cylinderRadius = 2.5 # unit mm
     self.posteriorMargin = 60.0 #unit mm
+    #self.kocherMargin = 150.0 #unit mm
     self.kocherMargin = 20.0 #unit mm
     self.entryRadius = 25.0
     self.transform = vtk.vtkTransform()
@@ -2353,7 +2409,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
       slicer.mrmlScene.RemoveNode(self.segmentationNode)
       self.segmentationNode = None  
     if self.ROINode:
-      self.ROINode = None
+      self.ROINode = None      
     self.baseVolumeNode = None
     self.ventricleVolume = None
     self.venousMedianValue = -10000
@@ -2501,7 +2557,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
       self.update_observers(VentriculostomyUserEvents.SetSliceViewerEvent)
     return marginNode
 
-
+  # connectedImage should be the image of the vessels, and it is in turn padded with the venousMargin
   def calculateConnectedCompWithMargin(self):
     marginNodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_vesselnessWithMarginModel")
     marginNode = slicer.mrmlScene.GetNodeByID(marginNodeID)
@@ -2639,7 +2695,6 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
     pass
   
   def createCandidatesWithinKocherPoint(self, entryPoints, posCenter, polyData, posKocher, surfacePolyData):
-
     points = vtk.vtkPoints()
     polyData.SetPoints(points)
 
@@ -2709,10 +2764,8 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
     if approachablePoints != 0 and numOfRef >=1:
       for pointIndex in range(1, len(path), 2):
           hasIntersection = locator.IntersectWithLine(path[pointIndex], path[pointIndex - 1], 1e-2, t, x, pcoords, subId)
-          print(x[2])
-          print(posNasion[2])
-          print(self.posteriorMargin)
           isPosteriorEnough = (abs(x[2] - posNasion[2]) > self.posteriorMargin)
+          #isPosteriorEnough = (abs(x[1] - posNasion[1]) > self.posteriorMargin)
           isWithinKocherMargin = (numpy.linalg.norm(numpy.array(x) - numpy.array(posKocher)) < self.kocherMargin)
           if (hasIntersection > 0) and isPosteriorEnough and isWithinKocherMargin:
             pointPre = path[pointIndex - 1]
@@ -2877,6 +2930,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
               posIJKAdjusted = [posSeed[0] + x, posSeed[1] + y, posSeed[2] + z]
     return posIJKAdjusted, voxelValueMax
 
+  # Create vessel map from seeds using connectedComponentFilter and save as connectedComponent
   def calculateConnectedComponent(self,inputVolumeNode, vesselSeedsNode, vesselnessModelNode):
       if inputVolumeNode:
         oriImage = sitk.Cast(sitkUtils.PullFromSlicer(inputVolumeNode.GetID()), sitk.sitkInt16)
@@ -2900,7 +2954,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
               venousMaxValueAdjusted = 800
             voxelValuefactor = math.pow(
               1 - (voxelValue - self.venousMedianValue) / (venousMaxValueAdjusted - self.venousMedianValue), 3) * (1 - self.thresholdProgressiveFactor) + self.thresholdProgressiveFactor
-            print(voxelValue, voxelValuefactor)
+            #print(voxelValue, voxelValuefactor)
             self.connectedComponentFilter.SetLower(voxelValue * voxelValuefactor)
             self.connectedComponentFilter.SetUpper(voxelValue / voxelValuefactor)
             connectedImage = sitk.Cast(self.connectedComponentFilter.Execute(oriImage), sitk.sitkInt16)
@@ -2917,23 +2971,10 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
           parameters["OutputGeometry"] = vesselnessModelNode.GetID()
           grayMaker = slicer.modules.grayscalemodelmaker
           slicer.cli.run(grayMaker, None, parameters, wait_for_completion=True)
-  
-  def calculateVenousVesselness(self,inputVolumeNode, vesselnessVolumeNode, vesselSeedsNode, outputTubeFile, vesselnessModelNode):
-      parameters = {}
-      parameters["inputVolume"] = inputVolumeNode.GetID()
-      parameters["outputTubeFile"] = outputTubeFile
-      parameters["outputTubeImage"] = vesselnessVolumeNode.GetID()
-      parameters["seedP"] = vesselSeedsNode.GetID()
-      parameters["scale"] = 1.0
-      parameters["border"] = 6.00
-      self.cliNode = slicer.cli.run(slicer.modules.segmenttubes, None, parameters, wait_for_completion=True)
-      parameters = {}
-      parameters["InputVolume"] = vesselnessVolumeNode.GetID()
-      parameters["Threshold"] = 0.5
-      parameters["OutputGeometry"] = vesselnessModelNode.GetID()
-      grayMaker = slicer.modules.grayscalemodelmaker
-      slicer.cli.run(grayMaker, None, parameters, wait_for_completion=True)
 
+  def calculatedVesselLabelMap(self, inputVolumeNode, vesselnessModelNode):
+    pass
+  
   def enableRelatedVolume(self, attributeName, volumeName, visibility = True):
     volumeNode = None
     if self.baseVolumeNode:
@@ -2990,6 +3031,20 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
       if markupsNode and markupsNode.GetDisplayNode():
         markupsNode.GetDisplayNode().SetVisibility(visibility)
     return markupsNode
+
+  def enableRelatedROI(self, attributeName, roiName, visibility = True):
+    roiNode = None
+    if self.baseVolumeNode:
+      enabledAttributeID = self.baseVolumeNode.GetAttribute(attributeName)
+      if enabledAttributeID and slicer.mrmlScene.GetNodeByID(enabledAttributeID):
+        roiNode = slicer.mrmlScene.GetNodeByID(enabledAttributeID)
+      else:
+        roiNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLAnnotationROINode")
+        roiNode.SetName(roiName)
+        slicer.mrmlScene.AddNode(roiNode)
+        roiNode.SetDisplayVisibility(False)
+        self.baseVolumeNode.SetAttribute(attributeName, roiNode.GetID())
+    return roiNode    
 
   def enableRelatedVariables(self, attributeName, fieldName):
     fieldvalue = -1
@@ -3541,13 +3596,16 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
 
   def createEntryPoint(self) :
     ###All calculation is based on the RAS coordinates system
-    inputModelNodeID =  self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_model")
+    inputModelNodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_model")
     inputModelNode = slicer.mrmlScene.GetNodeByID(inputModelNodeID)
     nasionNodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_nasion")
     nasionNode = slicer.mrmlScene.GetNodeByID(nasionNodeID)
     kocherNodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_kocher")
     kocherNode = slicer.mrmlScene.GetNodeByID(kocherNodeID)
     kocherNode.RemoveAllMarkups()
+    maskROI_ID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_maskROI")
+    maskROI = slicer.mrmlScene.GetNodeByID(maskROI_ID)
+
     if self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagittalLength"):
       sagittalReferenceLength = float(self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_sagittalLength"))   
     if self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_coronalLength")  :
@@ -3586,6 +3644,10 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
           posEntry = [0.0, 0.0, 0.0]
           self.coronalReferenceCurveManager.getLastPoint(posEntry)
           kocherNode.AddFiducial(posEntry[0], posEntry[1], posEntry[2])
+        
+        # Create face mask ROI
+        self.generateFaceMaskROI(maskROI)
+
     self.lockReferenceLine()
     nasionNode.SetLocked(True)
     kocherNode.SetLocked(True)
@@ -3622,6 +3684,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
           normalVec = numpy.array(self.trueSagittalPlane.GetNormal())
           originPos = numpy.array(self.trueSagittalPlane.GetOrigin())
           entryPointAtLeft = -numpy.sign(numpy.dot(numpy.array(posEntry)-originPos, normalVec)) # here left hemisphere means from the patient's perspective
+          print("CheckingForLeft")
           if entryPointAtLeft >= 0 and self.useLeftHemisphere ==False:
             self.useLeftHemisphere = True
             self.createEntryPoint()
@@ -3658,38 +3721,52 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
             return True
     return False
 
-  def generateLabelMapFor3DModel(self):
-    self.holeFilledImageNode, self.subtractedImageNode = self.getOrCreateHoleSkullVolumeNode()
-    baseDimension = [160, 120, 50]
-    posNasion = [0.0, 0.0, 0.0]
-    self.sagittalReferenceCurveManager.getFirstPoint(posNasion)
-    basePolyData = self.functions.generateCubeModelWithYawAngle(posNasion, self.sagittalYawAngle, baseDimension)
-    clippedImage  = self.functions.clipVolumeWithPolyData(self.holeFilledImageNode, basePolyData, True, 1)
-    clippedImageDataBase = self.functions.inverseVTKImage(clippedImage)
-    matrix = vtk.vtkMatrix4x4()
-    self.holeFilledImageNode.GetIJKToRASMatrix(matrix) 
+  def generateFaceMaskROI(self, roiNode):
+    if (roiNode.GetAttribute("ROINode.initialized") == "Initialized"):
+      return roiNode
+    else:
+      posNasion = [0.0, 0.0, 0.0]
+      self.sagittalReferenceCurveManager.getFirstPoint(posNasion)
+      heightPos = numpy.array([0.0, 0.0, 0.0])
+      self.sagittalReferenceCurveManager.getLastPoint(heightPos)
+      heightOfPath = abs(heightPos[2] - posNasion[2])
+      midpointPos = [(heightPos[0]+posNasion[0])/2, (heightPos[1]+posNasion[1])/2, (heightPos[2]+posNasion[2])/2]
+      maskHeight = heightOfPath + 100
 
-    self.guideVolumeNode.SetIJKToRASMatrix(matrix)
-    self.guideVolumeNode.SetAndObserveImageData(clippedImageDataBase)
+      roiNode.SetXYZ(midpointPos[0], midpointPos[1], midpointPos[2])
+      roiNode.SetRadiusXYZ(80, 60, maskHeight/2)
+
+      # Hacky way to signal that initialization is complete
+      roiNode.SetAttribute("ROINode.initialized", "Initialized")
+      roiNode.SetDisplayVisibility(True)
 
   def generateLabelMapForFaceMask(self):
-    #------------------------------------------------ Create mask ------------------------------------------------
+    # Create mask
     self.holeFilledImageNode, self.subtractedImageNode = self.getOrCreateHoleSkullVolumeNode()
-
-    posNasion = [0.0, 0.0, 0.0]
-    self.sagittalReferenceCurveManager.getFirstPoint(posNasion)
-
-    heightPos = numpy.array([0.0, 0.0, 0.0])
-    self.sagittalReferenceCurveManager.getLastPoint(heightPos)
 
     entryPos = numpy.array([0.0, 0.0, 0.0])
     self.cannulaManager.getLastPoint(entryPos)
     
-    heightOfPath = abs(heightPos[2] - posNasion[2])
-    midpointPos = [(heightPos[0]+posNasion[0])/2, (heightPos[1]+posNasion[1])/2, (heightPos[2]+posNasion[2])/2]
-    maskHeight = heightOfPath + 300 # TODO: Set this as an option in settings later
+    # TODO: Mask ROS currently doesn't respect sagittalYawAngle
+    maskROI_ID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_maskROI")
+    maskROI = slicer.mrmlScene.GetNodeByID(maskROI_ID)
+    baseDimension = [160,120,1000]
+    maskROI.GetRadiusXYZ(baseDimension)
+    baseDimension[0] = baseDimension[0]*2
+    baseDimension[1] = baseDimension[1]*2
+    baseDimension[2] = baseDimension[2]*2
+    midpointPos = entryPos
+    maskROI.GetXYZ(midpointPos)
 
-    baseDimension = [160, 120, maskHeight] # Size of face mask
+    # posNasion = [0.0, 0.0, 0.0]
+    # self.sagittalReferenceCurveManager.getFirstPoint(posNasion)
+    # heightPos = numpy.array([0.0, 0.0, 0.0])
+    # self.sagittalReferenceCurveManager.getLastPoint(heightPos)
+    # heightOfPath = abs(heightPos[2] - posNasion[2])
+    # midpointPos = [(heightPos[0]+posNasion[0])/2, (heightPos[1]+posNasion[1])/2, (heightPos[2]+posNasion[2])/2]
+    # maskHeight = heightOfPath + 100
+    # baseDimension=[160,120,maskHeight]
+
     basePolyData = self.functions.generateCubeModelWithYawAngle(midpointPos, self.sagittalYawAngle, baseDimension)
 
     clippedImage  = self.functions.clipVolumeWithPolyData(self.subtractedImageNode, basePolyData, True, 0)
@@ -3869,10 +3946,6 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
     averageNormal = averageNormal/numpy.linalg.norm(averageNormal)
 
     return averageNormal
-
-  def createGuideModel(self):
-    pass
-    
     
   def updateSliceViewBasedOnPoints(self, firstPos, lastPos):
     ## due to the RAS and vtk space difference, the X axis is flipped, So the standard rotation matrix is multiplied by -1 in the X axis
