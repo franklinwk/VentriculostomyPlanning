@@ -1,0 +1,6 @@
+Python 3.6
+pip install future-fstrings
+py -m pip install cmake
+pip install bpy
+Move "Python\Python36\Scripts\2.79" to "Python\Python36\2.79"
+

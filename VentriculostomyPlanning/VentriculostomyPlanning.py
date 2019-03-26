@@ -30,6 +30,7 @@ from os.path import basename
 from os import listdir
 from abc import ABCMeta, abstractmethod
 import datetime
+import time
 from functools import wraps
 from subprocess import check_output
 # VentriculostomyPlanning
@@ -38,7 +39,6 @@ class VentriculostomyPlanning(ScriptedLoadableModule):
   """Uses ScriptedLoadableModule base class, available at:
   https://github.com/Slicer/Slicer/blob/master/Base/Python/slicer/ScriptedLoadableModule.py
   """
-
   def __init__(self, parent):
     ScriptedLoadableModule.__init__(self, parent)
     self.parent.title = "VentriculostomyPlanning" # TODO make this more human readable by adding spaces
@@ -51,7 +51,6 @@ class VentriculostomyPlanning(ScriptedLoadableModule):
 #
 # VentriculostomyPlanningWidget
 #
-
 class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMixin):
   """Uses ScriptedLoadableModuleWidget base class, available at:
   https://github.com/Slicer/Slicer/blob/master/Base/Python/slicer/ScriptedLoadableModule.py
@@ -107,9 +106,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     #
     # Lines Area
     #
-
     # Layout within the dummy collapsible button
-
     self.caseManagerBox = qt.QGroupBox()
     CaseManagerInfoLayout = qt.QVBoxLayout()
     self.caseManagerBox.setLayout(CaseManagerInfoLayout)
@@ -600,7 +597,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
       self.logic.enableRelatedMarkups("vtkMRMLScalarVolumeNode.rel_sagittalPoint", "sagittalPoint", visibility=False)
       self.logic.enableRelatedMarkups("vtkMRMLScalarVolumeNode.rel_target", "target", visibility=False)
       self.logic.enableRelatedMarkups("vtkMRMLScalarVolumeNode.rel_distal", "distal", visibility=False)
-      #self.logic.enableRelatedMarkups("vtkMRMLScalarVolumeNode.rel_vesselSeeds", "vesselSeeds", visibility=False)
       self.logic.enableRelatedMarkups("vtkMRMLScalarVolumeNode.rel_cannula", "cannula", visibility=False)
       if self.logic.pathCandidatesModel:
         self.logic.pathCandidatesModel.SetDisplayVisibility(0)
@@ -611,7 +607,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
       self.logic.enableRelatedMarkups("vtkMRMLScalarVolumeNode.rel_sagittalPoint", "sagittalPoint", visibility=True)
       self.logic.enableRelatedMarkups("vtkMRMLScalarVolumeNode.rel_target", "target", visibility=True)
       self.logic.enableRelatedMarkups("vtkMRMLScalarVolumeNode.rel_distal", "distal", visibility=True)
-      #self.logic.enableRelatedMarkups("vtkMRMLScalarVolumeNode.rel_vesselSeeds", "vesselSeeds", visibility=True)
       self.logic.enableRelatedMarkups("vtkMRMLScalarVolumeNode.rel_cannula", "cannula", visibility=True)
       if self.logic.pathCandidatesModel:
         self.logic.pathCandidatesModel.SetDisplayVisibility(1)
@@ -646,8 +641,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         self.logic.createEntryPoint()
     if EventID == VentriculostomyUserEvents.CheckCurrentProgressEvent:   
       self.checkCurrentProgress()
-    # if EventID == VentriculostomyUserEvents.SegmentVesselWithSeedsEvent:
-    #   self.onSegmentVesselWithSeeds()
     if EventID == VentriculostomyUserEvents.SagittalCorrectionFinishedEvent:
       self.onResetButtons()
       self.fourUpLayoutButton.click()
@@ -773,8 +766,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         self.logic.savePlanningDataToDirectory(self.logic.ventricleVolume, outputDir)
         outputDir = os.path.join(self.slicerCaseWidget.currentCaseDirectory, "Results")
         self.jsonFile = os.path.join(outputDir, "PlanningTimeStamp.json")
-        self.logic.appendPlanningTimeStampToJson(self.jsonFile, "StartPreProcessing",
-                                                 datetime.datetime.now().time().isoformat())
+        self.logic.appendPlanningTimeStampToJson(self.jsonFile, "StartPreProcessing", datetime.datetime.now().time().isoformat())
         self.logic.enableRelatedModel("vtkMRMLScalarVolumeNode.rel_model", "surfaceModel", intersectionVis=False)
         self.logic.enableRelatedModel("vtkMRMLScalarVolumeNode.rel_clipModel", "clipModel", visibility=False, intersectionVis=False)
         self.logic.enableRelatedModel("vtkMRMLScalarVolumeNode.rel_cannulaModel", "cannulaModel", color = [0.5, 1.0, 0.0])
@@ -785,7 +777,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         self.logic.enableRelatedModel("vtkMRMLScalarVolumeNode.rel_pathCandidateModel", "pathCandidateModel",  color=[1.0, 1.0, 0.0], visibility= False)
         self.logic.enableRelatedModel("vtkMRMLScalarVolumeNode.rel_pathNavigationModel", "pathNavigationModel",  color=[1.0, 1.0, 0.0], visibility= False)
         self.logic.enableRelatedModel("vtkMRMLScalarVolumeNode.rel_coronalPlanningModel", "coronalPlanningModel", color=[0.0,1.0,0.0])
-        self.logic.enableRelatedModel("vtkMRMLScalarVolumeNode.rel_vesselnessModel", "vesselnessModel", color=[1.0, 0.0, 0.0], visibility=True)
+        self.logic.enableRelatedModel("vtkMRMLScalarVolumeNode.rel_vesselnessModel", "vesselnessModel", color=[1.0, 0.0, 0.0], visibility=True, opacity=1.0)
         self.logic.enableRelatedModel("vtkMRMLScalarVolumeNode.rel_vesselnessWithMarginModel", "vesselnessWithMarginModel", color=[1.0, 0.0, 0.0], visibility=False)
         self.logic.enableRelatedModel("vtkMRMLScalarVolumeNode.rel_grayScaleModel", "grayScaleModel",  color=[0.8, 0.2, 0.0])
         self.logic.enableRelatedModel("vtkMRMLScalarVolumeNode.rel_grayScaleWithMarginModel", "grayScaleWithMarginModel", visibility=False)
@@ -795,7 +787,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         self.logic.enableRelatedMarkups("vtkMRMLScalarVolumeNode.rel_sagittalPoint", "sagittalPoint")
         self.logic.enableRelatedMarkups("vtkMRMLScalarVolumeNode.rel_target", "target")
         self.logic.enableRelatedMarkups("vtkMRMLScalarVolumeNode.rel_distal", "distal")
-        #self.logic.enableRelatedMarkups("vtkMRMLScalarVolumeNode.rel_vesselSeeds", "vesselSeeds")
         self.logic.enableRelatedMarkups("vtkMRMLScalarVolumeNode.rel_cannula", "cannula")
         self.logic.enableRelatedMarkups("vtkMRMLScalarVolumeNode.rel_cylinderMarker", "cylinderMarker")
         self.logic.enableRelatedMarkups("vtkMRMLScalarVolumeNode.rel_sagittalReferenceMarker", "sagittalReferenceMarker",visibility=False)
@@ -816,8 +807,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         self.logic.enableRelatedVariables("vtkMRMLScalarVolumeNode.rel_venousMedianValue", "venousMedianValue")
         self.logic.enableRelatedVariables("vtkMRMLScalarVolumeNode.rel_venousMaxValue", "venousMaxValue")
         self.logic.enableRelatedROI("vtkMRMLScalarVolumeNode.rel_maskROI", "maskROI")
-        #vesselSeedsNodelID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_vesselSeeds")
-        #self.simpleMarkupsWidget.setCurrentNode(slicer.mrmlScene.GetNodeByID(vesselSeedsNodelID))
         self.kocherMarginEdit.setText(self.logic.kocherMargin)
         self.posteriorMarginEdit.setText(self.logic.posteriorMargin)
         self.surfaceModelThresholdEdit.setText(self.logic.surfaceModelThreshold)
@@ -895,15 +884,12 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
       self.saveDataButton.setEnabled(True)
       self.checkCurrentProgress()
       self.logic.placeWidget.setPlaceModeEnabled(False)
-    self.nodeAddedEventObserverID = slicer.mrmlScene.AddObserver(slicer.mrmlScene.NodeAddedEvent,
-                                                                 self.onVolumeAddedNode)
-    pass
+    self.nodeAddedEventObserverID = slicer.mrmlScene.AddObserver(slicer.mrmlScene.NodeAddedEvent, self.onVolumeAddedNode)
 
   def onResetButtons(self, caller=None, event=None):
     self.defineVentricleButton.setChecked(False)
     self.selectNasionButton.setChecked(False)
     self.selectSagittalButton.setChecked(False)
-    pass
 
   def checkCurrentProgress(self):
     self.LoadCaseButton.setEnabled(False)
@@ -944,7 +930,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         if cannulaFiducials.GetNumberOfFiducials()>1:
           self.createPlanningLineButton.setEnabled(True)
           self.tabMainGroupBox.visible = True if self.startVesselSegmentationButton.checked == False else False
-    pass
 
   def enableEventObserver(self):
     nasionNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_nasion")
@@ -1003,7 +988,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     self.cannulaToNormAngleEdit.text = '--'
     self.skullNormToSagittalAngleEdit.text = '--'
     self.skullNormToCoronalAngleEdit.text = '--'
-
 
   def onChangeThresholdValues(self, sliderLowerValue, sliderUpperValue):
     if self.logic.baseVolumeNode:
@@ -1087,8 +1071,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
 
               ROICenterPoint = coneTipPoint + ventricleDirect * coneHeight
               self.logic.ROINode.SetXYZ(ROICenterPoint)
-              ROIRadiusXYZ = [max(coneHeight * math.tan(angle * math.pi / 180.0), coneHeight * ventricleDirect[0]), coneHeight * ventricleDirect[1],
-                              max(coneHeight * math.tan(angle * math.pi / 180.0), coneHeight * ventricleDirect[2])]
+              ROIRadiusXYZ = [max(coneHeight * math.tan(angle * math.pi / 180.0), coneHeight * ventricleDirect[0]), coneHeight * ventricleDirect[1], max(coneHeight * math.tan(angle * math.pi / 180.0), coneHeight * ventricleDirect[2])]
               self.logic.ROINode.SetRadiusXYZ(ROIRadiusXYZ)
               cropVolumeLogic = slicer.modules.cropvolume.logic()
               cropVolumeLogic.CropVoxelBased(self.logic.ROINode, self.logic.baseVolumeNode, croppedVolumeNode)
@@ -1104,10 +1087,10 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
             #greenSliceNode.SetFieldOfView(self.green_widget.width/2, self.green_widget.height/2, 0.5)
             slicer.app.processEvents()
 
-            # if quarterVolume.GetDisplayNode():
-            #   quarterVolume.GetDisplayNode().SetAutoWindowLevel(False)
-            #   quarterVolume.GetDisplayNode().SetWindow(self.baseVolumeWindowValue)
-            #   quarterVolume.GetDisplayNode().SetLevel(self.baseVolumeLevelValue)
+            if quarterVolume.GetDisplayNode():
+              quarterVolume.GetDisplayNode().SetAutoWindowLevel(False)
+              quarterVolume.GetDisplayNode().SetWindow(self.baseVolumeWindowValue)
+              quarterVolume.GetDisplayNode().SetLevel(self.baseVolumeLevelValue)
 
       slicer.app.processEvents()
       self.nodeAddedEventObserverID = slicer.mrmlScene.AddObserver(slicer.mrmlScene.NodeAddedEvent, self.onVolumeAddedNode)
@@ -1281,15 +1264,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         self.portPushButton.click()
         slicer.app.processEvents()
 
-        if self.logic.segmentationNode.GetSegmentation().GetNthSegment(0) is not None:
-          faceMaskNode = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLModelNode", modelName).GetItemAsObject(0)
-          faceMaskNode.SetDisplayVisibility(False)
-          decimatePro = vtk.vtkDecimatePro()
-          decimatePro.SetInputData(faceMaskNode.GetPolyData())
-          decimatePro.SetTargetReduction(0.7)
-          decimatePro.Update()
-          faceMaskNode.SetAndObservePolyData(decimatePro.GetOutput())
-          faceMask = faceMaskNode.GetPolyData()
+        # Prepare and position faceMask, guidePlatform, skullModel, holeCylinder, and pilotHoles and send to Blender
 
         # Determine vector of trajectory
         targetPos = numpy.array([0.0, 0.0, 0.0])
@@ -1301,8 +1276,21 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         insertionVectorNorm = numpy.linalg.norm(insertionVector)
         insertionVector = numpy.array([insertionVector[0]/insertionVectorNorm, insertionVector[1]/insertionVectorNorm, insertionVector[2]/insertionVectorNorm])
 
+        # Prepare faceMask
+        if self.logic.segmentationNode.GetSegmentation().GetNthSegment(0) is not None:
+          faceMaskNode = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLModelNode", modelName).GetItemAsObject(0)
+          faceMaskNode.SetDisplayVisibility(False)
+          decimatePro = vtk.vtkDecimatePro()
+          decimatePro.SetInputData(faceMaskNode.GetPolyData())
+          decimatePro.SetTargetReduction(0.7)
+          decimatePro.Update()
+          faceMaskNode.SetAndObservePolyData(decimatePro.GetOutput())
+          faceMask = faceMaskNode.GetPolyData()
+
+        dir_path = os.path.dirname(os.path.realpath(__file__))
+
         # Load needle guide platform model and position
-        guidePlatformPath = os.path.dirname(os.path.realpath(__file__)) + "/NeedleGuideModelNoHoles.STL"
+        guidePlatformPath = dir_path + "/NeedleGuideModelNoHoles.STL"
         guidePlatform = self.LoadStl(guidePlatformPath) #Guide platform model has its centre point 20mm from the top to account for 8mm minimum height from skin (13mm total, with 7mm for margin)
         guideTransformWithTranslate = vtk.vtkTransform()
         guideTransformWithTranslate.SetMatrix(transform.GetMatrix())
@@ -1328,28 +1316,14 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         skullTransformFilter.SetTransform(skullTransform)
         skullTransformFilter.ReleaseDataFlagOn()
         skullTransformFilter.Update()
-        guidePlatformCut = self.logic.functions.polydataBoolean(guidePlatform, skullTransformFilter.GetOutput(), "difference", loop=True)
-        # platformDecimatePro = vtk.vtkDecimatePro()
-        # platformDecimatePro.SetInputData(guidePlatformCut)
-        # platformDecimatePro.SetTargetReduction(0.5)
-        # platformDecimatePro.Update()
-        # guidePlatformCut = platformDecimatePro.GetOutput()        
+        skullModel = skullTransformFilter.GetOutput()
+        #guidePlatformCut = self.logic.functions.polydataBoolean(guidePlatform, skullTransformFilter.GetOutput(), "difference", loop=True)
 
         # Attach guide platform to the mask
-        faceMaskWithPlatform = self.logic.functions.polydataBoolean(faceMask, guidePlatformCut, "union", triangleFilter=True, loop=True, clean=True)
+        #faceMaskWithPlatform = self.logic.functions.polydataBoolean(faceMask, guidePlatformCut, "union", triangleFilter=True, loop=True, clean=True)
 
-        # # Generate hole cylinder to cut through model and mask
-        # holeCylinderHeight = 600.0
-        # transformWithTranslate = vtk.vtkTransform()
-        # transformWithTranslate.SetMatrix(transform.GetMatrix())
-        # transformWithTranslate.RotateX(-90.0)
-        # transformWithTranslate.PostMultiply()
-        # transformWithTranslate.Translate(entryPos)
-        # holeCylinderRadius = 20.0 #TODO: Set radius as setting
-        # holeCylinder = self.logic.functions.generateCylinderModelWithTransform(holeCylinderRadius, holeCylinderHeight, transformWithTranslate) 
-        # faceMaskWithHole = self.logic.functions.polydataBoolean(faceMaskWithPlatform, holeCylinder, "difference", triangleFilter=True, loop=True)
-
-        holeCylinderPath = os.path.dirname(os.path.realpath(__file__)) + "/HoleCylinder.STL"
+        # Generate hole cylinder to cut through model and mask
+        holeCylinderPath = dir_path + "/HoleCylinder.STL"
         holeCylinder = self.LoadStl(holeCylinderPath)
         transformWithTranslate = vtk.vtkTransform()
         transformWithTranslate.SetMatrix(transform.GetMatrix())
@@ -1361,98 +1335,205 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         cylinderTransformFilter.ReleaseDataFlagOn()
         cylinderTransformFilter.Update()
         holeCylinder = cylinderTransformFilter.GetOutput()
-        faceMaskWithHole = self.logic.functions.polydataBoolean(faceMaskWithPlatform, holeCylinder, "difference", triangleFilter=True, loop=True)                
+        #faceMaskWithHole = self.logic.functions.polydataBoolean(faceMaskWithPlatform, holeCylinder, "difference", triangleFilter=True, loop=True)                
         
-        # # Create screw pilot holes
-        # pilotHolesTemplatePath = os.path.dirname(os.path.realpath(__file__)) + "/PilotHolesTemplate1.STL"
-        # pilotHolesTemplate = self.LoadStl(pilotHolesTemplatePath)
-        # transformWithTranslate = vtk.vtkTransform()
-        # transformWithTranslate.SetMatrix(transform.GetMatrix())
-        # transformWithTranslate.PostMultiply()
-        # transformWithTranslate.Translate(entryPos)
-        # transformFilter = vtk.vtkTransformPolyDataFilter()
-        # transformFilter.SetInputData(pilotHolesTemplate)
-        # transformFilter.SetTransform(transformWithTranslate)
-        # transformFilter.ReleaseDataFlagOn()
-        # transformFilter.Update()
-        # pilotHolesTemplate = transformFilter.GetOutput()
-        # faceMaskWithPilotHoles = self.logic.functions.polydataBoolean(faceMaskWithHole, pilotHolesTemplate, "difference", triangleFilter=True, loop=True, clean=True) 
+        # Create screw pilot holes
+        pilotHolesPath1 = dir_path + "/PilotHolesTemplate1.STL"
+        pilotHoles1 = self.LoadStl(pilotHolesPath1)
+        transformWithTranslate = vtk.vtkTransform()
+        transformWithTranslate.SetMatrix(transform.GetMatrix())
+        transformWithTranslate.PostMultiply()
+        transformWithTranslate.Translate(entryPos)
+        transformFilter = vtk.vtkTransformPolyDataFilter()
+        transformFilter.SetInputData(pilotHoles1)
+        transformFilter.SetTransform(transformWithTranslate)
+        transformFilter.ReleaseDataFlagOn()
+        transformFilter.Update()
+        pilotHoles1 = transformFilter.GetOutput()
 
-        # pilotHolesTemplatePath = os.path.dirname(os.path.realpath(__file__)) + "/PilotHolesTemplate2.STL"
-        # pilotHolesTemplate = self.LoadStl(pilotHolesTemplatePath)
-        # transformWithTranslate = vtk.vtkTransform()
-        # transformWithTranslate.SetMatrix(transform.GetMatrix())
-        # transformWithTranslate.PostMultiply()
-        # transformWithTranslate.Translate(entryPos)
-        # transformFilter = vtk.vtkTransformPolyDataFilter()
-        # transformFilter.SetInputData(pilotHolesTemplate)
-        # transformFilter.SetTransform(transformWithTranslate)
-        # transformFilter.ReleaseDataFlagOn()
-        # transformFilter.Update()
-        # pilotHolesTemplate = transformFilter.GetOutput()
-        # faceMaskWithPilotHoles = self.logic.functions.polydataBoolean(faceMaskWithPilotHoles, pilotHolesTemplate, "difference", triangleFilter=True, loop=True, clean=True) 
+        pilotHolesPath2 = dir_path + "/PilotHolesTemplate2.STL"
+        pilotHoles2 = self.LoadStl(pilotHolesPath2)
+        transformWithTranslate = vtk.vtkTransform()
+        transformWithTranslate.SetMatrix(transform.GetMatrix())
+        transformWithTranslate.PostMultiply()
+        transformWithTranslate.Translate(entryPos)
+        transformFilter = vtk.vtkTransformPolyDataFilter()
+        transformFilter.SetInputData(pilotHoles2)
+        transformFilter.SetTransform(transformWithTranslate)
+        transformFilter.ReleaseDataFlagOn()
+        transformFilter.Update()
+        pilotHoles2 = transformFilter.GetOutput()
 
-        # pilotHolesTemplatePath = os.path.dirname(os.path.realpath(__file__)) + "/PilotHolesTemplate3.STL"
-        # pilotHolesTemplate = self.LoadStl(pilotHolesTemplatePath)
-        # transformWithTranslate = vtk.vtkTransform()
-        # transformWithTranslate.SetMatrix(transform.GetMatrix())
-        # transformWithTranslate.PostMultiply()
-        # transformWithTranslate.Translate(entryPos)
-        # transformFilter = vtk.vtkTransformPolyDataFilter()
-        # transformFilter.SetInputData(pilotHolesTemplate)
-        # transformFilter.SetTransform(transformWithTranslate)
-        # transformFilter.ReleaseDataFlagOn()
-        # transformFilter.Update()
-        # pilotHolesTemplate = transformFilter.GetOutput()
-        # faceMaskWithPilotHoles = self.logic.functions.polydataBoolean(faceMaskWithPilotHoles, pilotHolesTemplate, "difference", triangleFilter=True, loop=True, clean=True) 
+        pilotHolesPath3 = dir_path + "/PilotHolesTemplate3.STL"
+        pilotHoles3 = self.LoadStl(pilotHolesPath3)
+        transformWithTranslate = vtk.vtkTransform()
+        transformWithTranslate.SetMatrix(transform.GetMatrix())
+        transformWithTranslate.PostMultiply()
+        transformWithTranslate.Translate(entryPos)
+        transformFilter = vtk.vtkTransformPolyDataFilter()
+        transformFilter.SetInputData(pilotHoles3)
+        transformFilter.SetTransform(transformWithTranslate)
+        transformFilter.ReleaseDataFlagOn()
+        transformFilter.Update()
+        pilotHoles3 = transformFilter.GetOutput()
 
-        # pilotHolesTemplatePath = os.path.dirname(os.path.realpath(__file__)) + "/PilotHolesTemplate4.STL"
-        # pilotHolesTemplate = self.LoadStl(pilotHolesTemplatePath)
-        # transformWithTranslate = vtk.vtkTransform()
-        # transformWithTranslate.SetMatrix(transform.GetMatrix())
-        # transformWithTranslate.PostMultiply()
-        # transformWithTranslate.Translate(entryPos)
-        # transformFilter = vtk.vtkTransformPolyDataFilter()
-        # transformFilter.SetInputData(pilotHolesTemplate)
-        # transformFilter.SetTransform(transformWithTranslate)
-        # transformFilter.ReleaseDataFlagOn()
-        # transformFilter.Update()
-        # pilotHolesTemplate = transformFilter.GetOutput()
-        # faceMaskWithPilotHoles = self.logic.functions.polydataBoolean(faceMaskWithPilotHoles, pilotHolesTemplate, "difference", triangleFilter=True, loop=True, clean=True)                         
+        pilotHolesPath4 = dir_path + "/PilotHolesTemplate4.STL"
+        pilotHoles4 = self.LoadStl(pilotHolesPath4)
+        transformWithTranslate = vtk.vtkTransform()
+        transformWithTranslate.SetMatrix(transform.GetMatrix())
+        transformWithTranslate.PostMultiply()
+        transformWithTranslate.Translate(entryPos)
+        transformFilter = vtk.vtkTransformPolyDataFilter()
+        transformFilter.SetInputData(pilotHoles4)
+        transformFilter.SetTransform(transformWithTranslate)
+        transformFilter.ReleaseDataFlagOn()
+        transformFilter.Update()
+        pilotHoles4 = transformFilter.GetOutput()                        
 
-        # pilotHoleCylinderHeight = 600.0
-        # transformWithTranslate = vtk.vtkTransform()
-        # transformWithTranslate.SetMatrix(transform.GetMatrix())
-        # transformWithTranslate.RotateX(-90.0)
-        # transformWithTranslate.PostMultiply()
-        # transformWithTranslate.Translate(entryPos)
-        # pilotHoleCylinderRadius = 20.0 #TODO: Set radius as setting
-        # pilotHoleCylinder = self.logic.functions.generateCylinderModelWithTransform(holeCylinderRadius, holeCylinderHeight, transformWithTranslate) 
-        # faceMaskWithHole = self.logic.functions.polydataBoolean(faceMaskWithPlatform, holeCylinder, "difference", triangleFilter=True, loop=True)
+        #faceMaskWithPilotHoles = self.logic.functions.polydataBoolean(faceMaskWithHole, pilotHoles, "difference", triangleFilter=True, loop=True, clean=True) 
+
+        # Save faceMask, guidePlatform, holeCylinder, and pilotHoles and send to Blender
+        faceMaskNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
+        faceMaskNode.SetName("FaceMask")
+        faceMaskDisplayNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelDisplayNode")
+        faceMaskDisplayNode.SetColor(0.7, 0.7, 0.7)
+        faceMaskDisplayNode.SetScene(slicer.mrmlScene)
+        slicer.mrmlScene.AddNode(faceMaskDisplayNode)
+        faceMaskNode.SetAndObserveDisplayNodeID(faceMaskDisplayNode.GetID())
+        slicer.mrmlScene.AddNode(faceMaskNode)
+        faceMaskNode.SetAndObservePolyData(faceMask)
+
+        guidePlatformNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
+        guidePlatformNode.SetName("GuidePlatform")
+        guidePlatformDisplayNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelDisplayNode")
+        guidePlatformDisplayNode.SetColor(1.0, 0.0, 0.0)
+        guidePlatformDisplayNode.SetScene(slicer.mrmlScene)
+        slicer.mrmlScene.AddNode(guidePlatformDisplayNode)
+        guidePlatformNode.SetAndObserveDisplayNodeID(guidePlatformDisplayNode.GetID())
+        slicer.mrmlScene.AddNode(guidePlatformNode)
+        guidePlatformNode.SetAndObservePolyData(guidePlatform)
+
+        skullModelNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
+        skullModelNode.SetName("OffsetSkullModel")
+        skullModelDisplayNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelDisplayNode")
+        skullModelDisplayNode.SetColor(0.0, 0.0, 0.0)
+        skullModelDisplayNode.SetScene(slicer.mrmlScene)
+        slicer.mrmlScene.AddNode(skullModelDisplayNode)
+        skullModelNode.SetAndObserveDisplayNodeID(skullModelDisplayNode.GetID())
+        slicer.mrmlScene.AddNode(skullModelNode)
+        skullModelNode.SetAndObservePolyData(skullModel)
+        
+        holeCylinderNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
+        holeCylinderNode.SetName("HoleCylinder")
+        holeCylinderDisplayNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelDisplayNode")
+        holeCylinderDisplayNode.SetColor(0.0, 1.0, 0.0)
+        holeCylinderDisplayNode.SetScene(slicer.mrmlScene)
+        slicer.mrmlScene.AddNode(holeCylinderDisplayNode)
+        holeCylinderNode.SetAndObserveDisplayNodeID(holeCylinderDisplayNode.GetID())
+        slicer.mrmlScene.AddNode(holeCylinderNode)
+        holeCylinderNode.SetAndObservePolyData(holeCylinder)
+
+        pilotHoles1Node = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
+        pilotHoles1Node.SetName("PilotHoles1")
+        pilotHoles1DisplayNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelDisplayNode")
+        pilotHoles1DisplayNode.SetColor(0.0, 1.0, 1.0)
+        pilotHoles1DisplayNode.SetScene(slicer.mrmlScene)
+        slicer.mrmlScene.AddNode(pilotHoles1DisplayNode)
+        pilotHoles1Node.SetAndObserveDisplayNodeID(pilotHoles1DisplayNode.GetID())
+        slicer.mrmlScene.AddNode(pilotHoles1Node)
+        pilotHoles1Node.SetAndObservePolyData(pilotHoles1)
+
+        pilotHoles2Node = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
+        pilotHoles2Node.SetName("PilotHoles2")
+        pilotHoles2DisplayNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelDisplayNode")
+        pilotHoles2DisplayNode.SetColor(0.0, 1.0, 1.0)
+        pilotHoles2DisplayNode.SetScene(slicer.mrmlScene)
+        slicer.mrmlScene.AddNode(pilotHoles2DisplayNode)
+        pilotHoles2Node.SetAndObserveDisplayNodeID(pilotHoles2DisplayNode.GetID())
+        slicer.mrmlScene.AddNode(pilotHoles2Node)
+        pilotHoles2Node.SetAndObservePolyData(pilotHoles2)
+
+        pilotHoles3Node = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
+        pilotHoles3Node.SetName("PilotHoles3")
+        pilotHoles3DisplayNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelDisplayNode")
+        pilotHoles3DisplayNode.SetColor(0.0, 1.0, 1.0)
+        pilotHoles3DisplayNode.SetScene(slicer.mrmlScene)
+        slicer.mrmlScene.AddNode(pilotHoles3DisplayNode)
+        pilotHoles3Node.SetAndObserveDisplayNodeID(pilotHoles3DisplayNode.GetID())
+        slicer.mrmlScene.AddNode(pilotHoles3Node)
+        pilotHoles3Node.SetAndObservePolyData(pilotHoles3)
+
+        pilotHoles4Node = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
+        pilotHoles4Node.SetName("PilotHoles4")
+        pilotHoles4DisplayNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelDisplayNode")
+        pilotHoles4DisplayNode.SetColor(0.0, 1.0, 1.0)
+        pilotHoles4DisplayNode.SetScene(slicer.mrmlScene)
+        slicer.mrmlScene.AddNode(pilotHoles4DisplayNode)
+        pilotHoles4Node.SetAndObserveDisplayNodeID(pilotHoles4DisplayNode.GetID())
+        slicer.mrmlScene.AddNode(pilotHoles4Node)
+        pilotHoles4Node.SetAndObservePolyData(pilotHoles4)
+
+        modelSavePath = dir_path + "\\Blender"
+        faceMaskSavePath = modelSavePath + "\\faceMask.STL"
+        guidePlatformSavePath = modelSavePath + "\\guidePlatform.STL"
+        skullModelSavePath = modelSavePath + "\\skullModel.STL"
+        holeCylinderSavePath = modelSavePath + "\\holeCylinder.STL"
+        pilotHoles1SavePath = modelSavePath + "\\pilotHoles1.STL"
+        pilotHoles2SavePath = modelSavePath + "\\pilotHoles2.STL"
+        pilotHoles3SavePath = modelSavePath + "\\pilotHoles3.STL"
+        pilotHoles4SavePath = modelSavePath + "\\pilotHoles4.STL"
+        slicer.util.saveNode(faceMaskNode, faceMaskSavePath)
+        slicer.util.saveNode(guidePlatformNode, guidePlatformSavePath)
+        slicer.util.saveNode(skullModelNode, skullModelSavePath)
+        slicer.util.saveNode(holeCylinderNode, holeCylinderSavePath)
+        slicer.util.saveNode(pilotHoles1Node, pilotHoles1SavePath)
+        slicer.util.saveNode(pilotHoles2Node, pilotHoles2SavePath)
+        slicer.util.saveNode(pilotHoles3Node, pilotHoles3SavePath)
+        slicer.util.saveNode(pilotHoles4Node, pilotHoles4SavePath)
+
+        # Call external Python with Blender module to run boolean operations
+        batchDir = dir_path + "\\Blender\\RunBoolean.bat"
+        check_output([batchDir], env=slicer.util.startupEnvironment())
+
+        outputModelPath = dir_path + "\\Blender\\outputBlenderModel.STL"
+        success = slicer.util.loadModel(outputModelPath)
+        outputModelNode = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLModelNode", "outputBlenderModel").GetItemAsObject(0)
 
         # Assign print model
         printModel = slicer.mrmlScene.GetNodeByID(self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_printModel"))
         if printModel:
           slicer.mrmlScene.RemoveNode(printModel)
+          slicer.mrmlScene.RemoveNode(printModel.GetDisplayNode())
         printModel = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
         printModel.SetName("PrintModel")
         printModelDisplay = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelDisplayNode")
-        printModelDisplay.SetColor(0.3, 0.3, 0.3)
+        printModelDisplay.SetColor(0.6, 0.4, 0.2)
         printModelDisplay.SetScene(slicer.mrmlScene)
         slicer.mrmlScene.AddNode(printModelDisplay)
         printModel.SetAndObserveDisplayNodeID(printModelDisplay.GetID())        
         slicer.mrmlScene.AddNode(printModel)    
-        printModel.SetAndObservePolyData(faceMaskWithHole)        
+        printModel.SetAndObservePolyData(outputModelNode.GetPolyData())        
         self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_printModel", printModel.GetID())
 
+        slicer.mrmlScene.RemoveNode(faceMaskNode)
+        slicer.mrmlScene.RemoveNode(guidePlatformNode)
+        slicer.mrmlScene.RemoveNode(skullModelNode)
+        slicer.mrmlScene.RemoveNode(holeCylinderNode)
+        slicer.mrmlScene.RemoveNode(pilotHoles1Node)
+        slicer.mrmlScene.RemoveNode(pilotHoles2Node)
+        slicer.mrmlScene.RemoveNode(pilotHoles3Node)
+        slicer.mrmlScene.RemoveNode(pilotHoles4Node)
+
+        slicer.mrmlScene.RemoveNode(outputModelNode)
+
+        # TODO: Delete the models with a cleanup.bat once done
+        
         #Generate trajectory cylinder
         # trajDistance = numpy.linalg.norm(targetPos-entryPos)
         # trajectoryCylinderHeight = trajDistance + 20
-
         # trajectoryVector = targetPos - entryPos
         # trajectoryVectorNorm = numpy.linalg.norm(trajectoryVector)
         # trajectoryVector = numpy.array([trajectoryVector[0]/trajectoryVectorNorm, trajectoryVector[1]/trajectoryVectorNorm, trajectoryVector[2]/trajectoryVectorNorm])        
-
         # transformWithTranslate2 = vtk.vtkTransform()
         # transformWithTranslate2.SetMatrix(transform.GetMatrix())
         # transformWithTranslate2.RotateX(-90.0)
@@ -1461,46 +1542,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         # trajectoryCylinderRadius = 1.0
         # trajectoryCylinder = self.logic.functions.generateCylinderModelWithTransform(trajectoryCylinderRadius, trajectoryCylinderHeight, transformWithTranslate2)            
 
-        # testNode2 = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
-        # testNode2.SetName("Trajectory")
-        # testDisplayNode2 = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelDisplayNode")
-        # testDisplayNode2.SetColor(1.0, 0.0, 0.0)
-        # testDisplayNode2.SetScene(slicer.mrmlScene)
-        # slicer.mrmlScene.AddNode(testDisplayNode2)
-        # testNode2.SetAndObserveDisplayNodeID(testDisplayNode2.GetID())        
-        # slicer.mrmlScene.AddNode(testNode2)    
-        # testNode2.SetAndObservePolyData(faceMaskWithHole)
-
-        # testNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
-        # testNode.SetName("FaceMask")
-        # testDisplayNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelDisplayNode")
-        # testDisplayNode.SetColor(0.0, 0.0, 1.0)
-        # testDisplayNode.SetScene(slicer.mrmlScene)
-        # slicer.mrmlScene.AddNode(testDisplayNode)
-        # testNode.SetAndObserveDisplayNodeID(testDisplayNode.GetID())        
-        # slicer.mrmlScene.AddNode(testNode)    
-        # testNode.SetAndObservePolyData(faceMaskWithPlatform)
-         
-        # testNode3 = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
-        # testNode3.SetName("GuidePlatform")
-        # testDisplayNode3 = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelDisplayNode")
-        # testDisplayNode3.SetColor(0.0, 1.0, 0.0)
-        # testDisplayNode3.SetScene(slicer.mrmlScene)
-        # slicer.mrmlScene.AddNode(testDisplayNode3)
-        # testNode3.SetAndObserveDisplayNodeID(testDisplayNode3.GetID())        
-        # slicer.mrmlScene.AddNode(testNode3)    
-        # testNode3.SetAndObservePolyData(guidePlatformCut)        
-        
-        # testNode4 = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelNode")
-        # testNode4.SetName("HoleCylinder")
-        # testDisplayNode4 = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelDisplayNode")
-        # testDisplayNode4.SetColor(1.0, 0.0, 0.0)
-        # testDisplayNode4.SetScene(slicer.mrmlScene)
-        # slicer.mrmlScene.AddNode(testDisplayNode4)
-        # testNode4.SetAndObserveDisplayNodeID(testDisplayNode4.GetID())        
-        # slicer.mrmlScene.AddNode(testNode4)    
-        # testNode4.SetAndObservePolyData(holeCylinder) 
-        
         self.onSaveData()
     pass
     
@@ -1510,39 +1551,6 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     reader.Update()
     polydata = reader.GetOutput()
     return polydata
-
-  # def onPlaceVesselSeed(self):
-  #   slicer.mrmlScene.RemoveObserver(self.nodeAddedEventObserverID)
-  #   self.imageSlider.setValue(0.0)
-  #   if self.addVesselSeedButton.isChecked():
-  #     self.deactivateOtherButtonsAndModel(currentButton=self.addVesselSeedButton)
-  #     index = next((i for i, name in enumerate(self.tabWidgetChildrenName) if name == self.tabMarkupsName), None)
-  #     self.tabWidget.setCurrentIndex(index)
-  #     self.isInAlgorithmSteps = True
-  #     if not self.logic.baseVolumeNode:
-  #       slicer.util.warningDisplay("No case is selected, please select the case in the combox", windowTitle="")
-  #       self.deactivateOtherButtonsAndModel()
-  #     else:
-  #       self.greenLayoutButton.click()
-  #       if self.prepareVolumes() and self.prepareCandidatePath():
-  #         #self.green_widget.sliceOrientation = 'Coronal' #provide coronal view at green widget
-  #         if self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_vesselSeeds"):
-  #           vesselSeedsNode = slicer.mrmlScene.GetNodeByID(
-  #             self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_vesselSeeds"))
-  #           self.logic.interactionMode = EndPlacementModes.VesselSeeds
-  #           self.simpleMarkupsWidget.setCurrentNode(vesselSeedsNode)
-  #   else:
-  #     self.logic.interactionMode = EndPlacementModes.NotSpecifiedMode
-  #     self.simpleMarkupsWidget.markupsPlaceWidget().setPlaceModeEnabled(False)
-  #     index = next((i for i, name in enumerate(self.tabWidgetChildrenName) if name == self.tabMainGroupBoxName), None)
-  #     self.tabWidget.setCurrentIndex(index)
-  #     self.checkCurrentProgress()
-  #     self.setBackgroundAndForegroundIDs(foregroundVolumeID=self.logic.ventricleVolume.GetID(),
-  #                                        backgroundVolumeID=self.logic.baseVolumeNode.GetID())  ## the slice widgets are set to none after the  cli module calculation. reason unclear...
-  #     self.isInAlgorithmSteps = False
-  #     self.conventionalLayoutButton.click()
-  #   self.nodeAddedEventObserverID = slicer.mrmlScene.AddObserver(slicer.mrmlScene.NodeAddedEvent, self.onVolumeAddedNode)
-  #   pass
 
   def onPerformVesselSegmentation(self):
     slicer.mrmlScene.RemoveObserver(self.nodeAddedEventObserverID)
@@ -1556,7 +1564,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         slicer.util.warningDisplay("No case is selected, please select the case in the combox", windowTitle="")
         self.deactivateOtherButtonsAndModel()
       else:
-        #self.prepareVolumes() # Create cropped quarter volumes
+        self.prepareVolumes() # Create cropped quarter volumes
         self.onSegmentVessels()
         #self.prepareCandidatePath()
     else:
@@ -1572,7 +1580,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
   def onSegmentVessels(self):
     slicer.mrmlScene.RemoveObserver(self.nodeAddedEventObserverID)
 
-    self.onConnectedComponentCalc()
+    self.onConnectedComponentCalc() # Comment out to disable segmentation
     self.prepareCandidatePath()
 
     self.isInAlgorithmSteps = False
@@ -1739,9 +1747,9 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
 
     self.isInAlgorithmSteps = True
     if self.logic.baseVolumeNode:
-      # quarterVolumeNode = self.logic.baseVolumeNode
-      # quarterVolumeNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_quarterVolume")
-      # quarterVolumeNode = slicer.mrmlScene.GetNodeByID(quarterVolumeNodeID)
+      quarterVolumeNode = self.logic.baseVolumeNode
+      quarterVolumeNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_quarterVolume")
+      quarterVolumeNode = slicer.mrmlScene.GetNodeByID(quarterVolumeNodeID)
   
       vesselnessModelNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_vesselnessModel")
       if vesselnessModelNodeID:
@@ -1749,8 +1757,8 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         slicer.mrmlScene.RemoveObserver(self.nodeAddedEventObserverID)
 
         try:
-          #self.logic.calculateConnectedComponent(quarterVolumeNode, vesselnessModelNode)
-          self.logic.calculateConnectedComponent(self.logic.baseVolumeNode, vesselnessModelNode)
+          self.logic.calculateConnectedComponent(quarterVolumeNode, vesselnessModelNode)
+          #self.logic.calculateConnectedComponent(self.logic.baseVolumeNode, vesselnessModelNode)
         except ValueError or TypeError:
           slicer.util.warningDisplay("Vessel Margin Calculation error, volumes might not be suitable for calculation")
         finally:
@@ -1759,6 +1767,11 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
           marginNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_vesselnessWithMarginModel")
           marginNode = slicer.mrmlScene.GetNodeByID(marginNodeID)
           marginNode.SetAttribute("vtkMRMLModelNode.modelCreated", "False")
+
+          maskROI_ID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_maskROI")
+          maskROI = slicer.mrmlScene.GetNodeByID(maskROI_ID)
+          maskROI.SetDisplayVisibility(False)
+
           self.onCalculateVenousCompletion()
           self.onSaveData()
     self.isInAlgorithmSteps = False
@@ -2849,25 +2862,26 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
         skullStrippedVolumeNode = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLScalarVolumeNode", "Cropped_volume_sub").GetItemAsObject(0)
         skullStrippedSavePath = dir_path + "\\NiftyNet\\brainVolume.nii.gz"
         slicer.util.saveNode(skullStrippedVolumeNode, skullStrippedSavePath)
+        slicer.app.processEvents()
+        time.sleep(3)
 
         # Run NiftyNet segmentation
         batchDir = dir_path + "\\NiftyNet\\RunSegmentation.bat"
-        print(batchDir)
-        #subprocess.call([batchDir])
         check_output([batchDir], env=slicer.util.startupEnvironment())
+        slicer.app.processEvents()
+        time.sleep(1)
 
         # Import volume
-        segmentationLoadPath = dir_path + "\\NiftyNet\\model\\model_500_batch1_Prob\\Vent_niftynet_out.nii.gz"
+        #segmentationLoadPath = dir_path + "\\NiftyNet\\model\\model_ContrastQuarter_1200_Prob\\brainVolume_niftynet_out.nii.gz"
+        segmentationLoadPath = dir_path + "\\NiftyNet\\model\\model_Contrast_1200_batch1_Prob\\brainVolume_niftynet_out.nii.gz"
         properties={"labelmap": True} 
         slicer.util.loadVolume(segmentationLoadPath, properties)
-        segmentedNode = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLLabelMapVolumeNode", "Vent_niftynet_out").GetItemAsObject(0)
+        segmentedNode = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLLabelMapVolumeNode", "brainVolume_niftynet_out").GetItemAsObject(0)
 
         # Correct IJkToRASMatrix for segmentedNode
-        # segmentedMatrix = vtk.vtkMatrix4x4()
-        # segmentedNode.GetIJKToRASMatrix(segmentedMatrix)
-        # segmentedMatrix.SetElement(0,0,-segmentedMatrix.GetElement(0,0))
-        # segmentedMatrix.SetElement(1,1,-segmentedMatrix.GetElement(1,1))
-        # segmentedNode.SetIJKToRASMatrix(segmentedMatrix)
+        originalMatrix = vtk.vtkMatrix4x4()
+        inputVolumeNode.GetIJKToRASMatrix(originalMatrix)
+        segmentedNode.SetIJKToRASMatrix(originalMatrix)
 
         # Run through label map binning
         connectedImageNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLLabelMapVolumeNode")
@@ -2878,7 +2892,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
         labelMapBinningWidget.nodeSelector.currentNodeID = segmentedNode.GetID()
         labelMapBinningWidget.newNodeSelector.currentNodeID = connectedImageNode.GetID()
         labelMapBinningWidget.lowLabelSpinBox.setValue(1)
-        labelMapBinningWidget.thresholdSpinBox.setValue(0.2)
+        labelMapBinningWidget.thresholdSpinBox.setValue(0.17)
         labelMapBinningWidget.highLabelSpinBox.setValue(0)
         labelMapBinningWidget.onApply()
 
@@ -2910,7 +2924,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
         self.baseVolumeNode.SetAttribute(attributeName, volumeNode.GetID())
     return volumeNode
 
-  def enableRelatedModel(self, attributeName, modelName, color = [0.0, 0.0, 1.0], visibility = True, intersectionVis=True):
+  def enableRelatedModel(self, attributeName, modelName, color = [0.0, 0.0, 1.0], visibility = True, intersectionVis=True, opacity = 0.5):
     modelNode = None
     if self.baseVolumeNode:
       enabledAttributeID = self.baseVolumeNode.GetAttribute(attributeName)
@@ -2924,7 +2938,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
         slicer.mrmlScene.AddNode(modelNode)
         modelDisplayNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelDisplayNode")
         modelDisplayNode.SetColor(color)
-        modelDisplayNode.SetOpacity(0.5)
+        modelDisplayNode.SetOpacity(opacity)
         slicer.mrmlScene.AddNode(modelDisplayNode)
         modelNode.SetAndObserveDisplayNodeID(modelDisplayNode.GetID())
         self.baseVolumeNode.SetAttribute(attributeName, modelNode.GetID())
@@ -3604,7 +3618,6 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
           normalVec = numpy.array(self.trueSagittalPlane.GetNormal())
           originPos = numpy.array(self.trueSagittalPlane.GetOrigin())
           entryPointAtLeft = -numpy.sign(numpy.dot(numpy.array(posEntry)-originPos, normalVec)) # here left hemisphere means from the patient's perspective
-          print("CheckingForLeft")
           if entryPointAtLeft >= 0 and self.useLeftHemisphere ==False:
             self.useLeftHemisphere = True
             self.createEntryPoint()
@@ -3678,19 +3691,8 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
     midpointPos = entryPos
     maskROI.GetXYZ(midpointPos)
 
-    # posNasion = [0.0, 0.0, 0.0]
-    # self.sagittalReferenceCurveManager.getFirstPoint(posNasion)
-    # heightPos = numpy.array([0.0, 0.0, 0.0])
-    # self.sagittalReferenceCurveManager.getLastPoint(heightPos)
-    # heightOfPath = abs(heightPos[2] - posNasion[2])
-    # midpointPos = [(heightPos[0]+posNasion[0])/2, (heightPos[1]+posNasion[1])/2, (heightPos[2]+posNasion[2])/2]
-    # maskHeight = heightOfPath + 100
-    # baseDimension=[160,120,maskHeight]
-
     basePolyData = self.functions.generateCubeModelWithYawAngle(midpointPos, self.sagittalYawAngle, baseDimension)
-
     clippedImage  = self.functions.clipVolumeWithPolyData(self.subtractedImageNode, basePolyData, True, 0)
-
     matrix = vtk.vtkMatrix4x4()
     self.holeFilledImageNode.GetIJKToRASMatrix(matrix)
 

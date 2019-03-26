@@ -2,3 +2,12 @@
 *.pyc
 *.nii.gz
 /VentriculostomyPlanning/NiftyNet/model/
+/VentriculostomyPlanning/Blender/faceMask.STL
+/VentriculostomyPlanning/Blender/guidePlatform.STL
+/VentriculostomyPlanning/Blender/holeCylinder.STL
+/VentriculostomyPlanning/Blender/skullModel.STL
+/VentriculostomyPlanning/Blender/pilotHoles1.STL
+/VentriculostomyPlanning/Blender/pilotHoles2.STL
+/VentriculostomyPlanning/Blender/pilotHoles3.STL
+/VentriculostomyPlanning/Blender/pilotHoles4.STL
+/VentriculostomyPlanning/Blender/outputBlenderModel.STL
