@@ -2855,7 +2855,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
         skullRemovalWidget = skullRemoval.widgetRepresentation().self()
         skullRemovalWidget.nodeSelector.currentNodeID = inputVolumeNode.GetID()
         skullRemovalWidget.labelmapCheckBox.setCheckState(0)
-        skullRemovalWidget.marginBox.value = 1.0
+        skullRemovalWidget.marginBox.value = 8.0
         skullRemovalWidget.onApply()
 
         # Save for NiftyNet
@@ -2892,7 +2892,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
         labelMapBinningWidget.nodeSelector.currentNodeID = segmentedNode.GetID()
         labelMapBinningWidget.newNodeSelector.currentNodeID = connectedImageNode.GetID()
         labelMapBinningWidget.lowLabelSpinBox.setValue(1)
-        labelMapBinningWidget.thresholdSpinBox.setValue(0.17)
+        labelMapBinningWidget.thresholdSpinBox.setValue(0.015)
         labelMapBinningWidget.highLabelSpinBox.setValue(0)
         labelMapBinningWidget.onApply()
 
