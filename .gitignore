@@ -1,7 +1,7 @@
 .idea
 *.pyc
 *.nii.gz
-/VentriculostomyPlanning/NiftyNet/model/
+/VentriculostomyPlanning/NiftyNet/model/*
 /VentriculostomyPlanning/Blender/faceMask.STL
 /VentriculostomyPlanning/Blender/guidePlatform.STL
 /VentriculostomyPlanning/Blender/holeCylinder.STL

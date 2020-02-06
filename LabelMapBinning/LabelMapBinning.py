@@ -65,7 +65,10 @@ class LabelMapBinningWidget:
     controlLayout.addRow("Label under threshold value:", self.lowLabelSpinBox)
 
     self.thresholdSpinBox = qt.QDoubleSpinBox()
-    self.thresholdSpinBox.setSingleStep(0.01)
+    self.thresholdSpinBox.setMaximum(1.0)
+    self.thresholdSpinBox.setMinimum(-1.0)
+    self.thresholdSpinBox.setDecimals(5)
+    self.thresholdSpinBox.setSingleStep(0.0001)
     self.thresholdSpinBox.setValue(0.7)
     controlLayout.addRow("Threshold value:", self.thresholdSpinBox)
 

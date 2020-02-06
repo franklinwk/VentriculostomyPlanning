@@ -180,6 +180,20 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     self.createModelButton.connect('clicked(bool)', self.onCreateModel)
     surfaceModelConfigLayout.addWidget(self.createModelButton)
 
+
+    labelMapThresholdLayout = qt.QHBoxLayout()
+    labelMapThresholdLabel = self.createLabel('Label map threshold: ')
+    labelMapThresholdLayout.addWidget(labelMapThresholdLabel)
+    self.labelMapThresholdEdit = self.createLineEdit(title="", text='0.3', readOnly=False, frame=True, maxLength = 10,
+                                                styleSheet="QLineEdit { background:transparent; }",
+                                                         cursor=qt.QCursor(qt.Qt.IBeamCursor))
+    self.labelMapThresholdEdit.connect('textEdited(QString)', self.onModifyLabelMapThreshold)
+    labelMapThresholdLayout.addWidget(self.labelMapThresholdEdit)
+
+    self.labelMapThresholdButton = self.createButton(title="Threshold segmentation map", toolTip="Threshold label map produced by algorithm.", enabled=True)
+    self.labelMapThresholdButton.connect('clicked(bool)', self.onLabelMapThreshold)
+    labelMapThresholdLayout.addWidget(self.labelMapThresholdButton)
+
     # Venous model calculation and margin setting
     venousMarginConfigLayout = qt.QHBoxLayout()
     venousMarginLabel = self.createLabel('Venous Safety Margin: ')
@@ -517,6 +531,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     appSettingLayout.addRow(self.caseRootConfigLayout)
     appSettingLayout.addRow(referenceConfigLayout)
     appSettingLayout.addRow(surfaceModelConfigLayout)
+    appSettingLayout.addRow(labelMapThresholdLayout)
     appSettingLayout.addRow(venousMarginConfigLayout)
     appSettingLayout.addRow(posteriorMarginConfigLayout)
     appSettingLayout.addRow(kocherMarginConfigLayout)
@@ -1596,6 +1611,30 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
         self.setBackgroundAndForegroundIDs(foregroundVolumeID=self.logic.ventricleVolume.GetID(),
                                            backgroundVolumeID=self.logic.baseVolumeNode.GetID())
 
+  def onLabelMapThreshold(self):
+    if self.logic.baseVolumeNode:
+      try:
+        vesselnessModelNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_vesselnessModel")
+        vesselnessModelNode = slicer.mrmlScene.GetNodeByID(vesselnessModelNodeID)
+        self.logic.labelMapBinning(vesselnessModelNode)
+      except ValueError or TypeError:
+        slicer.util.warningDisplay("Vessel Margin Calculation error, volumes might not be suitable for calculation")
+      finally:
+        slicer.app.processEvents()
+        self.nodeAddedEventObserverID = slicer.mrmlScene.AddObserver(slicer.mrmlScene.NodeAddedEvent, self.onVolumeAddedNode)
+        marginNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_vesselnessWithMarginModel")
+        marginNode = slicer.mrmlScene.GetNodeByID(marginNodeID)
+        marginNode.SetAttribute("vtkMRMLModelNode.modelCreated", "False")
+
+        maskROI_ID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_maskROI")
+        maskROI = slicer.mrmlScene.GetNodeByID(maskROI_ID)
+        maskROI.SetDisplayVisibility(False)
+
+        self.onCalculateVenousCompletion()
+        self.onSaveData()
+        self.prepareCandidatePath()
+    pass                            
+
   def createModel(self):
     self.isInAlgorithmSteps = True
     if self.logic.baseVolumeNode:
@@ -1723,6 +1762,10 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
       if outputModelNode:
         outputModelNode.SetAttribute("vtkMRMLModelNode.modelCreated","False")
     pass
+
+  def onModifyLabelMapThreshold(self):
+    self.logic.labelMapThreshold = float(self.labelMapThresholdEdit.text)
+    pass    
 
   def onModifyMeasureLength(self):
     sagittalReferenceLength = float(self.lengthSagittalReferenceLineEdit.text)
@@ -2297,6 +2340,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
     self.cylinderRadius = 2.5 # unit mm
     self.posteriorMargin = 60.0 #unit mm
     self.kocherMargin = 20.0 #unit mm
+    self.labelMapThreshold = 0.3
     self.entryRadius = 25.0
     self.transform = vtk.vtkTransform()
     self.placeWidget = slicer.qSlicerMarkupsPlaceWidget()
@@ -2855,7 +2899,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
         skullRemovalWidget = skullRemoval.widgetRepresentation().self()
         skullRemovalWidget.nodeSelector.currentNodeID = inputVolumeNode.GetID()
         skullRemovalWidget.labelmapCheckBox.setCheckState(0)
-        skullRemovalWidget.marginBox.value = 8.0
+        skullRemovalWidget.marginBox.value = 3.0
         skullRemovalWidget.onApply()
 
         # Save for NiftyNet
@@ -2873,42 +2917,52 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
 
         # Import volume
         #segmentationLoadPath = dir_path + "\\NiftyNet\\model\\model_ContrastQuarter_1200_Prob\\brainVolume_niftynet_out.nii.gz"
-        segmentationLoadPath = dir_path + "\\NiftyNet\\model\\model_Contrast_1200_batch1_Prob\\brainVolume_niftynet_out.nii.gz"
+        segmentationLoadPath = dir_path + "\\NiftyNet\\model\\model_Contrast_1200_batch1_Prob\\window_seg_brainVolume__niftynet_out.nii.gz"
         properties={"labelmap": True} 
         slicer.util.loadVolume(segmentationLoadPath, properties)
-        segmentedNode = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLLabelMapVolumeNode", "brainVolume_niftynet_out").GetItemAsObject(0)
+        segmentedNode = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLLabelMapVolumeNode", "window_seg_brainVolume__niftynet_out").GetItemAsObject(0)
 
         # Correct IJkToRASMatrix for segmentedNode
         originalMatrix = vtk.vtkMatrix4x4()
         inputVolumeNode.GetIJKToRASMatrix(originalMatrix)
         segmentedNode.SetIJKToRASMatrix(originalMatrix)
 
-        # Run through label map binning
-        connectedImageNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLLabelMapVolumeNode")
-        connectedImageNode.SetName("connectedImage")
-        slicer.mrmlScene.AddNode(connectedImageNode)
-        labelMapBinning = slicer.modules.labelmapbinning
-        labelMapBinningWidget = labelMapBinning.widgetRepresentation().self()
-        labelMapBinningWidget.nodeSelector.currentNodeID = segmentedNode.GetID()
-        labelMapBinningWidget.newNodeSelector.currentNodeID = connectedImageNode.GetID()
-        labelMapBinningWidget.lowLabelSpinBox.setValue(1)
-        labelMapBinningWidget.thresholdSpinBox.setValue(0.015)
-        labelMapBinningWidget.highLabelSpinBox.setValue(0)
-        labelMapBinningWidget.onApply()
+        self.labelMapBinning(vesselnessModelNode)
 
-        # Create vessel model
-        imageCollection = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLScalarVolumeNode", "connectedImage")
-        if imageCollection:
-          connectedImageNode = imageCollection.GetItemAsObject(0)
-          parameters = {}
-          parameters["InputVolume"] = connectedImageNode.GetID()
-          parameters["OutputGeometry"] = vesselnessModelNode.GetID()
-          parameters["Threshold"] = 0.5
-          grayMaker = slicer.modules.grayscalemodelmaker
-          self.cliNode = slicer.cli.run(grayMaker, None, parameters, wait_for_completion=True)
-          self.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_vesselnessModel", vesselnessModelNode.GetID())
-          vesselnessModelNode.SetAttribute("vtkMRMLModelNode.modelCreated", "True")
   
+  def labelMapBinning(self, vesselnessModelNode):
+    segmentedNode = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLLabelMapVolumeNode", "window_seg_brainVolume__niftynet_out").GetItemAsObject(0)
+    # Run through label map binning
+    imageCollection = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLLabelMapVolumeNode", "connectedImage")
+    if imageCollection:
+      connectedImageNode = imageCollection.GetItemAsObject(0)
+      slicer.mrmlScene.RemoveNode(connectedImageNode)
+    connectedImageNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLLabelMapVolumeNode")
+    connectedImageNode.SetName("connectedImage")
+    slicer.mrmlScene.AddNode(connectedImageNode)
+    labelMapBinning = slicer.modules.labelmapbinning
+    labelMapBinningWidget = labelMapBinning.widgetRepresentation().self()
+    labelMapBinningWidget.nodeSelector.currentNodeID = segmentedNode.GetID()
+    labelMapBinningWidget.newNodeSelector.currentNodeID = connectedImageNode.GetID()
+    labelMapBinningWidget.lowLabelSpinBox.setValue(1)
+    labelMapBinningWidget.thresholdSpinBox.setValue(self.labelMapThreshold)
+    #labelMapBinningWidget.thresholdSpinBox.setValue(-0.02)
+    labelMapBinningWidget.highLabelSpinBox.setValue(0)
+    labelMapBinningWidget.onApply()
+
+    # Create vessel model
+    imageCollection = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLScalarVolumeNode", "connectedImage")
+    if imageCollection:
+      connectedImageNode = imageCollection.GetItemAsObject(0)
+      parameters = {}
+      parameters["InputVolume"] = connectedImageNode.GetID()
+      parameters["OutputGeometry"] = vesselnessModelNode.GetID()
+      parameters["Threshold"] = 0.5
+      grayMaker = slicer.modules.grayscalemodelmaker
+      self.cliNode = slicer.cli.run(grayMaker, None, parameters, wait_for_completion=True)
+      self.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_vesselnessModel", vesselnessModelNode.GetID())
+      vesselnessModelNode.SetAttribute("vtkMRMLModelNode.modelCreated", "True")
+
   def enableRelatedVolume(self, attributeName, volumeName, visibility = True):
     volumeNode = None
     if self.baseVolumeNode:
