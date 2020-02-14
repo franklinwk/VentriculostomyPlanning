@@ -15,3 +15,8 @@ class CandidatePathStatus(object):
   NoPosteriorAndNoWithinKocherPoint = 1
   NoPosteriorPoint = 2
   NoWithinKocherPoint = 3
+
+class VentricleSideStatus(object):
+  NotYetChecked = 1
+  RightSide = 2
+  LeftSide = 3

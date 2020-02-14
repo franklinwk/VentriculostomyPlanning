@@ -13,3 +13,4 @@ class VentriculostomyUserEvents(object):
   ResetButtonEvent = vtk.vtkCommand.UserEvent + 159
   SegmentVesselWithSeedsEvent = vtk.vtkCommand.UserEvent + 160
   SagittalCorrectionFinishedEvent = vtk.vtkCommand.UserEvent + 161
+  CheckVentricleSideEvent = vtk.vtkCommand.UserEvent + 162

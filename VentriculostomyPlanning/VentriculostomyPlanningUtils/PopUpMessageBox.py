@@ -201,3 +201,16 @@ class SagittalCorrectionMessageBox(qt.QMessageBox):
     self.addButton(self.cancelButton, qt.QMessageBox.RejectRole)
     self.confirmButton.setEnabled(True)
     self.cancelButton.setEnabled(True)
+    
+ 
+class VentricleSideMessageBox(qt.QMessageBox):
+  def __init__(self):
+    qt.QMessageBox.__init__(self)
+    self.setWindowTitle('VentricleSideBox')
+    self.setText("Which side of the ventricle should be targeted?")
+    self.leftButton = qt.QPushButton('Left')
+    self.rightButton = qt.QPushButton('Right')
+    self.addButton(self.leftButton, qt.QMessageBox.YesRole)
+    self.addButton(self.rightButton, qt.QMessageBox.RejectRole)
+    self.leftButton.setEnabled(True)
+    self.rightButton.setEnabled(True)

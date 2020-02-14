@@ -17,11 +17,11 @@ from PercutaneousApproachAnalysis import *
 from numpy import linalg
 from code import interact
 from VentriculostomyPlanningUtils.SlicerCaseManager import SlicerCaseManagerWidget, beforeRunProcessEvents
-from VentriculostomyPlanningUtils.PopUpMessageBox import SerialAssignMessageBox, SagittalCorrectionMessageBox
+from VentriculostomyPlanningUtils.PopUpMessageBox import SerialAssignMessageBox, SagittalCorrectionMessageBox, VentricleSideMessageBox
 from VentriculostomyPlanningUtils.UserEvents import VentriculostomyUserEvents
 from VentriculostomyPlanningUtils.UsefulFunctions import UsefulFunctions
 from VentriculostomyPlanningUtils.WatchDog import WatchDog
-from VentriculostomyPlanningUtils.Constants import EndPlacementModes, SagittalCorrectionStatus, CandidatePathStatus
+from VentriculostomyPlanningUtils.Constants import EndPlacementModes, SagittalCorrectionStatus, CandidatePathStatus, VentricleSideStatus
 from VentriculostomyPlanningUtils.VentriclostomyButtons import *
 from SlicerDevelopmentToolboxUtils.buttons import FourUpLayoutButton
 from SlicerDevelopmentToolboxUtils.mixins import ModuleWidgetMixin, ModuleLogicMixin
@@ -68,6 +68,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     self.dicomWidget.parent.close()
     self.SerialAssignBox = SerialAssignMessageBox()
     self.SagittalCorrectionBox = SagittalCorrectionMessageBox()
+    self.VentricleSideBox = VentricleSideMessageBox()
     self.volumeSelected = False
     self.volumePrepared = False
     self.baseVolumeWindowValue = 974
@@ -967,10 +968,9 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
       distalNode.AddObserver(slicer.vtkMRMLMarkupsNode.MarkupAddedEvent, self.logic.endPlacement)
       distalNode.AddObserver(slicer.vtkMRMLMarkupsNode().PointModifiedEvent, self.logic.createVentricleCylinder)
       distalNode.AddObserver(slicer.vtkMRMLMarkupsNode().PointEndInteractionEvent, self.logic.endModifiyCylinder)
-    slicer.mrmlScene.AddObserver(VentriculostomyUserEvents.TriggerDistalSelectionEvent,
-                                 self.logic.startEditPlanningDistal)
-    slicer.mrmlScene.AddObserver(VentriculostomyUserEvents.CheckSagittalCorrectionEvent,
-                                 self.checkIfSagittalCorrectionNeeded)
+    slicer.mrmlScene.AddObserver(VentriculostomyUserEvents.TriggerDistalSelectionEvent, self.logic.startEditPlanningDistal)
+    slicer.mrmlScene.AddObserver(VentriculostomyUserEvents.CheckSagittalCorrectionEvent, self.checkIfSagittalCorrectionNeeded)
+    slicer.mrmlScene.AddObserver(VentriculostomyUserEvents.CheckVentricleSideEvent, self.checkIfVentricleSideFlipNeeded)
 
   @beforeRunProcessEvents
   def checkIfSagittalCorrectionNeeded(self, caller, eventId):
@@ -990,6 +990,16 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
       self.setSliceForCylinder()
     elif self.logic.needSagittalCorrection == SagittalCorrectionStatus.NeedCorrection:
       self.selectSagittalButton.click()
+
+  @beforeRunProcessEvents
+  def checkIfVentricleSideFlipNeeded(self, caller, eventId):
+    userAction = self.VentricleSideBox.exec_()
+    if userAction == 0:
+      self.logic.useLeftHemisphere = True
+      self.logic.createEntryPoint()
+    else:
+      self.logic.useLeftHemisphere = False
+      self.logic.createEntryPoint()
 
   @vtk.calldata_type(vtk.VTK_INT)
   def onResetPlanningOutput(self, node, eventID, callData):
@@ -1011,13 +1021,13 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
 
   def onChangePosteriorMargin(self, value):
     if self.logic.baseVolumeNode:
-      self.logic.posteriorMargin = value
+      self.logic.posteriorMargin = float(value)
       self.posteriorMarginEdit.setText(str(value))
       self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_posteriorMargin", str(value))
 
   def onChangeKocherMargin(self, value):
     if self.logic.baseVolumeNode:
-      self.logic.kocherMargin = value
+      self.logic.kocherMargin = float(value)
       self.kocherMarginEdit.setText(str(value))
       self.logic.baseVolumeNode.SetAttribute("vtkMRMLScalarVolumeNode.rel_kocherMargin", str(value))
 
@@ -1872,8 +1882,7 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
     shiftZ = 50
     nasionNode = slicer.mrmlScene.GetNodeByID(self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_nasion"))
     targetNode = slicer.mrmlScene.GetNodeByID(self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_target"))
-    distalNode = slicer.mrmlScene.GetNodeByID(
-      self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_distal"))
+    distalNode = slicer.mrmlScene.GetNodeByID(self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_distal"))
     if (nasionNode.GetNumberOfFiducials() == 1):
       self.setBackgroundAndForegroundIDs(foregroundVolumeID=self.logic.ventricleVolume.GetID(), backgroundVolumeID=self.logic.baseVolumeNode.GetID(), fitToSlice=True
                                              )
@@ -1911,6 +1920,9 @@ class VentriculostomyPlanningWidget(ScriptedLoadableModuleWidget, ModuleWidgetMi
 
   # Event handlers for trajectory
   def onDefineVentricle(self):
+    # Ask user for ventricle side so that we can flip the kocher's point if needed
+    slicer.mrmlScene.InvokeEvent(VentriculostomyUserEvents.CheckVentricleSideEvent)
+
     targetNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_target")
     distalNodeID = self.logic.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_distal")
     if targetNodeID and distalNodeID:
@@ -2514,8 +2526,7 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
   def startEditPlanningTarget(self):
     if self.baseVolumeNode:
       if self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_target"):
-        targetNode = slicer.mrmlScene.GetNodeByID(
-          self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_target"))
+        targetNode = slicer.mrmlScene.GetNodeByID(self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_target"))
         self.interactionMode = EndPlacementModes.VentricleTarget
         self.placeWidget.setPlaceMultipleMarkups(self.placeWidget.ForcePlaceMultipleMarkups)
         self.placeWidget.setMRMLScene(slicer.mrmlScene)
@@ -2523,14 +2534,44 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
         self.placeWidget.setPlaceModeEnabled(True)
 
   def startEditPlanningDistal(self, caller = None, event = None):
+    # I believe distal node is already created at this point, so perhaps I can just set its position here?
     if self.baseVolumeNode:
       if self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_distal"):
-        distalNode = slicer.mrmlScene.GetNodeByID(
-          self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_distal"))
+        distalNode = slicer.mrmlScene.GetNodeByID(self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_distal"))
         self.interactionMode = EndPlacementModes.VentricleDistal
-        self.placeWidget.setMRMLScene(slicer.mrmlScene)
-        self.placeWidget.setCurrentNode(distalNode)
-        self.placeWidget.setPlaceModeEnabled(True)
+        #self.placeWidget.setMRMLScene(slicer.mrmlScene)
+        #self.placeWidget.setCurrentNode(distalNode)
+        #self.placeWidget.setPlaceModeEnabled(True)
+
+        # Calculate distal point by looking at vector to Kocher's point
+
+        targetNodeID = self.baseVolumeNode.GetAttribute("vtkMRMLScalarVolumeNode.rel_target")
+        if targetNodeID:
+          targetNode = slicer.mrmlScene.GetNodeByID(targetNodeID)
+          if targetNode:
+            posTarget = numpy.array([0.0, 0.0, 0.0])
+            targetNode.GetNthFiducialPosition(0, posTarget)
+
+            numOfRef = self.coronalReferenceCurveManager.curveFiducials.GetNumberOfFiducials()
+            if numOfRef >= 1:
+              # # If target is on the opposite side of head from kocher's point then recalculate kocher's point
+              # posNasion = numpy.array([0.0,0.0,0.0])
+              # self.sagittalReferenceCurveManager.curveFiducials.GetNthFiducialPosition(0,posNasion)
+
+              # numOfSagRef = self.sagittalReferenceCurveManager.curveFiducials.GetNumberOfFiducials()
+              # posLastSag = numpy.array([0.0,0.0,0.0])
+              # self.sagittalReferenceCurveManager.curveFiducials.GetNthFiducialPosition(numOfRef-1,posLastSag)
+
+              posKocher = [0.0,0.0,0.0]
+              self.coronalReferenceCurveManager.curveFiducials.GetNthFiducialPosition(numOfRef-1,posKocher)            
+
+              kocherVector = [posKocher[0] - posTarget[0], posKocher[1] - posTarget[1], posKocher[2] - posTarget[2]]
+              vectorMag = numpy.linalg.norm(kocherVector)
+              kocherVector = [kocherVector[0]/vectorMag, kocherVector[1]/vectorMag, kocherVector[2]/vectorMag]
+
+              distalDistance = 5.0
+              posDistal = [posTarget[0] + (kocherVector[0] * distalDistance), posTarget[1] + (kocherVector[1] * distalDistance), posTarget[2] + (kocherVector[2] * distalDistance)]
+              distalNode.AddFiducial(posDistal[0], posDistal[1], posDistal[2])
 
   def endVentricleCylinderDefinition(self):
     if self.baseVolumeNode:
@@ -3218,8 +3259,8 @@ class VentriculostomyPlanningLogic(ScriptedLoadableModuleLogic, ModuleLogicMixin
       if self.trajectoryProjectedMarker and self.trajectoryProjectedMarker.GetMarkupsDisplayNode():
         self.trajectoryProjectedMarker.GetMarkupsDisplayNode().SetVisibility(0)
       self.endVentricleCylinderDefinition()
-      self.createVentricleCylinder()
-      self.endModifiyCylinder()
+      #self.createVentricleCylinder()
+      #self.endModifiyCylinder()
       slicer.mrmlScene.InvokeEvent(VentriculostomyUserEvents.TriggerDistalSelectionEvent)
     elif self.interactionMode == EndPlacementModes.VentricleDistal:
       if self.trajectoryProjectedMarker and self.trajectoryProjectedMarker.GetMarkupsDisplayNode():
